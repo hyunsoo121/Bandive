@@ -99,9 +99,60 @@ static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer("postgres:17
 
 **원인.** `ddl-auto=validate` + 실제 DB 필요. H2 같은 임베디드 DB 미포함.
 
-**해결.** `support/IntegrationTest` 베이스 클래스가 Testcontainers 로 실제 Postgres/Redis 를 띄우고
-`@ServiceConnection` 으로 접속 정보를 주입. 모든 통합 테스트는 이 클래스를 상속.
+**해결.** `support/AbstractContainerTest` 가 JVM 당 1회 뜨는 싱글턴 Postgres/Redis 컨테이너 +
+`@DynamicPropertySource` 로 접속 정보를 주입. `IntegrationTest`(`@SpringBootTest`)와
+`RepositoryTest`(`@DataJpaTest`)가 이걸 상속해 같은 컨테이너를 공유한다.
 **Docker 데몬이 떠 있어야 `./gradlew test` 가 돈다.**
+
+---
+
+## Phase 1 (도메인 모델)
+
+### `@DataJpaTest` 에서 `createdAt` 이 null → NOT NULL 제약 위반
+
+**증상.** Repository 테스트에서 엔티티 저장 시
+`null value in column "created_at" ... violates not-null constraint`.
+
+**원인.** `@EnableJpaAuditing` 을 `common/config/JpaConfig`(`@Configuration`)에 뒀는데,
+`@DataJpaTest` **슬라이스는 `@Configuration` 을 컴포넌트 스캔하지 않는다.** 그래서 Auditing 리스너가
+컨텍스트에 없고 `@CreatedDate`/`@LastModifiedDate` 가 안 채워짐. (`@SpringBootTest` 는 전체 스캔이라 정상)
+
+**해결.** `RepositoryTest` 베이스에 `@Import(JpaConfig.class)` 추가.
+
+---
+
+### Flyway `checksum mismatch` — 이미 적용된 마이그레이션을 수정함
+
+**증상.** 개발 중 `V1__init.sql` 을 고치고 앱을 다시 띄우면
+`Migration checksum mismatch for migration version 1`.
+
+**원인.** Flyway 는 적용 완료된 마이그레이션 파일의 해시를 `flyway_schema_history` 에 저장하고,
+이후 파일이 바뀌면 무결성 위반으로 본다. **아직 배포 전이라 로컬에서 V1 을 계속 편집하는 상황**에서 발생.
+
+**해결 (로컬, 데이터 버려도 될 때).** 볼륨째 초기화:
+
+```sh
+cd backend && docker compose down -v && docker compose up -d
+```
+
+배포 후에는 절대 적용된 마이그레이션을 수정하지 말 것 — 항상 `V2__*.sql` 를 새로 추가.
+
+---
+
+### Boot 4 — 테스트 슬라이스 애너테이션 패키지 이동
+
+**증상.** `import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;` 등이
+컴파일 안 됨 (클래스 없음).
+
+**원인.** Boot 4 가 테스트 자동설정도 모듈별로 쪼갬. 새 좌표:
+
+| 애너테이션 | Boot 4 패키지 | 제공 모듈 |
+|---|---|---|
+| `@DataJpaTest` | `org.springframework.boot.data.jpa.test.autoconfigure` | `spring-boot-data-jpa-test` |
+| `@AutoConfigureTestDatabase` | `org.springframework.boot.jdbc.test.autoconfigure` | `spring-boot-jdbc-test` |
+| `TestEntityManager` | `org.springframework.boot.jpa.test.autoconfigure` | `spring-boot-jpa-test` |
+
+모듈 자체는 `spring-boot-starter-data-jpa-test` 가 다 끌어온다. import 경로만 갱신하면 됨.
 
 ---
 

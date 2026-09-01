@@ -165,8 +165,11 @@
   `io.spring.javaformat`, `/actuator/health` 부팅 확인 완료. `db/migration/` 은 비어있음(V1 은 Phase 1).
   git 협업 세팅(pre-commit 훅 `hooks/`, 이슈/PR 템플릿, GitHub Actions CI)은 루트 [`../README.md`](../README.md) 참고.
   겪은 이슈는 [`../docs/TROUBLESHOOTING.md`](../docs/TROUBLESHOOTING.md).
-- **Phase 1 — 도메인 모델**: 엔티티 10개 + Enum + `BaseTimeEntity`(JPA Auditing) + 유니크 제약 +
-  `V1__init.sql` + Repository. 검증: `@DataJpaTest`
+- **Phase 1 — 도메인 모델 ✅ 완료 (2026-09-01)**: 엔티티 10개 + Enum 9개 + `BaseTimeEntity`(Auditing, `Instant` created/updated) +
+  유니크 제약 + `V1__init.sql`(FK 전부 CASCADE, 선택 연결만 SET NULL) + Repository 10개.
+  검증: `@DataJpaTest`(`support/RepositoryTest`, `@Import(JpaConfig)` 필수) + `support/AbstractContainerTest` 싱글턴 컨테이너.
+  결정: `updated_at` 전 테이블, `Song↔SongPart` 만 양방향+cascade/orphanRemoval, `InviteCode.code` 전역 unique,
+  `SongPart` unique(song,instrument,part_index). 파트 배정 권한(밴드장 vs 누구나)은 Phase 4 에서 확정.
 - **Phase 2 — 인증(카카오 OAuth2 + JWT)**: `SecurityFilterChain`(공개 GET / 인증 액션 분리),
   카카오 provider, `CustomOAuth2UserService`(kakao_id 로 User upsert), 로그인 성공 핸들러 → JWT 발급,
   `/api/auth/logout`·`/refresh`, `@PreAuthorize("@bandGuard.isOwner(#bandId)")` 커스텀 빈. 검증: 통합 테스트(카카오 목)
@@ -179,7 +182,9 @@
 - **Phase 5 — 파일 업로드 / 외부 음원 검색**: `StorageService`(로컬 dev / S3 prod),
   곡 검색은 MANUAL 우선 완성 · SEARCH 는 스텁 후 실 API 연동
 - **Phase 6 — 프론트 연동**: `frontend/src/api/*` 레이어, `AppContext` 액션을 실제 호출로 교체, 목 제거
-- **Phase 7 — 배포**: Dockerfile, prod compose, CI/CD (push → AWS 자동 배포)
+- **Phase 7 — 배포**: Dockerfile, prod compose, CI/CD (push → AWS 자동 배포).
+  ⚠️ 로컬에서 비켜쓴 포트를 **기본값으로 복구**: Postgres 5432, Redis 6379, 앱 8080
+  (`application-prod.yaml` / prod compose / `SERVER_PORT`). 프로덕션 호스트엔 충돌 없음.
 
 ---
 

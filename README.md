@@ -1,70 +1,422 @@
-# 밴디브 (Bandive)
+# 밴디브(Bandive) 프로젝트 기획
 
-밴드 전용 아카이브형 커뮤니티 서비스. 밴드를 만들고 멤버를 초대해 **합주곡 리스트 / 일정 / 구성원 / 영상**을
-한곳에서 관리한다. 노션 대체가 목표이고, 영상은 자체 호스팅하지 않고 외부 URL 을 메타데이터로 정리·검색한다.
+## 0. 서비스명
 
-- 대상: 실제 지인 밴드 소규모 배포 (10팀 이하)
-- 권한 2단계: **밴드장(OWNER) / 멤버(MEMBER)**. 로그인은 카카오만. 비회원도 열람(GET)은 가능
+- **밴디브 (Bandive)** — Band + Archive 합성어로 확정
 
-## 저장소 구조 (모노레포)
+## 1. 개요
 
-| 경로 | 내용 |
-|---|---|
-| `frontend/` | Vite + React 19 + TS + react-router-dom 7, 플레인 CSS. 목업 이식 완료 (홈/곡/일정/영상/멤버) |
-| `backend/` | Spring Boot 4.1.1 (Java 21) · PostgreSQL · Redis · JWT(카카오 OAuth2) · Flyway. 상세: [`backend/CLAUDE.md`](backend/CLAUDE.md) |
-| `밴드 아카이브 서비스 UIUX/` | 원본 목업 (Claude Design 캔버스) |
-| `hooks/` | git pre-commit 훅 (lint/format) |
-| `docs/` | [트러블슈팅](docs/TROUBLESHOOTING.md) 등 |
+- **목적**: 노션(Notion) 대체용, 밴드 전용 아카이브형 커뮤니티 서비스
+- **핵심 컨셉**: 밴드를 생성하고 멤버를 초대해, 합주곡 리스트/일정/구성원/영상을 한곳에서 관리
+- **핵심 기능 목록**
+  - 밴드 생성 및 멤버 초대
+  - 밴드 커스터마이징 (이름, 로고, 배너)
+  - 합주곡 리스트
+  - 연습 날짜 / 공연 날짜 일정
+  - 밴드 구성원 관리
+  - 공연 영상 / 합주 영상 아카이브
+  - 합주곡 위시리스트
 
-## 처음 클론했다면
+## 2. 방향성 (확정)
 
-```sh
-sh hooks/install.sh        # git pre-commit 훅 활성화 (core.hooksPath=hooks)
+| 항목               | 결정                                                   |
+| ------------------ | ------------------------------------------------------ |
+| 우선 목표          | 실제 밴드 대상 소규모 배포                             |
+| 플랫폼             | 웹 (반응형)                                            |
+| 핵심 차별화 포인트 | 합주영상/공연영상 아카이브 (메타데이터 기반 정리·검색) |
+| 초기 목표 규모     | 지인 밴드 몇 개 (10팀 이하)                            |
+| 밴드 초대 방식     | 초대 코드/링크 방식                                    |
+
+## 3. 경쟁 서비스 조사 요약
+
+- **BandHelper, BANDZONE** (해외): 세트리스트 배포, 리허설 노트, 정산 등 종합 밴드 운영 툴
+- **브레멘, 합주하자** (국내): 합주 파트너 매칭 중심, 아카이브 성격은 약함
+- 완전히 동일한 조합의 서비스는 확인되지 않았으며, "아카이브 특화 + 노션 대체"라는 포지셔닝은 틈새(niche)로 판단됨
+
+## 4. 영상 저장 방식 (논의 후 변경)
+
+- 최초 검토안: 자체 업로드 (S3 등 오브젝트 스토리지)
+- 문제점: 장기적 저장 비용 리스크, 유튜브/카카오톡/구글드라이브 대비 뚜렷한 차별점 부재
+- **최종 결정: 자체 호스팅 대신 URL 첨부 방식** (유튜브/구글드라이브 링크 등)
+  - 저장 비용 리스크를 서비스가 아닌 외부 플랫폼이 부담
+  - 핵심 가치(밴드·곡·일정과 연결된 아카이브 정리·검색)는 URL 방식으로도 유지 가능
+  - 향후 필요 시 자체 업로드를 선택적으로 확장 가능하도록 데이터 모델에 platform 구분값 반영 예정
+
+## 5. 확정된 세부 결정사항
+
+### 5.1 권한 모델
+
+- 밴드장(Owner) / 사용자(Member) 2단계 역할 구조 (관리자 역할 제외, 3단계에서 변경)
+
+### 5.2 합주곡 위시리스트 운영 방식
+
+- 누구나 곡 추가 가능
+- 곡 등록 방식 2가지
+  - 곡 검색: 외부 음원 API(Spotify 등)에서 검색해 등록
+  - 직접 입력: 제목/아티스트를 수동으로 입력
+- 곡 등록 시 추가 입력 필드: 비고/메모, 세션 구성(악기별 필요 인원, 예: 드럼1/기타2/건반1/보컬1), 참고 영상
+- 투표(좋아요 방식)는 멤버 1인당 1회만 가능
+- 최종 승격은 자동이 아닌, 득표 수를 참고해 밴드장이 수동 승인
+- 파트 배정(세션별 담당 멤버 매핑)은 합주곡(CONFIRMED) 상태에서만 가능, 미배정(null) 허용
+
+### 5.3 로고 / 배너
+
+- 이미지 파일 직접 업로드 지원 (영상과 달리 자체 스토리지 부담이 적어 업로드 방식 채택)
+
+### 5.4 일정(Schedule) 기능
+
+- 캘린더 뷰 제공
+- 참석 여부 체크(출결) 기능 포함
+- 캘린더에서 일정에 연결된 영상 목록도 함께 표시 (일정-영상 연결은 선택 사항, 미연결 허용)
+
+### 5.5 배포 환경
+
+- 클라우드 플랫폼: AWS
+- 도메인: 무료 서브도메인으로 우선 테스트 (정식 도메인 구매는 추후 검토)
+
+### 5.6 UI 화면 흐름
+
+- 홈 대시보드 + 하단 탭바 구조 (모바일형 네비게이션)
+- 한 사용자가 여러 밴드에 속할 수 있으므로 밴드 전환(switcher) 버튼 UI 추가
+
+### 5.7 영상 공개 범위 정책
+
+- 밴드별로 공개 범위를 직접 설정 가능 (예: 밴드 멤버만 열람 vs 링크 소지자 열람)
+- 영상은 특정 일정(Schedule)과 선택적으로 연결 가능 (미연결 허용)
+
+### 5.8 회원가입 / 로그인 방식
+
+- 카카오 소셜 로그인 방식 채택
+
+### 5.9 비회원 기능 범위
+
+- 비회원도 전체 콘텐츠 열람 가능
+- 투표, 댓글 등 액션(action)은 로그인 필요
+
+### 5.10 CI/CD 파이프라인
+
+- 자동 배포까지 구축 (push 시 AWS까지 자동 반영)
+
+### 5.11 기술 스택
+
+- 백엔드: Spring Boot + JPA + PostgreSQL + Redis (기존 숙달 스택 활용)
+- 클라우드/배포: AWS, Docker
+
+### 5.12 보류된 논의 (2단계 확장 후보)
+
+- 밴드 팔로우(구성원 아닌 구경) 기능: 데이터 구조만 여지 남기고 UI는 보류
+- 전체공개 밴드 탐방 랜딩페이지: 콜드 스타트 문제로 이번 MVP 범위에서 제외, 공개 밴드가 충분히 쌓인 뒤 재검토
+
+## 6. 결정 필요 사항 (진행 중)
+
+- (현재 없음 — 추가 논의 필요 시 갱신)
+
+## 7. 데이터 스키마 (ERD)
+
+```mermaid
+erDiagram
+  USERS ||--o{ BAND_MEMBERS : joins
+  BANDS ||--o{ BAND_MEMBERS : has
+  BANDS ||--o{ INVITE_CODES : issues
+  BANDS ||--o{ SONGS : has
+  USERS ||--o{ SONGS : adds
+  SONGS ||--o{ VOTES : receives
+  USERS ||--o{ VOTES : casts
+  SONGS ||--o{ SONG_PARTS : requires
+  BAND_MEMBERS ||--o{ SONG_PARTS : assigned_to
+  BANDS ||--o{ SCHEDULES : has
+  USERS ||--o{ SCHEDULES : creates
+  SCHEDULES ||--o{ ATTENDANCES : has
+  USERS ||--o{ ATTENDANCES : responds
+  BANDS ||--o{ MEDIA : has
+  USERS ||--o{ MEDIA : uploads
+  SCHEDULES ||--o{ MEDIA : linked_to
+
+  USERS {
+    uuid id PK
+    string nickname
+    string email
+    timestamp created_at
+  }
+  BANDS {
+    uuid id PK
+    string name
+    string logo_url
+    string banner_url
+    timestamp created_at
+  }
+  BAND_MEMBERS {
+    uuid id PK
+    uuid band_id FK
+    uuid user_id FK
+    string role
+    timestamp joined_at
+  }
+  INVITE_CODES {
+    uuid id PK
+    uuid band_id FK
+    string code
+    timestamp expires_at
+    int max_uses
+    int used_count
+  }
+  SONGS {
+    uuid id PK
+    uuid band_id FK
+    string title
+    string artist
+    string status
+    string source_type
+    string external_track_id
+    string memo
+    string reference_video_url
+    uuid added_by FK
+  }
+  SONG_PARTS {
+    uuid id PK
+    uuid song_id FK
+    string instrument
+    int part_index
+    uuid assigned_member_id FK
+  }
+  VOTES {
+    uuid id PK
+    uuid song_id FK
+    uuid user_id FK
+  }
+  SCHEDULES {
+    uuid id PK
+    uuid band_id FK
+    string type
+    timestamp date_time
+    string location
+    uuid created_by FK
+  }
+  ATTENDANCES {
+    uuid id PK
+    uuid schedule_id FK
+    uuid user_id FK
+    string status
+  }
+  MEDIA {
+    uuid id PK
+    uuid band_id FK
+    uuid schedule_id FK
+    string type
+    string external_url
+    string platform
+    string visibility
+    uuid uploaded_by FK
+  }
 ```
 
-### 프론트엔드
+### USERS
 
-```sh
-cd frontend
-npm ci
-npm run dev                # http://localhost:5173
+- id (PK), nickname, email, created_at
+
+### BANDS
+
+- id (PK), name, logo_url, banner_url, created_at
+
+### BAND_MEMBERS (User ↔ Band 다대다 연결)
+
+- id (PK), band_id (FK), user_id (FK), role (OWNER/MEMBER), joined_at
+
+### INVITE_CODES
+
+- id (PK), band_id (FK), code, expires_at, max_uses, used_count
+
+### SONGS
+
+- id (PK), band_id (FK), title, artist, status (WISHLIST/CONFIRMED), source_type (SEARCH/MANUAL), external_track_id (nullable, 외부 음원 API 트랙 ID), memo, reference_video_url, added_by (FK, User)
+
+### SONG_PARTS (곡의 세션 구성 및 파트 배정)
+
+- id (PK), song_id (FK), instrument (DRUM/GUITAR/KEYBOARD/VOCAL/BASS 등), part_index (동일 악기 내 순번, 예: 기타1/기타2), assigned_member_id (FK, BandMember, nullable — 합주곡 상태일 때만 배정)
+
+### VOTES (Song ↔ User 다대다 연결, 좋아요 방식, 1인 1표)
+
+- id (PK), song_id (FK), user_id (FK)
+
+### SCHEDULES
+
+- id (PK), band_id (FK), type (REHEARSAL/PERFORMANCE), date_time, location, created_by (FK, User)
+
+### ATTENDANCES (Schedule ↔ User 다대다 연결)
+
+- id (PK), schedule_id (FK), user_id (FK), status (참석/불참/미정)
+
+### MEDIA
+
+- id (PK), band_id (FK), schedule_id (FK, nullable — 특정 일정과 선택적 연결), type (REHEARSAL/PERFORMANCE), external_url, platform, visibility (밴드별 설정), uploaded_by (FK, User)
+
+### 관계 요약
+
+- User 1:N BandMember N:1 Band (다대다 관계 매핑)
+- Band 1:N InviteCode / Song / Schedule / Media
+- Song 1:N Vote, User 1:N Vote (다대다 매핑, 곡당 사용자 1표 제한은 유니크 제약으로 처리)
+- Song 1:N SongPart, BandMember 1:N SongPart (파트 배정, assigned_member_id는 nullable)
+- Schedule 1:N Attendance, User 1:N Attendance (다대다 매핑)
+- Schedule 1:N Media (선택적 연결, schedule_id nullable)
+
+## 8. API 엔드포인트 설계
+
+### 8.1 인증
+
+| Method | Endpoint                 | 설명                                    | 인증 필요 |
+| ------ | ------------------------ | --------------------------------------- | --------- |
+| GET    | /api/auth/kakao/callback | 카카오 로그인 콜백 처리, 세션/토큰 발급 | X         |
+| POST   | /api/auth/logout         | 로그아웃                                | O         |
+| POST   | /api/auth/refresh        | 토큰 재발급                             | O         |
+
+### 8.2 밴드
+
+| Method | Endpoint                   | 설명                       | 인증 필요  |
+| ------ | -------------------------- | -------------------------- | ---------- |
+| POST   | /api/bands                 | 밴드 생성                  | O          |
+| GET    | /api/bands/{bandId}        | 밴드 상세 조회             | X          |
+| GET    | /api/bands/my              | 내가 속한 밴드 목록        | O          |
+| PATCH  | /api/bands/{bandId}        | 밴드 정보 수정 (이름/설명) | O (밴드장) |
+| POST   | /api/bands/{bandId}/logo   | 로고 이미지 업로드         | O (밴드장) |
+| POST   | /api/bands/{bandId}/banner | 배너 이미지 업로드         | O (밴드장) |
+
+### 8.3 초대
+
+| Method | Endpoint                         | 설명                  | 인증 필요  |
+| ------ | -------------------------------- | --------------------- | ---------- |
+| POST   | /api/bands/{bandId}/invite-codes | 초대 코드 발급/재발급 | O (밴드장) |
+| POST   | /api/invite-codes/{code}/join    | 초대 코드로 밴드 가입 | O          |
+
+### 8.4 밴드 멤버
+
+| Method | Endpoint                             | 설명           | 인증 필요  |
+| ------ | ------------------------------------ | -------------- | ---------- |
+| GET    | /api/bands/{bandId}/members          | 멤버 목록 조회 | X          |
+| DELETE | /api/bands/{bandId}/members/{userId} | 멤버 추방      | O (밴드장) |
+| DELETE | /api/bands/{bandId}/members/me       | 밴드 탈퇴      | O          |
+
+### 8.5 곡 (위시리스트 / 합주곡 리스트)
+
+| Method | Endpoint                                  | 설명                                                                 | 인증 필요  |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------- | ---------- |
+| GET    | /api/songs/search?q=                      | 외부 음원 API(예: Spotify) 곡 검색                                   | X          |
+| GET    | /api/bands/{bandId}/songs?status=         | 곡 목록 (위시리스트/확정 필터)                                       | X          |
+| POST   | /api/bands/{bandId}/songs                 | 곡 추가 (검색 결과 선택 또는 직접 입력, 메모/세션구성/참고영상 포함) | O          |
+| POST   | /api/songs/{songId}/vote                  | 투표 (1인 1표)                                                       | O          |
+| DELETE | /api/songs/{songId}/vote                  | 투표 취소                                                            | O          |
+| PATCH  | /api/songs/{songId}/confirm               | 합주곡으로 승격                                                      | O (밴드장) |
+| PUT    | /api/songs/{songId}/parts/{partId}/assign | 파트 배정/해제 (합주곡 상태에서만, 미배정 가능)                      | O (밴드장) |
+| DELETE | /api/songs/{songId}                       | 곡 삭제                                                              | O (밴드장) |
+
+### 8.6 일정
+
+| Method | Endpoint                               | 설명                                      | 인증 필요  |
+| ------ | -------------------------------------- | ----------------------------------------- | ---------- |
+| GET    | /api/bands/{bandId}/schedules          | 일정 목록 (캘린더 뷰용, 연결된 영상 포함) | X          |
+| POST   | /api/bands/{bandId}/schedules          | 일정 등록                                 | O          |
+| PATCH  | /api/schedules/{scheduleId}            | 일정 수정                                 | O          |
+| DELETE | /api/schedules/{scheduleId}            | 일정 삭제                                 | O (밴드장) |
+| POST   | /api/schedules/{scheduleId}/attendance | 참석 여부 등록/변경                       | O          |
+
+### 8.7 미디어 (영상)
+
+| Method | Endpoint                              | 설명                                             | 인증 필요                 |
+| ------ | ------------------------------------- | ------------------------------------------------ | ------------------------- |
+| GET    | /api/bands/{bandId}/media?scheduleId= | 영상 목록 조회 (일정별 필터 가능, 공개범위 적용) | X (공개 설정에 따라 제한) |
+| POST   | /api/bands/{bandId}/media             | 영상 URL 등록 (scheduleId 선택 입력)             | O                         |
+| PATCH  | /api/media/{mediaId}/visibility       | 공개 범위 변경                                   | O (밴드장)                |
+| DELETE | /api/media/{mediaId}                  | 영상 삭제                                        | O                         |
+
+## 9. 기능 플로우
+
+### 9.1 진입 및 인증 흐름
+
+```mermaid
+flowchart TD
+    A[진입<br/>초대 링크 또는 직접 방문] --> B[콘텐츠 열람<br/>비회원도 가능, 읽기 전용]
+    B --> C[카카오 로그인<br/>액션 시도 시점에 요구]
+    C --> D[밴드 선택 / 생성<br/>초대코드 가입 또는 신규 생성]
+    D --> E[밴드 대시보드<br/>곡·일정·영상·멤버 탭]
 ```
 
-| 스크립트 | 설명 |
-|---|---|
-| `npm run dev` / `build` / `preview` | Vite |
-| `npm run lint` / `lint:fix` | oxlint |
-| `npm run format` / `format:check` | Prettier |
+1. 진입 (초대 링크 또는 직접 방문)
+2. 콘텐츠 열람 (비회원도 가능, 읽기 전용)
+3. 카카오 로그인 (액션 시도 시점에 요구)
+4. 밴드 선택 / 생성 (초대코드로 가입 또는 신규 생성)
+5. 밴드 대시보드 (곡·일정·영상·멤버 탭)
 
-### 백엔드
+### 9.2 곡 위시리스트 흐름
 
-로컬 인프라(Postgres 5433, Redis 6380)를 먼저 띄운다. **포트가 기본값(5432/6379/8080)이 아닌 이유는
-다른 프로젝트와 충돌을 피하기 위함** — [트러블슈팅](docs/TROUBLESHOOTING.md#포트-충돌) 참고.
-
-```sh
-cd backend
-docker compose up -d       # postgres:5433, redis:6380
-./gradlew bootRun          # http://localhost:8081  (local 프로파일이 기본)
-curl localhost:8081/actuator/health
+```mermaid
+flowchart TD
+    A[곡 등록<br/>검색 API 또는 직접 입력] --> B[투표<br/>멤버 1인당 1표]
+    B --> C[밴드장 승인<br/>득표 참고해 합주곡 승격]
+    C --> D[파트 배정<br/>합주곡 상태에서만, 미배정 가능]
 ```
 
-| 명령 | 설명 |
-|---|---|
-| `./gradlew bootRun` | 앱 실행 (local 프로파일) |
-| `./gradlew check` | 포맷 검사 + 통합 테스트 (Docker 필요 — Testcontainers) |
-| `./gradlew format` / `checkFormat` | spring-javaformat |
-| `docker compose down` (`-v` 볼륨까지) | 인프라 정리 |
+1. 곡 등록 (검색 API 또는 직접 입력, 메모/세션구성/참고영상 포함)
+2. 투표 (멤버 1인당 1표)
+3. 밴드장 승인 (득표 참고해 합주곡으로 승격)
+4. 파트 배정 (합주곡 상태에서만 가능, 미배정 허용)
 
-프로파일: `local`(기본, docker-compose 대상) / `test`(Testcontainers) / `prod`(전 항목 환경변수 필수).
-환경변수는 [`backend/.env.example`](backend/.env.example) 참고.
+### 9.3 일정·영상 연결 흐름
 
-## 개발 워크플로
+```mermaid
+flowchart TD
+    A[일정 등록<br/>연습 또는 공연, 날짜/장소] --> B[출결 체크<br/>참석 여부 등록/변경]
+    B --> C[영상 URL 등록<br/>일정과 선택적 연결, nullable]
+    C --> D[캘린더 표시<br/>일정 + 연결된 영상 함께 표시]
+```
 
-1. 이슈 생성 → 브랜치 분기 (`feat/…`, `fix/…`, `chore/…`)
-2. 커밋 시 pre-commit 훅이 변경된 영역(frontend/backend)만 lint·format 검사
-3. PR 올리면 GitHub Actions CI 가 프론트(lint/format/build)·백엔드(checkFormat/build) 실행
-4. `main` 병합
+1. 일정 등록 (연습/공연, 날짜/장소)
+2. 출결 체크 (참석 여부 등록/변경)
+3. 영상 URL 등록 (일정과 선택적 연결, nullable)
+4. 캘린더 표시 (일정 + 연결된 영상 함께 표시)
 
-## 로드맵
+## 10. ADR (Architecture Decision Records)
 
-`backend/CLAUDE.md` 의 Phase 0~7. 현재 **Phase 0(부트스트랩) 완료**, 다음은 Phase 1(도메인 모델 + `V1__init.sql`).
+### ADR-001. 영상 저장 방식: 자체 호스팅 대신 URL 첨부
+
+- **상태**: 승인됨
+- **배경**: 초기에는 S3 자체 업로드를 검토했으나, 트랜스코딩·스토리지 장기 비용 리스크가 있고 유튜브/카카오톡/구글드라이브 대비 뚜렷한 차별점을 만들기 어려움
+- **결정**: 영상은 자체 저장 없이 외부 URL(유튜브/구글드라이브 등)만 저장. Media.external_url 필드로 관리
+- **결과**: 저장 비용이 사실상 0에 수렴. 대신 원본 화질 보존이나 링크 영속성은 보장하지 못함. 데이터 모델에 platform 구분값을 남겨 추후 자체 업로드로 확장 가능하도록 설계
+
+### ADR-002. 권한 모델: 3단계 → 2단계로 변경
+
+- **상태**: 승인됨 (수정됨)
+- **배경**: 최초에는 밴드장/관리자/멤버 3단계로 설계했으나, 이후 밴드장/사용자 2단계로 단순화 요청
+- **결정**: BAND_MEMBERS.role은 OWNER/MEMBER 두 값만 가짐
+- **결과**: 권한 체크 로직이 단순해짐. 다만 밴드장 부재 시 위임할 관리자가 없어 병목 가능성 있음 (장기 검토 필요)
+
+### ADR-003. 백엔드 기술 스택: Spring Boot 채택
+
+- **상태**: 승인됨
+- **배경**: Django와 비교 검토. 이 프로젝트의 핵심 난이도는 역할 기반 접근 제어와 카카오 OAuth 연동이며, 개발자가 이미 Spring Boot/JPA/PostgreSQL/Redis 스택에 숙달되어 있음
+- **결정**: Spring Boot + Spring Data JPA + PostgreSQL + Redis
+- **결과**: 기존 ERD·API 설계를 바로 구현으로 옮길 수 있음. Django의 관리자 페이지 자동 생성 같은 이점은 포기
+
+### ADR-004. 밴드 가입 방식: 초대 코드/링크 전용
+
+- **상태**: 승인됨
+- **배경**: 공개 검색/가입이 아닌 지인 기반 소규모 밴드(10팀 이하) 대상 서비스
+- **결정**: 밴드 가입은 InviteCode(코드/링크)를 통해서만 가능. 공개 밴드 목록에서 바로 가입하는 기능은 없음
+- **결과**: 폐쇄적이고 안전한 그룹 형성이 가능하나, 신규 사용자 확보 채널로는 기능하지 않음
+
+### ADR-005. 비회원 접근 정책: 콘텐츠 전체 열람 허용
+
+- **상태**: 승인됨
+- **배경**: 서비스 확산 및 공유 편의성을 고려해, 링크를 받은 비회원도 내용을 바로 볼 수 있어야 한다는 요구
+- **결정**: 모든 GET(조회) 엔드포인트는 비인증 허용. 투표·등록·수정 등 액션(POST/PATCH/DELETE)만 카카오 로그인 요구
+- **결과**: 공유 링크로 유입되는 사용자 경험이 좋아짐. 다만 밴드별 영상 공개 범위(5.7) 설정과 충돌하지 않도록 Media 조회는 visibility 값에 따라 예외적으로 제한
+
+### ADR-006. 공개 밴드 탐방 랜딩페이지 및 팔로우 기능: 보류
+
+- **상태**: 보류 (2단계 검토 대상)
+- **배경**: 콜드 스타트 문제 — 목표 규모가 지인 밴드 10팀 이하인 시점에는 "공개 밴드 탐방"이나 "팔로우"가 체감되는 콘텐츠가 부족함
+- **결정**: 이번 MVP 범위에서는 UI로 노출하지 않음. 다만 Band.visibility, BandFollow 같은 데이터 구조 확장 여지는 남겨둠
+- **결과**: MVP 개발 범위 축소. 공개 밴드 수가 늘어난 시점에 재논의 필요
+
+---
+
+_최종 수정: 2026-08-28_
