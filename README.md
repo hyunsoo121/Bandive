@@ -67,4 +67,7 @@ curl localhost:8081/actuator/health
 
 ## 로드맵
 
-`backend/CLAUDE.md` 의 Phase 0~7. 현재 **Phase 0(부트스트랩) 완료**, 다음은 Phase 1(도메인 모델 + `V1__init.sql`).
+`backend/CLAUDE.md` 의 Phase 0~7. 현재 **Phase 1(도메인 모델) 완료** — 엔티티 10개 + Enum + `V1__init.sql` + Repository + `@DataJpaTest`. 다음은 Phase 2(카카오 OAuth2 + JWT).
+
+> 개발 중 `V1__init.sql` 을 수정했다면 Flyway checksum 때문에 로컬 DB 를 초기화해야 한다:
+> `cd backend && docker compose down -v && docker compose up -d` ([트러블슈팅](docs/TROUBLESHOOTING.md) 참고).
