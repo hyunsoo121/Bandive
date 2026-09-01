@@ -1,0 +1,32 @@
+.login-modal {
+  width: 320px;
+  max-width: calc(100vw - 32px);
+  background: var(--color-bg);
+  border: 2px solid var(--color-text);
+  box-shadow: var(--shadow-lg);
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.login-modal h3 {
+  font-size: 19px;
+}
+.login-modal p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.login-modal__kakao {
+  background: #fee500;
+  color: #201e1d;
+  border: 2px solid var(--color-text);
+  padding: 13px 14px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.login-modal .btn--ghost {
+  align-self: flex-start;
+  padding-left: 0;
+}

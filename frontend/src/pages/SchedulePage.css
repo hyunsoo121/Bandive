@@ -1,0 +1,245 @@
+.sched {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 120px;
+}
+
+.sched__head {
+  padding: 16px;
+  border-bottom: 2px solid var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sched__head h2 {
+  font-size: 24px;
+  letter-spacing: -0.01em;
+}
+.sched__monthnav {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.sched__monthnav span {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 15px;
+}
+.sched__monthnav button {
+  border: 0;
+  background: transparent;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-neutral-600);
+  cursor: pointer;
+}
+
+/* ─── 캘린더 ─── */
+.sched__dow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  border-bottom: 1px solid var(--color-divider);
+}
+.sched__dow span {
+  text-align: center;
+  padding: 9px 0;
+  font-size: 11px;
+  font-weight: 700;
+}
+.sched__grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+.sched__cell {
+  height: 62px;
+  border: 0;
+  border-right: 1px solid var(--color-divider);
+  border-bottom: 1px solid var(--color-divider);
+  padding: 6px;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+.sched__cell:disabled {
+  cursor: default;
+}
+.sched__cell.is-sel {
+  background: var(--color-accent-200);
+}
+.sched__cell-n {
+  font-size: 12px;
+}
+.sched__dot {
+  width: 6px;
+  height: 6px;
+}
+.sched__cell-tag {
+  font-size: 9px;
+  color: var(--color-neutral-700);
+}
+
+.sched__legend {
+  display: flex;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 2px solid var(--color-text);
+  align-items: center;
+}
+.sched__legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--color-neutral-700);
+}
+.sched__legend i {
+  width: 8px;
+  height: 8px;
+}
+
+/* ─── 리스트 + 상세 ─── */
+.sched__cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 20px;
+  padding: 18px 16px;
+  align-items: start;
+}
+.sched__list-col,
+.sched__detail-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sched__list {
+  border-top: 2px solid var(--color-text);
+}
+.sched__empty {
+  padding: 20px;
+  font-size: 12px;
+  color: var(--color-neutral-600);
+  text-align: center;
+}
+
+.sched__event {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  padding: 12px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--color-divider);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+.sched__event:hover {
+  background: var(--color-neutral-100);
+}
+.sched__event.is-sel {
+  background: var(--color-accent-100);
+}
+.sched__event-date {
+  width: 46px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+}
+.sched__event-date strong {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 19px;
+  line-height: 1.1;
+}
+.sched__event-date .muted {
+  font-size: 10px;
+}
+
+.sched__kind {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  color: #fff;
+}
+
+.sched__detail-head {
+  padding: 14px;
+  border-bottom: 1px solid var(--color-divider);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sched__section {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-bottom: 1px solid var(--color-divider);
+}
+.sched__section:last-child {
+  border-bottom: 0;
+}
+.sched__section-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-neutral-700);
+}
+
+.sched__att {
+  flex: 1;
+  text-align: center;
+  padding: 10px 0;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 2px solid var(--color-text);
+  background: transparent;
+  color: var(--color-text);
+}
+.sched__att.is-on {
+  background: var(--color-text);
+  color: var(--color-bg);
+}
+
+.sched__vid {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 2px solid var(--color-text);
+  background: var(--color-bg);
+  padding: 8px;
+}
+.sched__vid-thumb {
+  width: 56px;
+  height: 36px;
+  flex: none;
+  background: repeating-linear-gradient(135deg, #9b9797 0 9px, #bab6b6 9px 18px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sched__vid-play {
+  width: 0;
+  height: 0;
+  border-left: 10px solid var(--color-bg);
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+}
+
+.sched__att-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+.sched__att-row:last-child {
+  border-bottom: 0;
+}
+.sched__status {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+}

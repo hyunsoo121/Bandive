@@ -1,0 +1,214 @@
+.home {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── 배너 ─── */
+.home__banner {
+  position: relative;
+  height: 180px;
+  border-bottom: 2px solid var(--color-text);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--color-neutral-400) 0 10px,
+    var(--color-neutral-300) 10px 20px
+  );
+  display: flex;
+  align-items: flex-end;
+}
+.home__banner-hint {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-neutral-700);
+}
+.home__banner-upload {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: var(--color-bg);
+  border: 2px solid var(--color-text);
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.home__band {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  padding: 16px;
+  width: 100%;
+  background: linear-gradient(to top, rgba(32, 30, 29, 0.6), transparent);
+}
+.home__band-avatar {
+  width: 60px;
+  height: 60px;
+  flex: none;
+  background: var(--color-accent);
+  border: 2px solid var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 22px;
+}
+.home__band strong {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 24px;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+.home__band-sub {
+  font-size: 12px;
+  color: #e8e5e5;
+}
+
+/* ─── 통계 ─── */
+.home__stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 2px solid var(--color-text);
+}
+.home__stat {
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--color-text);
+}
+.home__stat + .home__stat {
+  border-left: 1px solid var(--color-divider);
+}
+.home__stat:hover {
+  background: var(--color-neutral-100);
+}
+.home__stat strong {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 22px;
+}
+.home__stat .muted {
+  font-size: 11px;
+}
+
+/* ─── 섹션 레이아웃 ─── */
+.home__cols {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+.home__section {
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-bottom: 1px solid var(--color-divider);
+}
+.home__cols .home__section:first-child {
+  border-right: 1px solid var(--color-divider);
+}
+.home__section--wide {
+  padding-bottom: 28px;
+  border-bottom: 0;
+}
+.home__more {
+  font-size: 12px;
+  color: var(--color-accent-700);
+  font-weight: 700;
+}
+.home__empty {
+  padding: 24px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-neutral-600);
+}
+
+/* ─── 다가오는 일정 카드 ─── */
+.home__next-body {
+  display: flex;
+  gap: 14px;
+  padding: 14px;
+  align-items: flex-start;
+}
+.home__next-date {
+  width: 56px;
+  flex: none;
+  border-right: 1px solid var(--color-divider);
+  padding-right: 12px;
+  display: flex;
+  flex-direction: column;
+}
+.home__next-date strong {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 26px;
+  line-height: 1;
+}
+.home__next-date .muted {
+  font-size: 11px;
+}
+.home__next-foot {
+  border-top: 1px solid var(--color-divider);
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.home__next-foot:hover {
+  background: var(--color-neutral-200);
+}
+
+/* ─── 최근 곡 ─── */
+.home__songlist {
+  border-top: 2px solid var(--color-text);
+}
+.home__songrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--color-divider);
+}
+.home__songno {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 13px;
+  color: var(--color-neutral-500);
+  width: 18px;
+}
+
+/* ─── 최근 영상 ─── */
+.home__videos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+.home__video {
+  border: 2px solid var(--color-text);
+  background: var(--color-neutral-100);
+  display: flex;
+  flex-direction: column;
+}
+.home__video-thumb {
+  height: 92px;
+  border-bottom: 2px solid var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.home__play {
+  width: 0;
+  height: 0;
+  border-left: 15px solid var(--color-bg);
+  border-top: 10px solid transparent;
+  border-bottom: 10px solid transparent;
+}

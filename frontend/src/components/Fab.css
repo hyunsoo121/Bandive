@@ -1,0 +1,22 @@
+.fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 15;
+  background: var(--color-accent);
+  color: #fff;
+  border: 2px solid var(--color-text);
+  padding: 13px 18px;
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .fab {
+    right: 16px;
+    bottom: calc(var(--tabbar-h) + 20px);
+  }
+}
