@@ -17,14 +17,15 @@
 | Spring Boot | **4.1.1** (Spring Framework 7, Jakarta EE 11). 그대로 4.x 진행 |
 | Java | 21 / Gradle 9.7.1 (Groovy DSL) |
 | base package | `com.bandive.bandive` |
-| 설정 파일 | `src/main/resources/application.yaml` |
-| DB | PostgreSQL |
-| 캐시 | Redis (초대 코드 캐싱, refresh 토큰 저장) |
+| 설정 파일 | `application.yaml` (+ `-local` / `-test` / `-prod`). 기본 프로파일 `local` |
+| DB | PostgreSQL — 로컬 docker-compose 는 **호스트 5433**, 앱은 **8081** (기본 포트가 타 프로젝트와 충돌) |
+| 캐시 | Redis (초대 코드 캐싱, refresh 토큰 저장) — 로컬 docker-compose **호스트 6380** |
 | **인증** | **JWT (access 15~30분 + refresh)**. refresh 는 Redis 저장 + httpOnly 쿠키. 카카오 소셜 로그인만 지원 |
-| **패키지 구조** | **도메인형** — `com.bandive.bandive.<domain>` 안에 `controller / service / repository / dto / entity` |
-| **스키마 관리** | **Flyway** 마이그레이션 (`V1__init.sql` 부터 손으로). `spring.jpa.hibernate.ddl-auto=validate` |
-| 빌드에 추가 필요 | `flyway-core`, `flyway-database-postgresql`, `jjwt-api/impl/jackson` |
-| 스타터 주의 | Boot 4 → `spring-boot-starter-web` 이 `spring-boot-starter-webmvc` 로, 테스트 스타터가 모듈별 분리됨 |
+| **패키지 구조** | **도메인형** — `com.bandive.bandive.<domain>` 안에 `controller / service / repository / dto / entity`. 공통은 `common/{config,exception,response}` |
+| **스키마 관리** | **Flyway** 마이그레이션 (`V1__init.sql` 부터 손으로 — Phase 1). `spring.jpa.hibernate.ddl-auto=validate` |
+| 빌드 의존성 | `spring-boot-flyway`(⚠️ `flyway-core` 아님 — 아래), `flyway-database-postgresql`, `jjwt-api/impl/jackson`, `io.spring.javaformat` 플러그인 |
+| 테스트 | Testcontainers **2.x** (아티팩트명 `testcontainers-*` 접두, `PostgreSQLContainer` 는 `org.testcontainers.postgresql` 의 비제네릭 클래스). 통합 테스트 베이스 = `support/IntegrationTest` |
+| 스타터 주의 | Boot 4 → `starter-web` = `starter-webmvc`, 테스트 스타터 모듈별 분리, **auto-config 도 모듈 분리** (Flyway 는 `spring-boot-flyway` 를 직접 넣어야 동작) |
 
 ---
 
@@ -158,9 +159,12 @@
 
 각 Phase(Phase 4는 도메인별)마다 **착수 전에 구체적으로 뭘 할지 설명하고 사용자 승인받은 뒤 진행**한다.
 
-- **Phase 0 — 부트스트랩 세팅**: 도메인형 패키지 골격, `application.yaml` 프로파일 분리(local/prod),
-  `docker-compose.yml`(Postgres+Redis), `.gitignore`/`.env.example`, Flyway 도입, `/actuator/health` 부팅 확인,
-  build.gradle 에 Flyway·JJWT 추가
+- **Phase 0 — 부트스트랩 세팅 ✅ 완료 (2026-09-01)**: 도메인형 패키지 골격(`.gitkeep`),
+  `application.yaml` 프로파일 분리(local/test/prod), `docker-compose.yml`(Postgres 5433 / Redis 6380),
+  `.gitignore`/`.env.example`, Flyway 도입(`spring-boot-flyway`), Testcontainers 통합 테스트 베이스,
+  `io.spring.javaformat`, `/actuator/health` 부팅 확인 완료. `db/migration/` 은 비어있음(V1 은 Phase 1).
+  git 협업 세팅(pre-commit 훅 `hooks/`, 이슈/PR 템플릿, GitHub Actions CI)은 루트 [`../README.md`](../README.md) 참고.
+  겪은 이슈는 [`../docs/TROUBLESHOOTING.md`](../docs/TROUBLESHOOTING.md).
 - **Phase 1 — 도메인 모델**: 엔티티 10개 + Enum + `BaseTimeEntity`(JPA Auditing) + 유니크 제약 +
   `V1__init.sql` + Repository. 검증: `@DataJpaTest`
 - **Phase 2 — 인증(카카오 OAuth2 + JWT)**: `SecurityFilterChain`(공개 GET / 인증 액션 분리),

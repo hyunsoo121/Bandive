@@ -1,0 +1,4 @@
+# 통합 테스트 프로파일. DB/Redis 접속은 Testcontainers @ServiceConnection 이 주입.
+spring:
+  jpa:
+    show-sql: false
