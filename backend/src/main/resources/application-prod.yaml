@@ -1,0 +1,17 @@
+# 운영 프로파일. 모든 접속 정보는 환경변수 필수 (미설정 시 기동 실패).
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT:6379}
+  jpa:
+    show-sql: false
+
+management:
+  endpoint:
+    health:
+      show-details: never

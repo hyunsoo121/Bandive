@@ -17,7 +17,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
       - run: npm run lint
       - run: npm run format:check
       - run: npm run build
@@ -34,5 +36,5 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew checkFormat assemble
-      # TODO(Phase 1): Testcontainers 도입 후 `./gradlew build` 로 교체 (테스트 포함)
+      # ubuntu-latest 러너엔 Docker 가 있어 Testcontainers 통합 테스트가 그대로 돈다
+      - run: ./gradlew checkFormat build

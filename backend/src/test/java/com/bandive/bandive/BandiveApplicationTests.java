@@ -1,10 +1,10 @@
 package com.bandive.bandive;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
-class BandiveApplicationTests {
+import com.bandive.bandive.support.IntegrationTest;
+
+class BandiveApplicationTests extends IntegrationTest {
 
 	@Test
 	void contextLoads() {

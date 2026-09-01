@@ -1,0 +1,33 @@
+# 로컬 개발용 인프라. `docker compose up -d` 로 띄우고 backend 를 local 프로파일로 실행.
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: bandive-postgres
+    environment:
+      POSTGRES_DB: bandive
+      POSTGRES_USER: bandive
+      POSTGRES_PASSWORD: bandive
+      TZ: UTC
+    ports:
+      - "5433:5432"   # 호스트 5433 — 다른 프로젝트(PickYouth 등)의 5432 와 충돌 방지
+    volumes:
+      - bandive-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bandive -d bandive"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: bandive-redis
+    ports:
+      - "6380:6379"   # 호스트 6380 — 다른 프로젝트의 6379 와 충돌 방지
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  bandive-pgdata:
