@@ -7,7 +7,12 @@ export function LoginModal() {
 
   return (
     <div className="overlay overlay--center" onClick={closeLogin}>
-      <div className="login-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+      <div
+        className="login-modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+      >
         <BrandMark size={36} />
         <h3>밴디브 로그인이 필요합니다</h3>
         <p className="muted">

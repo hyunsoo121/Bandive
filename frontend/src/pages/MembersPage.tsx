@@ -48,7 +48,8 @@ export function MembersPage() {
               <span
                 className="members__role"
                 style={{
-                  background: m.role === 'owner' ? 'var(--color-accent)' : 'var(--color-neutral-200)',
+                  background:
+                    m.role === 'owner' ? 'var(--color-accent)' : 'var(--color-neutral-200)',
                   color: m.role === 'owner' ? '#fff' : 'var(--color-neutral-800)',
                 }}
               >
@@ -87,9 +88,7 @@ export function MembersPage() {
       )}
 
       {!isOwner && (
-        <p className="members__note muted">
-          멤버 초대와 추방은 밴드장만 할 수 있습니다.
-        </p>
+        <p className="members__note muted">멤버 초대와 추방은 밴드장만 할 수 있습니다.</p>
       )}
     </div>
   );

@@ -20,7 +20,13 @@ export const NAV_ITEMS: NavItem[] = [
     d1: 'M10 18V5l11-2v12',
     d2: 'M7 15a3 3 0 1 0 0 6 3 3 0 1 0 0-6M18 12a3 3 0 1 0 0 6 3 3 0 1 0 0-6',
   },
-  { key: 'schedule', label: '일정', to: 'schedule', d1: 'M3 5h18v16H3z', d2: 'M3 10h18M8 3v4M16 3v4' },
+  {
+    key: 'schedule',
+    label: '일정',
+    to: 'schedule',
+    d1: 'M3 5h18v16H3z',
+    d2: 'M3 10h18M8 3v4M16 3v4',
+  },
   { key: 'media', label: '영상', to: 'media', d1: 'M2 6h14v12H2z', d2: 'm16 11 6-4v10z' },
   {
     key: 'members',

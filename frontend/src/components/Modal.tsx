@@ -11,7 +11,14 @@ interface Props {
   width?: number;
 }
 
-export function Modal({ title, onClose, children, footer, variant = 'center', width = 380 }: Props) {
+export function Modal({
+  title,
+  onClose,
+  children,
+  footer,
+  variant = 'center',
+  width = 380,
+}: Props) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();

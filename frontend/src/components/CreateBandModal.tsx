@@ -25,7 +25,13 @@ export function CreateBandModal({ onCreated }: Props) {
       onClose={closeCreate}
       footer={
         <>
-          <button type="button" className="btn btn--primary" style={{ flex: 1 }} disabled={!canCreate} onClick={submit}>
+          <button
+            type="button"
+            className="btn btn--primary"
+            style={{ flex: 1 }}
+            disabled={!canCreate}
+            onClick={submit}
+          >
             밴드 만들기
           </button>
           <button type="button" className="btn" onClick={closeCreate}>

@@ -75,7 +75,11 @@ export function AppLayout() {
         <nav className="sidenav">{navList('side')}</nav>
 
         <div className="sidebar__me">
-          <Avatar label={meInitial} size={30} color={user ? 'var(--color-text)' : 'var(--color-neutral-500)'} />
+          <Avatar
+            label={meInitial}
+            size={30}
+            color={user ? 'var(--color-text)' : 'var(--color-neutral-500)'}
+          />
           <span className="stack">
             <strong style={{ fontSize: 13 }}>{meName}</strong>
             <span className="muted" style={{ fontSize: 11 }}>

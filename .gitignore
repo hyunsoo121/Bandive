@@ -1,0 +1,50 @@
+# ── OS / Editor ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.sw?
+
+# ── IDE ──────────────────────────────────────────────────────
+.idea/
+.vscode/
+*.iml
+*.ipr
+*.iws
+
+# ── Secrets / env ────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.pem
+
+# ── Node (frontend) ─────────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+*.tsbuildinfo
+.eslintcache
+coverage/
+.nyc_output/
+*.local
+
+# ── Java / Gradle (backend) ─────────────────────────────────
+.gradle/
+build/
+bin/
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# ── Logs ────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ── Runtime ─────────────────────────────────────────────────
+dump.rdb
+
+# ── Claude ──────────────────────────────────────────────────
+.claude/

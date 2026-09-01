@@ -25,8 +25,10 @@ const BASE_ATTENDANCE: Record<string, AttendanceStatus> = {
 };
 
 function statusStyle(s: AttendanceStatus): { background: string; color: string } {
-  if (s === '참석') return { background: 'var(--color-accent-200)', color: 'var(--color-accent-800)' };
-  if (s === '불참') return { background: 'var(--color-neutral-200)', color: 'var(--color-neutral-700)' };
+  if (s === '참석')
+    return { background: 'var(--color-accent-200)', color: 'var(--color-accent-800)' };
+  if (s === '불참')
+    return { background: 'var(--color-neutral-200)', color: 'var(--color-neutral-700)' };
   return { background: 'transparent', color: 'var(--color-neutral-700)' };
 }
 
@@ -78,7 +80,9 @@ export function SchedulePage() {
   const myName = user?.name ?? '';
   const attendanceRows = members.map((m) => {
     const status =
-      m.name === myName ? (myAtt[selected?.id ?? ''] ?? BASE_ATTENDANCE[m.name] ?? '미정') : (BASE_ATTENDANCE[m.name] ?? '미정');
+      m.name === myName
+        ? (myAtt[selected?.id ?? ''] ?? BASE_ATTENDANCE[m.name] ?? '미정')
+        : (BASE_ATTENDANCE[m.name] ?? '미정');
     return { ...m, status };
   });
   const goingCount = attendanceRows.filter((r) => r.status === '참석').length;
@@ -104,7 +108,10 @@ export function SchedulePage() {
       {/* 캘린더 */}
       <div className="sched__dow">
         {DOW.map((d, i) => (
-          <span key={d} style={{ color: i === 0 ? 'var(--color-accent-700)' : 'var(--color-neutral-700)' }}>
+          <span
+            key={d}
+            style={{ color: i === 0 ? 'var(--color-accent-700)' : 'var(--color-neutral-700)' }}
+          >
             {d}
           </span>
         ))}
@@ -179,7 +186,9 @@ export function SchedulePage() {
                       className="sched__kind"
                       style={{
                         background:
-                          e.type === 'PERFORMANCE' ? 'var(--color-neutral-800)' : 'var(--color-accent)',
+                          e.type === 'PERFORMANCE'
+                            ? 'var(--color-neutral-800)'
+                            : 'var(--color-accent)',
                       }}
                     >
                       {KIND_LABEL[e.type]}
@@ -235,9 +244,7 @@ export function SchedulePage() {
                       key={opt}
                       type="button"
                       className={`sched__att${myStatus === opt ? ' is-on' : ''}`}
-                      onClick={guard(() =>
-                        setMyAtt((prev) => ({ ...prev, [selected.id]: opt })),
-                      )}
+                      onClick={guard(() => setMyAtt((prev) => ({ ...prev, [selected.id]: opt })))}
                     >
                       {opt}
                     </button>
@@ -296,7 +303,9 @@ export function SchedulePage() {
             </div>
           ) : (
             <div className="panel sched__empty">
-              {isDataMonth ? '일정을 선택하면 출결·영상이 표시됩니다.' : '이 달에는 일정이 없습니다.'}
+              {isDataMonth
+                ? '일정을 선택하면 출결·영상이 표시됩니다.'
+                : '이 달에는 일정이 없습니다.'}
             </div>
           )}
         </section>

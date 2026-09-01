@@ -21,5 +21,7 @@ export function slotsOf(song: Song): PartSlot[] {
 
 /** "보컬 1", "기타 2" 형태의 세션 구성 칩 텍스트 */
 export function sessionChips(song: Song): string[] {
-  return INSTRUMENTS.filter((i) => (song.sessions[i] ?? 0) > 0).map((i) => `${i} ${song.sessions[i]}`);
+  return INSTRUMENTS.filter((i) => (song.sessions[i] ?? 0) > 0).map(
+    (i) => `${i} ${song.sessions[i]}`,
+  );
 }

@@ -84,7 +84,9 @@ export function HomePage() {
                 </div>
                 <div className="stack" style={{ gap: 6, flex: 1 }}>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <span className={`tag ${upcoming.type === 'PERFORMANCE' ? 'tag--muted' : 'tag--accent'}`}>
+                    <span
+                      className={`tag ${upcoming.type === 'PERFORMANCE' ? 'tag--muted' : 'tag--accent'}`}
+                    >
                       {KIND_LABEL[upcoming.type]}
                     </span>
                     <span className="tag">D-{Math.max(0, upcoming.day - 28)}</span>

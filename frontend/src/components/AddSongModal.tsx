@@ -34,9 +34,10 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
   const [memo, setMemo] = useState('');
 
   const query = q.trim().toLowerCase();
-  const results = (query
-    ? SONG_CATALOG.filter((c) => `${c.title} ${c.artist}`.toLowerCase().includes(query))
-    : SONG_CATALOG
+  const results = (
+    query
+      ? SONG_CATALOG.filter((c) => `${c.title} ${c.artist}`.toLowerCase().includes(query))
+      : SONG_CATALOG
   ).slice(0, 5);
 
   const canSubmit = title.trim().length > 0 && artist.trim().length > 0;
@@ -131,7 +132,9 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
                     </span>
                   </span>
                   {on && (
-                    <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-accent-700)' }}>
+                    <span
+                      style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-accent-700)' }}
+                    >
                       선택됨
                     </span>
                   )}
@@ -170,18 +173,37 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
         </div>
       )}
 
-      <div className="stack" style={{ gap: 8, borderTop: '2px solid var(--color-text)', paddingTop: 14 }}>
+      <div
+        className="stack"
+        style={{ gap: 8, borderTop: '2px solid var(--color-text)', paddingTop: 14 }}
+      >
         <span className="kicker">세션 구성</span>
         {INSTRUMENTS.map((inst) => (
           <div key={inst} className="addsong__session">
-            <span style={{ flex: 1, fontSize: 13, color: sessions[inst] > 0 ? undefined : 'var(--color-neutral-400)' }}>
+            <span
+              style={{
+                flex: 1,
+                fontSize: 13,
+                color: sessions[inst] > 0 ? undefined : 'var(--color-neutral-400)',
+              }}
+            >
               {inst}
             </span>
-            <button type="button" className="addsong__step" onClick={() => step(inst, -1)} aria-label={`${inst} 감소`}>
+            <button
+              type="button"
+              className="addsong__step"
+              onClick={() => step(inst, -1)}
+              aria-label={`${inst} 감소`}
+            >
               −
             </button>
             <span className="addsong__count">{sessions[inst]}</span>
-            <button type="button" className="addsong__step" onClick={() => step(inst, 1)} aria-label={`${inst} 증가`}>
+            <button
+              type="button"
+              className="addsong__step"
+              onClick={() => step(inst, 1)}
+              aria-label={`${inst} 증가`}
+            >
               ＋
             </button>
           </div>

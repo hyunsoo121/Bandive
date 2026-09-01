@@ -179,7 +179,14 @@ function SongRow({
           onClick={onVote}
           aria-pressed={song.votedByMe}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={3}
+          >
             <path d="m5 15 7-7 7 7" />
           </svg>
           <span className="votebox__count">{song.votes}</span>
@@ -243,7 +250,9 @@ function SongRow({
                   {slots.map((slot) => (
                     <div key={slot.key} className="songrow__slot">
                       <span className="muted">{slot.label}</span>
-                      <span className="songrow__assignee">{song.assignments[slot.key] || '미지정'}</span>
+                      <span className="songrow__assignee">
+                        {song.assignments[slot.key] || '미지정'}
+                      </span>
                     </div>
                   ))}
                 </div>

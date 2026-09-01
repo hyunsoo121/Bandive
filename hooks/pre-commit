@@ -1,0 +1,56 @@
+#!/bin/sh
+#
+# Bandive monorepo pre-commit hook.
+# staged 파일 경로를 보고 frontend / backend 검사를 각각 실행한다.
+# 설치: hooks/install.sh  (git config core.hooksPath hooks)
+
+set -e
+
+REPO_ROOT=$(git rev-parse --show-toplevel)
+cd "$REPO_ROOT"
+
+STAGED=$(git diff --cached --name-only --diff-filter=ACM)
+[ -z "$STAGED" ] && exit 0
+
+FAILED=0
+
+# ── frontend ────────────────────────────────────────────────
+if echo "$STAGED" | grep -q '^frontend/'; then
+  echo "▶ [frontend] oxlint + prettier 검사 중..."
+  if ! (cd frontend && npm run lint --silent); then
+    echo ""
+    echo "✗ [frontend] oxlint 오류. 자동 수정 후 다시 커밋:"
+    echo "    cd frontend && npm run lint:fix"
+    echo ""
+    FAILED=1
+  fi
+  if ! (cd frontend && npm run format:check --silent); then
+    echo ""
+    echo "✗ [frontend] 포맷 오류. 자동 수정 후 다시 커밋:"
+    echo "    cd frontend && npm run format"
+    echo ""
+    FAILED=1
+  fi
+  [ "$FAILED" -eq 0 ] && echo "✓ [frontend] 통과"
+fi
+
+# ── backend ─────────────────────────────────────────────────
+if echo "$STAGED" | grep -q '^backend/'; then
+  echo "▶ [backend] spring-javaformat 검사 중..."
+  if ! (cd backend && ./gradlew checkFormat -q --console=plain); then
+    echo ""
+    echo "✗ [backend] 포맷 오류. 자동 수정 후 다시 커밋:"
+    echo "    cd backend && ./gradlew format"
+    echo ""
+    FAILED=1
+  fi
+  [ "$FAILED" -eq 0 ] && echo "✓ [backend] 통과"
+fi
+
+if [ "$FAILED" -ne 0 ]; then
+  echo "✗ pre-commit 실패 — 커밋이 중단되었습니다."
+  exit 1
+fi
+
+echo "✓ pre-commit 통과"
+exit 0

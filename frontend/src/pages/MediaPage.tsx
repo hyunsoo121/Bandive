@@ -16,7 +16,8 @@ const STRIPE_SHADES = [
   ['#605d5d', '#7d7979'],
   ['#444141', '#605d5d'],
 ];
-const stripe = (a: string, b: string) => `repeating-linear-gradient(135deg, ${a} 0 12px, ${b} 12px 24px)`;
+const stripe = (a: string, b: string) =>
+  `repeating-linear-gradient(135deg, ${a} 0 12px, ${b} 12px 24px)`;
 
 export function MediaPage() {
   const { currentBand, role, media: allMedia } = useApp();
@@ -57,9 +58,7 @@ export function MediaPage() {
       </div>
 
       {isGuest && hiddenCount > 0 && (
-        <p className="media__notice">
-          멤버 전용 영상 {hiddenCount}개는 로그인 후 볼 수 있습니다.
-        </p>
+        <p className="media__notice">멤버 전용 영상 {hiddenCount}개는 로그인 후 볼 수 있습니다.</p>
       )}
 
       <div className="media__grid">
@@ -100,7 +99,9 @@ export function MediaPage() {
 
         {list.length === 0 && (
           <div className="media__empty">
-            {bandMedia.length === 0 ? '아직 등록된 영상이 없습니다.' : '이 필터에 해당하는 영상이 없습니다.'}
+            {bandMedia.length === 0
+              ? '아직 등록된 영상이 없습니다.'
+              : '이 필터에 해당하는 영상이 없습니다.'}
           </div>
         )}
       </div>
