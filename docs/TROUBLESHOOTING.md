@@ -153,6 +153,54 @@ cd backend && docker compose down -v && docker compose up -d
 | `TestEntityManager` | `org.springframework.boot.jpa.test.autoconfigure` | `spring-boot-jpa-test` |
 
 모듈 자체는 `spring-boot-starter-data-jpa-test` 가 다 끌어온다. import 경로만 갱신하면 됨.
+`@AutoConfigureMockMvc` 도 마찬가지 — `org.springframework.boot.webmvc.test.autoconfigure`.
+
+---
+
+## Phase 2 (카카오 OAuth2 + JWT)
+
+### `.env` 를 어떻게 읽나
+
+`application.yaml` 에 `spring.config.import: optional:file:.env[.properties]` 를 넣었다.
+`backend/.env` 를 properties 형식(`KEY=value`)으로 읽어 `${KAKAO_CLIENT_ID}` 같은 placeholder 를 채운다.
+`optional:` 이라 파일이 없어도(=CI) 기동은 되고, `[.properties]` 는 확장자와 무관하게 properties 로 파싱하라는 힌트.
+`bootRun` / 테스트 모두 작업 디렉토리가 `backend/` 라 상대경로가 맞는다.
+
+### 기동 실패: `localhost:5433 에 대한 연결이 거부되었습니다` (Flyway/Hikari)
+
+**원인.** docker-compose 의 Postgres/Redis 컨테이너가 안 떠 있음. `bootRun` 전에 인프라를 먼저 올려야 한다.
+
+**해결.** `cd backend && docker compose up -d` (healthy 확인) 후 `./gradlew bootRun`.
+컨테이너 상태는 `docker compose ps`.
+
+---
+
+### 기동 실패: `app.auth.jwt.secret 이 설정되지 않았거나 32바이트 미만입니다`
+
+**원인.** `backend/.env` 에 `JWT_SECRET`(또는 `KAKAO_CLIENT_ID`/`KAKAO_CLIENT_SECRET`)이 없음.
+`@ConfigurationProperties` 바인딩은 미해결 placeholder 를 리터럴 `"${JWT_SECRET}"` 로 남기므로
+(환경 프로퍼티 resolver 가 `ignoreUnresolvableNestedPlaceholders=true`), `JwtProvider` 생성자에서 걸린다.
+
+**해결.** `backend/.env.example` 을 참고해 `backend/.env` 에 3개 키를 채운다:
+`KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET`, `JWT_SECRET`(≥32바이트, `openssl rand -base64 48`).
+테스트는 `application-test.yaml` 의 더미값을 쓰므로 `.env` 없이도 통과한다.
+
+### 카카오 로그인 시 `KOE101` (invalid client) / redirect 후 에러
+
+**원인.** `KAKAO_CLIENT_ID` 미설정(리터럴 `${...}` 전송) 또는 카카오 콘솔에
+**Redirect URI 미등록**. 우리 기본 콜백은 `http://localhost:8081/login/oauth2/code/kakao`.
+
+**해결.** `.env` 값 확인 + 카카오 디벨로퍼스 > 카카오 로그인 > Redirect URI 에 위 주소 등록.
+
+### `permitAll` 로 열어둔 GET 인데 401 이 나온다
+
+**증상.** `GET /api/bands/1` 이 (컨트롤러가 아직 없어) 404 대신 401.
+
+**원인.** 핸들러 없는 요청은 서블릿 컨테이너가 `/error` 로 forward 하는데, `/error` 가 인가 규칙에
+안 걸려 있으면 `anyRequest().authenticated()` 에 잡혀 401 이 된다. (MockMvc 는 이 forward 를 안 타서
+테스트에선 404 로 보여 놓치기 쉽다 — 반드시 실제 기동으로 확인.)
+
+**해결.** `SecurityConfig` 인가 규칙에 `"/error"` 를 `permitAll` 로 추가.
 
 ---
 

@@ -1,4 +1,26 @@
-# 통합 테스트 프로파일. DB/Redis 접속은 Testcontainers @ServiceConnection 이 주입.
+# 통합/슬라이스 테스트 프로파일. DB/Redis 접속은 support/AbstractContainerTest 의 @DynamicPropertySource 가 주입.
+# 카카오/JWT 는 실제 값 없이 더미로 채워 컨텍스트만 로드되게 한다 (실제 카카오 호출은 MockWebServer/스텁).
 spring:
   jpa:
     show-sql: false
+  security:
+    oauth2:
+      client:
+        registration:
+          kakao:
+            client-id: test-kakao-client-id
+            client-secret: test-kakao-client-secret
+
+app:
+  auth:
+    jwt:
+      secret: test-jwt-secret-0123456789-0123456789-0123456789-abcdef
+      access-ttl: PT30M
+      refresh-ttl: P14D
+    oauth2:
+      success-redirect: http://localhost:5173/oauth/success
+      failure-redirect: http://localhost:5173/oauth/failure
+    cookie:
+      secure: false
+    cors:
+      allowed-origin: http://localhost:5173

@@ -170,11 +170,15 @@
   검증: `@DataJpaTest`(`support/RepositoryTest`, `@Import(JpaConfig)` 필수) + `support/AbstractContainerTest` 싱글턴 컨테이너.
   결정: `updated_at` 전 테이블, `Song↔SongPart` 만 양방향+cascade/orphanRemoval, `InviteCode.code` 전역 unique,
   `SongPart` unique(song,instrument,part_index). 파트 배정 권한(밴드장 vs 누구나)은 Phase 4 에서 확정.
-- **Phase 2 — 인증(카카오 OAuth2 + JWT)**: `SecurityFilterChain`(공개 GET / 인증 액션 분리),
-  카카오 provider, `CustomOAuth2UserService`(kakao_id 로 User upsert), 로그인 성공 핸들러 → JWT 발급,
-  `/api/auth/logout`·`/refresh`, `@PreAuthorize("@bandGuard.isOwner(#bandId)")` 커스텀 빈. 검증: 통합 테스트(카카오 목)
-- **Phase 3 — 공통 인프라**: CORS(프론트 오리진), `@RestControllerAdvice` 전역 예외 → 일관 에러 JSON,
-  DTO 컨벤션, `BandGuard`(소속/밴드장 검사)
+- **Phase 2 — 인증(카카오 OAuth2 + JWT) ✅ 완료 (2026-09-01)**: `SecurityConfig`(STATELESS, `GET /api/**`+`/error` 공개, 그 외 인증),
+  카카오 `oauth2Login`(authorization request 는 쿠키 = `HttpCookieOAuth2AuthorizationRequestRepository`),
+  `CustomOAuth2UserService`(kakao_id upsert, 이메일 미수집), `OAuth2LoginSuccessHandler`(refresh → Redis `refresh:{userId}` + httpOnly `SameSite=Strict` 쿠키 `refresh_token`, path `/api/auth` → 프론트 `?oauth/success` 리다이렉트).
+  `AuthController`: `POST /api/auth/refresh`(회전), `POST /api/auth/logout`, `GET /api/auth/me`.
+  `JwtProvider`(HS256, access 30m / refresh 14d), `JwtAuthenticationFilter`(Bearer), `@CurrentUser Long`, `BandGuard`(`@PreAuthorize("@bandGuard.isOwner(#bandId)")` + `@EnableMethodSecurity`), 401/403 JSON 핸들러.
+  설정: `spring.config.import: optional:file:.env[.properties]` 로 `.env` 로드. `app.auth.*` = `AuthProperties`.
+  검증: 41 테스트 (JwtProvider / SecurityRules / AuthController / CustomOAuth2UserService / OAuth2LoginSuccessHandler / BandGuard). 실제 카카오 없이 더미값 + `MockWebServer` 미사용(핸들러 직접 호출).
+- **Phase 3 — 공통 인프라**: CORS 정식화(현재 최소본 SecurityConfig 안에 있음), `@RestControllerAdvice` 전역 예외 → 일관 에러 JSON
+  (현재는 `server.error.include-stacktrace=never` 로만 막아둠), DTO 컨벤션. `BandGuard` 는 Phase 2 에서 완료.
 - **Phase 4 — 도메인 API** (CLAUDE.md 순서, 각 도메인이 승인 단위):
   1. 밴드  2. 초대(Redis 캐시)  3. 밴드 멤버  4. 곡(+SongPart 슬롯·투표·승격·배정)
   5. 일정(+출결)  6. 미디어(visibility 필터)
