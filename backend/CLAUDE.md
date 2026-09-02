@@ -197,7 +197,16 @@
     밴드당 코드 1개(재발급 시 이전 행 삭제+캐시 evict). 코드 8자리(`0O1I` 제외), 만료·횟수 제한 없음(컬럼 유지, `used_count`만 +1).
     join: 없는 코드 `404 INVITE_CODE_NOT_FOUND` / 이미 멤버 `409 ALREADY_MEMBER`. `InviteCodeCache`(Redis `invite:{code}→bandId`, TTL 없음, 미스 시 DB 복구).
     신규 `app.frontend.base-url`(`common/config/{FrontendProperties,AppConfig}`), `InviteCodeRepository` 에 `existsByCode/findByBandId/deleteByBandId`. SecurityConfig 수정 없음. 74 테스트 그린.
-  - 4-3 밴드 멤버  4-4 곡(+SongPart·투표·승격·배정)  4-5 일정(+출결)  4-6 미디어(visibility 필터)
+  - **4-3 밴드 멤버 ✅ 완료 (2026-09-02)**: `member/{dto,service,controller}`.
+    `GET /api/bands/{bandId}/members`(공개, `MemberResponse{userId,nickname,role,parts,joinedAt}`, OWNER 먼저→가입순, `findAllByBandIdWithUser` fetch join) /
+    `PATCH .../members/me`(내 파트) / `PATCH .../members/{userId}`(밴드장이 남의 파트) /
+    `DELETE .../members/{userId}`(추방, 밴드장 204) / `DELETE .../members/me`(탈퇴 204) /
+    `PUT /api/bands/{bandId}/owner`(밴드장 위임, `{userId}`, 이전 밴드장→MEMBER, 204) / `DELETE /api/bands/{bandId}`(밴드 삭제, 204).
+    추방: 없는 멤버 `404 MEMBER_NOT_FOUND`, 밴드장 대상 `409 CANNOT_KICK_OWNER`. 탈퇴: 비멤버 `404 NOT_A_MEMBER`, 밴드장 `409 OWNER_CANNOT_LEAVE`.
+    **V3**: `band_member_parts` 테이블(멤버 1:N 파트, `@ElementCollection Set<String>`). Instrument enum 이름 기본이나 자유 문자열 허용(공백/중복 제거).
+    밴드 삭제: `bands` FK 전부 `ON DELETE CASCADE` → `bandRepository.delete()` 로 하위 일괄. 로고/배너 파일·Redis 초대키는 `BandService.delete` 가 직접 정리(→ `InviteCodeRepository`+`InviteCodeCache` 주입).
+    `/me` literal 우선 매칭. SecurityConfig 수정 없음(전부 non-GET). 99 테스트 그린.
+  - 4-4 곡(+SongPart·투표·승격·배정)  4-5 일정(+출결)  4-6 미디어(visibility 필터)
 - **Phase 5 — 파일 업로드 / 외부 음원 검색**: `StorageService`(로컬 dev / S3 prod),
   곡 검색은 MANUAL 우선 완성 · SEARCH 는 스텁 후 실 API 연동
 - **Phase 6 — 프론트 연동**: `frontend/src/api/*` 레이어, `AppContext` 액션을 실제 호출로 교체, 목 제거

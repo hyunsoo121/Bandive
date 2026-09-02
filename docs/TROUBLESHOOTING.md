@@ -273,6 +273,20 @@ class BandControllerTest {
 CGLIB 프록시가 생기는데 부모의 `final` setter 를 못 감싼다는 **경고일 뿐**(우리는 그 setter 를 안 씀). 무시 가능.
 거슬리면 upsert 로직을 별도 `@Service` 로 빼면 사라진다.
 
+### `@DataJpaTest` 삭제 테스트 — `TransientPropertyValueException: ... references an unsaved transient instance`
+
+**증상.** 서비스가 `bandRepository.delete(band)` 로 지우고 하위(band_members 등)는 DB `ON DELETE CASCADE` 에
+맡기는데, `@DataJpaTest` 에서 그 서비스를 호출하면 `em.flush()` 시점에
+`BandMember references an unsaved transient instance of Band`.
+
+**원인.** `@DataJpaTest` 는 한 테스트 = 한 트랜잭션/세션. setup 에서 `service.create(...)` 로 만든
+`BandMember` 가 영속성 컨텍스트에 **관리 상태로 남아** 있는데, 이후 `bands.delete(band)` 로 Band 가
+삭제 예약되면 그 BandMember 의 `band` 참조가 transient 로 취급된다. (운영에선 삭제가 새 트랜잭션/세션에서
+돌기 때문에 이 문제 없음 — `@PreAuthorize` 의 `BandGuard` 조회도 별도 짧은 트랜잭션.)
+
+**해결.** 테스트에서 `service.delete(...)` 호출 직전에 `em.flush(); em.clear();` 로 컨텍스트를 비운다
+(운영 상황을 흉내). 서비스 코드는 그대로 — DB cascade 방식 유지.
+
 ---
 
 ### pre-commit 훅이 안 걸림
@@ -282,3 +296,43 @@ CGLIB 프록시가 생기는데 부모의 `final` setter 를 못 감싼다는 **
 **원인.** `core.hooksPath` 미설정 (clone 직후) 또는 `hooks/pre-commit` 실행권한 없음.
 
 **해결.** `sh hooks/install.sh` 한 번 실행. 훅을 우회해야 하면 `git commit --no-verify`.
+
+---
+
+## 프론트 ↔ 백엔드 연동 (frontend/src/api)
+
+### 로그인은 되는데 새로고침하면 로그아웃된다
+
+**증상.** 카카오 로그인 직후엔 멀쩡한데 F5 누르면 게스트로 돌아감.
+
+**원인.** access 토큰은 메모리에만 둔다(그게 의도). 새로고침 시엔 refresh 쿠키로 다시 받아야 하는데,
+`POST /api/auth/refresh` 가 401 이면 복구 실패.
+
+**해결.** refresh 쿠키(`refresh_token`, httpOnly, path `/api/auth`)가 브라우저에 남아 있는지 확인.
+- 백엔드가 `application-local.yaml` 로 떠서 `app.auth.cookie.secure=false` 여야 http localhost 에서 쿠키가 심긴다.
+- 프론트 fetch 는 전부 `credentials: 'include'` (client.ts) — 빠지면 쿠키가 안 실린다.
+- 로컬은 `localhost:5173` ↔ `localhost:8081` 로 **포트만 다르고 같은 site** 라 `SameSite=Strict` 쿠키도 전송된다.
+  (배포 때 프론트/백엔드가 다른 도메인이면 `SameSite=None; Secure` 로 바꿔야 함 — Phase 7 숙제)
+
+### CORS 에러 — `blocked by CORS policy` 또는 프리플라이트 실패
+
+**원인.** 백엔드 `app.cors.allowed-origins` 에 프론트 오리진이 없거나, credentials 요청인데
+와일드카드 오리진이라 브라우저가 거부.
+
+**해결.** `backend/.env` (또는 기본값)에 `APP_CORS_ALLOWED_ORIGINS=http://localhost:5173`.
+`CorsConfig` 는 이미 `allowCredentials(true)` + 명시 오리진 + 모든 헤더/메서드 허용.
+프론트 `VITE_API_ORIGIN` 이 그 오리진에서 백엔드를 가리키는지도 확인 (기본 `http://localhost:8081`).
+
+### 초대 코드가 멤버 화면에 안 보인다
+
+**증상.** 밴드장인데 멤버 탭에 초대 코드가 없음.
+
+**원인.** 버그 아님. 초대 코드 **조회** API 가 없다 (`POST` 발급/재발급만 있음). 발급을 눌러야 표시된다.
+`POST` 를 다시 부르면 이전 코드는 폐기되므로 자동 호출하지 않는 것.
+
+### 밴드장인데 밴드 전환 시트에 "사용자" 로 표시된다
+
+**원인.** `GET /api/bands/my` 응답에 아직 role 필드가 없다. 현재 밴드 화면의 권한 판정은
+멤버 목록에서 내 역할을 찾아 정확히 하지만, 내 밴드 **목록**(스위처)에는 역할 정보가 없어 전부 'member' fallback.
+
+**해결.** 백엔드가 my 응답에 role 을 실어주면 자동 해결 (`mappers.toBand` 가 이미 `dto.role` 을 읽음).

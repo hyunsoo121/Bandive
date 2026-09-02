@@ -14,6 +14,8 @@ import com.bandive.bandive.band.dto.BandResponse;
 import com.bandive.bandive.band.dto.BandUpdateRequest;
 import com.bandive.bandive.common.exception.NotFoundException;
 import com.bandive.bandive.common.storage.StorageService;
+import com.bandive.bandive.invite.InviteCodeRepository;
+import com.bandive.bandive.invite.service.InviteCodeCache;
 import com.bandive.bandive.member.BandMember;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
@@ -36,12 +38,18 @@ public class BandService {
 
 	private final StorageService storage;
 
+	private final InviteCodeRepository inviteCodes;
+
+	private final InviteCodeCache inviteCodeCache;
+
 	public BandService(BandRepository bands, BandMemberRepository bandMembers, UserRepository users,
-			StorageService storage) {
+			StorageService storage, InviteCodeRepository inviteCodes, InviteCodeCache inviteCodeCache) {
 		this.bands = bands;
 		this.bandMembers = bandMembers;
 		this.users = users;
 		this.storage = storage;
+		this.inviteCodes = inviteCodes;
+		this.inviteCodeCache = inviteCodeCache;
 	}
 
 	/** 밴드 생성 — 만든 사람을 자동으로 OWNER 멤버로 등록. */
@@ -93,6 +101,35 @@ public class BandService {
 		band.changeBanner(storage.store(BANNER_DIR, file));
 		storage.delete(previous);
 		return BandResponse.from(band, bandMembers.countByBandId(bandId));
+	}
+
+	/** 밴드장 위임 — 대상은 OWNER, 이전 밴드장은 MEMBER 로. 대상 == 본인이면 no-op. */
+	@Transactional
+	public void transferOwnership(Long bandId, Long currentOwnerId, Long targetUserId) {
+		if (currentOwnerId.equals(targetUserId)) {
+			return;
+		}
+		BandMember target = bandMembers.findByBandIdAndUserId(bandId, targetUserId)
+			.orElseThrow(() -> new NotFoundException("MEMBER_NOT_FOUND", "위임할 멤버를 찾을 수 없습니다."));
+		BandMember current = bandMembers.findByBandIdAndUserId(bandId, currentOwnerId)
+			.orElseThrow(() -> new NotFoundException("NOT_A_MEMBER", "이 밴드의 멤버가 아닙니다."));
+		target.changeRole(BandRole.OWNER);
+		current.changeRole(BandRole.MEMBER);
+	}
+
+	/** 밴드 삭제 — 하위(멤버/초대/곡/일정/미디어)는 DB FK CASCADE 로 함께 삭제. 파일·Redis 초대키는 직접 정리. */
+	@Transactional
+	public void delete(Long bandId) {
+		Band band = findBand(bandId);
+
+		inviteCodes.findByBandId(bandId).ifPresent(inviteCode -> {
+			inviteCodeCache.evict(inviteCode.getCode());
+			inviteCodes.delete(inviteCode);
+		});
+		storage.delete(band.getLogoUrl());
+		storage.delete(band.getBannerUrl());
+
+		bands.delete(band);
 	}
 
 	private Band findBand(Long bandId) {

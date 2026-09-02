@@ -12,6 +12,9 @@ import com.bandive.bandive.band.dto.BandResponse;
 import com.bandive.bandive.band.dto.BandUpdateRequest;
 import com.bandive.bandive.common.exception.NotFoundException;
 import com.bandive.bandive.common.storage.StorageService;
+import com.bandive.bandive.invite.InviteCode;
+import com.bandive.bandive.invite.InviteCodeRepository;
+import com.bandive.bandive.invite.service.InviteCodeCache;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
 import com.bandive.bandive.support.Fixtures;
@@ -25,6 +28,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.BDDMockito.then;
+import static org.mockito.Mockito.mock;
 
 class BandServiceTest extends RepositoryTest {
 
@@ -38,15 +43,20 @@ class BandServiceTest extends RepositoryTest {
 	private UserRepository users;
 
 	@Autowired
+	private InviteCodeRepository inviteCodes;
+
+	@Autowired
 	private TestEntityManager em;
 
 	private final RecordingStorage storage = new RecordingStorage();
+
+	private final InviteCodeCache inviteCodeCache = mock(InviteCodeCache.class);
 
 	private BandService service;
 
 	@BeforeEach
 	void setUp() {
-		service = new BandService(bands, bandMembers, users, storage);
+		service = new BandService(bands, bandMembers, users, storage, inviteCodes, inviteCodeCache);
 	}
 
 	@Test
@@ -127,6 +137,55 @@ class BandServiceTest extends RepositoryTest {
 
 		assertThat(second.logoUrl()).isEqualTo("http://localhost:8081/files/band-logo/second.png");
 		assertThat(storage.deleted).contains("http://localhost:8081/files/band-logo/first.png");
+	}
+
+	@Test
+	void 위임하면_역할이_뒤바뀐다() {
+		Long ownerId = em.persist(Fixtures.user("o")).getId();
+		Long bandId = service.create(ownerId, new BandCreateRequest("팀", null)).id();
+		User next = em.persist(Fixtures.user("n"));
+		bandMembers.save(Fixtures.member(bands.findById(bandId).orElseThrow(), next, BandRole.MEMBER));
+		em.flush();
+
+		service.transferOwnership(bandId, ownerId, next.getId());
+		em.flush();
+		em.clear();
+
+		assertThat(bandMembers.findByBandIdAndUserId(bandId, next.getId()).orElseThrow().getRole())
+			.isEqualTo(BandRole.OWNER);
+		assertThat(bandMembers.findByBandIdAndUserId(bandId, ownerId).orElseThrow().getRole())
+			.isEqualTo(BandRole.MEMBER);
+	}
+
+	@Test
+	void 위임_대상이_멤버가_아니면_404() {
+		Long ownerId = em.persist(Fixtures.user("o")).getId();
+		Long bandId = service.create(ownerId, new BandCreateRequest("팀", null)).id();
+		em.flush();
+
+		assertThatThrownBy(() -> service.transferOwnership(bandId, ownerId, 999L))
+			.isInstanceOf(NotFoundException.class);
+	}
+
+	@Test
+	void 삭제하면_밴드와_하위_멤버_초대가_사라지고_파일_Redis_를_정리한다() {
+		Long ownerId = em.persist(Fixtures.user("o")).getId();
+		Long bandId = service.create(ownerId, new BandCreateRequest("팀", null)).id();
+		bands.findById(bandId).orElseThrow().changeLogo("http://localhost:8081/files/band-logo/x.png");
+		inviteCodes.save(InviteCode.builder().band(bands.findById(bandId).orElseThrow()).code("DELCODE1").build());
+		em.flush();
+		// 실제 요청에선 delete 가 새 트랜잭션/세션에서 돈다 — 앞서 만든 엔티티가 영속성 컨텍스트에 남지 않도록 정리
+		em.clear();
+
+		service.delete(bandId);
+		em.flush();
+		em.clear();
+
+		assertThat(bands.findById(bandId)).isEmpty();
+		assertThat(bandMembers.findAllByBandId(bandId)).isEmpty();
+		assertThat(inviteCodes.findByBandId(bandId)).isEmpty();
+		then(inviteCodeCache).should().evict("DELCODE1");
+		assertThat(storage.deleted).contains("http://localhost:8081/files/band-logo/x.png");
 	}
 
 	private MultipartFile dummyFile() {

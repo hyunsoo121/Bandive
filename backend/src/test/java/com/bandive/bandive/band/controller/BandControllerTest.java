@@ -30,11 +30,14 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.BDDMockito.then;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -127,6 +130,40 @@ class BandControllerTest {
 		mvc.perform(multipart("/api/bands/1/logo")
 			.file(new MockMultipartFile("file", "logo.png", "image/png", new byte[] { 1, 2, 3 }))
 			.with(asUser(7L))).andExpect(status().isOk());
+	}
+
+	@Test
+	void 밴드장_위임은_204() throws Exception {
+		given(bandGuard.isOwner(1L)).willReturn(true);
+
+		mvc.perform(put("/api/bands/1/owner").with(asUser(7L))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"userId\":9}")).andExpect(status().isNoContent());
+		then(bandService).should().transferOwnership(1L, 7L, 9L);
+	}
+
+	@Test
+	void 위임은_밴드장이_아니면_403() throws Exception {
+		given(bandGuard.isOwner(1L)).willReturn(false);
+
+		mvc.perform(put("/api/bands/1/owner").with(asUser(7L))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"userId\":9}")).andExpect(status().isForbidden());
+	}
+
+	@Test
+	void 밴드_삭제는_밴드장이면_204() throws Exception {
+		given(bandGuard.isOwner(1L)).willReturn(true);
+
+		mvc.perform(delete("/api/bands/1").with(asUser(7L))).andExpect(status().isNoContent());
+		then(bandService).should().delete(1L);
+	}
+
+	@Test
+	void 밴드_삭제는_밴드장이_아니면_403() throws Exception {
+		given(bandGuard.isOwner(1L)).willReturn(false);
+
+		mvc.perform(delete("/api/bands/1").with(asUser(7L))).andExpect(status().isForbidden());
 	}
 
 	@TestConfiguration
