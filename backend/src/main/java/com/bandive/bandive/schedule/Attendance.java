@@ -47,4 +47,8 @@ public class Attendance extends BaseTimeEntity {
 	@Column(nullable = false, length = 20)
 	private AttendanceStatus status;
 
+	public void changeStatus(AttendanceStatus status) {
+		this.status = status;
+	}
+
 }

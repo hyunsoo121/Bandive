@@ -218,7 +218,15 @@
     권한은 서비스 레벨(songId → song.band 로 멤버/밴드장 검사). `NOT_A_MEMBER` 403 / `NOT_BAND_OWNER` 403.
     ⚠️ 공개 GET + 현재유저 → `@AuthenticationPrincipal UserPrincipal`(익명이면 null), `@CurrentUser` 는 익명에서 500.
     124 테스트 그린.
-  - 4-5 일정(+출결)  4-6 미디어(visibility 필터)
+  - **4-5 일정 + 출결 ✅ 완료 (2026-09-02)**: `schedule/{dto,service,controller}`.
+    `GET /api/bands/{bandId}/schedules`(공개, dateTime 오름차순, `ScheduleResponse` 에 `attendees`(응답한 멤버만)·`counts{attending,absent,undecided}`·`myStatus`(비회원 null) — `@AuthenticationPrincipal UserPrincipal`) /
+    `POST .../schedules`(밴드 멤버, `{type,dateTime,location?}`) /
+    `PATCH /api/schedules/{id}`(**밴드 멤버 누구나**, 부분 수정 — null 필드 무시) /
+    `DELETE /api/schedules/{id}`(밴드장, attendances cascade) /
+    `POST /api/schedules/{id}/attendance`(밴드 멤버, `{status}` → 내 출결 **upsert**).
+    권한 서비스 레벨(scheduleId → schedule.band). 없는 일정 `404 SCHEDULE_NOT_FOUND`.
+    **"연결 영상 포함"은 4-6 에서** (Media 도메인 후). 마이그레이션 없음. 142 테스트 그린.
+  - 4-6 미디어(visibility 필터)
 - **Phase 5 — 파일 업로드 / 외부 음원 검색**: `StorageService`(로컬 dev / S3 prod),
   곡 검색은 MANUAL 우선 완성 · SEARCH 는 스텁 후 실 API 연동
 - **Phase 6 — 프론트 연동**: `frontend/src/api/*` 레이어, `AppContext` 액션을 실제 호출로 교체, 목 제거
