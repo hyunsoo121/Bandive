@@ -68,7 +68,7 @@ class JwtProviderTest {
 	private static AuthProperties props(String secret, Duration access, Duration refresh) {
 		return new AuthProperties(new AuthProperties.Jwt(secret, access, refresh),
 				new AuthProperties.Oauth2("http://localhost:5173/oauth/success", "http://localhost:5173/oauth/failure"),
-				new AuthProperties.Cookie(false), new AuthProperties.Cors("http://localhost:5173"));
+				new AuthProperties.Cookie(false));
 	}
 
 	private static void await() {

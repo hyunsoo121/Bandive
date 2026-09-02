@@ -204,6 +204,33 @@ cd backend && docker compose down -v && docker compose up -d
 
 ---
 
+## Phase 3 (공통 인프라)
+
+### `package com.fasterxml.jackson.databind does not exist`
+
+**원인.** Spring Boot 4 / Spring Framework 7 은 **Jackson 3** 을 쓴다. 3.x 에서 패키지 루트가
+`com.fasterxml.jackson.*` → **`tools.jackson.*`** 로 바뀌었다 (`jackson-databind` 좌표도
+`tools.jackson.core:jackson-databind`).
+
+**해결.** import 를 `tools.jackson.databind.ObjectMapper` 로. Jackson 3 에서 직렬화 예외는
+unchecked (`tools.jackson.core.JacksonException extends RuntimeException`) 라 `throws IOException`
+없어도 된다. Boot 이 만들어주는 `ObjectMapper`(사실상 `tools.jackson.databind.json.JsonMapper`) 빈은
+그대로 주입된다.
+
+### 에러 응답이 두 종류로 갈린다 (필터 vs 컨트롤러)
+
+**증상.** 컨트롤러에서 던진 예외는 `ErrorResponse` 스키마인데, 인증 실패(401)·인가 실패(403)는
+Spring Security 기본 응답.
+
+**원인.** `@RestControllerAdvice` 는 **DispatcherServlet 안**에서만 동작. 인증/인가는 그 앞
+**필터 단계**라 advice 를 안 탄다.
+
+**해결.** `RestAuthenticationEntryPoint`(401) / `RestAccessDeniedHandler`(403) 에서 `ObjectMapper` 로
+같은 `ErrorResponse` 를 직접 써준다. `@PreAuthorize`(메서드 보안) 거부는 컨트롤러 이후라
+`GlobalExceptionHandler` 의 `AuthorizationDeniedException` 핸들러가 잡는다.
+
+---
+
 ### pre-commit 훅이 안 걸림
 
 **증상.** 커밋해도 lint/format 검사가 안 돎.

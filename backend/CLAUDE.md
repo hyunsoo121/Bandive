@@ -177,8 +177,14 @@
   `JwtProvider`(HS256, access 30m / refresh 14d), `JwtAuthenticationFilter`(Bearer), `@CurrentUser Long`, `BandGuard`(`@PreAuthorize("@bandGuard.isOwner(#bandId)")` + `@EnableMethodSecurity`), 401/403 JSON 핸들러.
   설정: `spring.config.import: optional:file:.env[.properties]` 로 `.env` 로드. `app.auth.*` = `AuthProperties`.
   검증: 41 테스트 (JwtProvider / SecurityRules / AuthController / CustomOAuth2UserService / OAuth2LoginSuccessHandler / BandGuard). 실제 카카오 없이 더미값 + `MockWebServer` 미사용(핸들러 직접 호출).
-- **Phase 3 — 공통 인프라**: CORS 정식화(현재 최소본 SecurityConfig 안에 있음), `@RestControllerAdvice` 전역 예외 → 일관 에러 JSON
-  (현재는 `server.error.include-stacktrace=never` 로만 막아둠), DTO 컨벤션. `BandGuard` 는 Phase 2 에서 완료.
+- **Phase 3 — 공통 인프라 ✅ 완료 (2026-09-02)**:
+  - `common/exception/`: `BandiveException`(status+code, 직접 throw 가능) + `NotFoundException`(404)/`ForbiddenException`(403)/`ConflictException`(409)/`ValidationException`(400).
+  - `GlobalExceptionHandler`(`@RestControllerAdvice extends ResponseEntityExceptionHandler`): BandiveException / `@Valid` 실패(첫 필드 메시지 한 줄) / `AuthorizationDeniedException` / 프레임워크 예외(405·깨진 JSON·404) / 그 외 → 500 (내부 메시지 은닉).
+  - `common/response/ErrorResponse`(status, code, message, path, timestamp). **성공 응답은 래핑 안 함**.
+  - 필터단(401/403)은 `RestAuthenticationEntryPoint`/`RestAccessDeniedHandler` 가 `ObjectMapper` 로 같은 `ErrorResponse` 를 씀. `AuthController` 는 `ResponseStatusException` → `BandiveException` 으로 교체.
+  - CORS: `common/config/{CorsConfig,CorsProperties}` 로 분리. `app.cors.allowed-origins`(리스트, `${APP_CORS_ALLOWED_ORIGINS}`), `allowCredentials(true)`. `SecurityConfig` 는 `.cors(withDefaults())` 만.
+  - DTO 컨벤션: `common/dto/package-info.java` (Request=record+Bean Validation, Response=record+`from(Entity)`, 엔티티 직접 노출 금지).
+  - ⚠️ Boot 4 = **Jackson 3** → `tools.jackson.*` 패키지. 검증: 49 테스트 (GlobalExceptionHandler 6 / CorsConfig 2 신규).
 - **Phase 4 — 도메인 API** (CLAUDE.md 순서, 각 도메인이 승인 단위):
   1. 밴드  2. 초대(Redis 캐시)  3. 밴드 멤버  4. 곡(+SongPart 슬롯·투표·승격·배정)
   5. 일정(+출결)  6. 미디어(visibility 필터)

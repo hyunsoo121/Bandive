@@ -22,5 +22,5 @@ app:
       failure-redirect: http://localhost:5173/oauth/failure
     cookie:
       secure: false
-    cors:
-      allowed-origin: http://localhost:5173
+  cors:
+    allowed-origins: http://localhost:5173
