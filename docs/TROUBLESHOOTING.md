@@ -231,6 +231,50 @@ Spring Security 기본 응답.
 
 ---
 
+## Phase 4 (도메인 API)
+
+### `@WebMvcTest` 컨텍스트 로드 실패 — `No qualifying bean of type 'JwtProvider'`
+
+**원인.** `@WebMvcTest` 슬라이스는 컨트롤러뿐 아니라 **`Filter` / `WebMvcConfigurer` / `@ControllerAdvice` 빈도
+같이 올린다.** `JwtAuthenticationFilter`(`@Component`, `OncePerRequestFilter`)가 딸려 올라오면서
+생성자 의존 `JwtProvider` 를 찾다 실패.
+
+**해결.** 그 의존을 `@MockitoBean` 으로 채운다:
+
+```java
+@WebMvcTest(BandController.class)
+class BandControllerTest {
+    @MockitoBean BandService bandService;
+    @MockitoBean(name = "bandGuard") BandGuard bandGuard;   // @PreAuthorize SpEL 용
+    @MockitoBean JwtProvider jwtProvider;                    // 딸려온 JwtAuthenticationFilter 용
+```
+
+`@PreAuthorize` 를 태우려면 슬라이스에 method security 가 필요하다 — 테스트 안 nested
+`@TestConfiguration @EnableMethodSecurity` + permit-all `SecurityFilterChain` 하나 두면 된다.
+현재 로그인 사용자는 `SecurityMockMvcRequestPostProcessors.authentication(new UsernamePasswordAuthenticationToken(new UserPrincipal(id), ...))` 로 주입 (`@CurrentUser` 가 `principal.id` 를 읽음).
+
+### 앱 기동 실패 — `Ambiguous @ExceptionHandler method mapped for [MaxUploadSizeExceededException]`
+
+**원인.** `GlobalExceptionHandler extends ResponseEntityExceptionHandler`. 최근 Spring 은
+`MaxUploadSizeExceededException`(그리고 `ErrorResponseException`, `MissingServletRequestPartException` 등)을
+**base class 가 이미 `@ExceptionHandler` 로 처리**한다. 하위에서 같은 타입을 다시 선언하면 컨텍스트 초기화 때 터진다.
+
+**해결.** base class 가 잡는 타입은 다시 선언하지 말고, 메시지/코드만 바꾸고 싶으면
+`handleExceptionInternal` 오버라이드 안에서 `statusCode` 로 분기한다 (예: `case 413 -> "파일이 너무 큽니다"`).
+
+### `.env` 값에 앞 공백이 있으면 로컬에선 되는데 다른 데선 깨진다
+
+`JWT_SECRET= abc...` 처럼 `=` 뒤에 공백을 넣으면 **Spring properties 파서는 앞뒤 공백을 잘라내서** 앱은 정상 동작하지만,
+쉘 `export` / docker env 로 같은 `.env` 를 읽으면 공백이 값에 포함돼 서명 불일치(401) 등이 난다. `.env` 값은 공백 없이 붙여 쓴다.
+
+### WARN `... cannot get proxied via CGLIB` (CustomOAuth2UserService)
+
+`CustomOAuth2UserService` 가 `DefaultOAuth2UserService` 를 상속하면서 `@Transactional` 메서드를 가져
+CGLIB 프록시가 생기는데 부모의 `final` setter 를 못 감싼다는 **경고일 뿐**(우리는 그 setter 를 안 씀). 무시 가능.
+거슬리면 upsert 로직을 별도 `@Service` 로 빼면 사라진다.
+
+---
+
 ### pre-commit 훅이 안 걸림
 
 **증상.** 커밋해도 lint/format 검사가 안 돎.

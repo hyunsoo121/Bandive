@@ -93,6 +93,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
 			case 400 -> "요청 형식이 올바르지 않습니다.";
 			case 404 -> "요청한 리소스를 찾을 수 없습니다.";
 			case 405 -> "허용되지 않은 요청 방식입니다.";
+			case 413 -> "파일이 너무 큽니다 (최대 5MB).";
 			case 415 -> "지원하지 않는 요청 형식입니다.";
 			default -> "요청을 처리할 수 없습니다.";
 		};

@@ -185,10 +185,15 @@
   - CORS: `common/config/{CorsConfig,CorsProperties}` 로 분리. `app.cors.allowed-origins`(리스트, `${APP_CORS_ALLOWED_ORIGINS}`), `allowCredentials(true)`. `SecurityConfig` 는 `.cors(withDefaults())` 만.
   - DTO 컨벤션: `common/dto/package-info.java` (Request=record+Bean Validation, Response=record+`from(Entity)`, 엔티티 직접 노출 금지).
   - ⚠️ Boot 4 = **Jackson 3** → `tools.jackson.*` 패키지. 검증: 49 테스트 (GlobalExceptionHandler 6 / CorsConfig 2 신규).
-- **Phase 4 — 도메인 API** (CLAUDE.md 순서, 각 도메인이 승인 단위):
-  1. 밴드  2. 초대(Redis 캐시)  3. 밴드 멤버  4. 곡(+SongPart 슬롯·투표·승격·배정)
-  5. 일정(+출결)  6. 미디어(visibility 필터)
-  각 도메인: DTO → Service → Controller → `@WebMvcTest`
+- **Phase 4 — 도메인 API** (각 도메인이 승인 단위). 각 도메인: DTO → Service → Controller → `@WebMvcTest`
+  - **4-1 밴드 ✅ 완료 (2026-09-02)**: `band/{dto,service,controller}`. `POST /api/bands`(생성자 자동 OWNER 등록, 201) /
+    `GET /api/bands/{id}`(공개) / `GET /api/bands/my`(인증) / `PATCH /api/bands/{id}`(`@PreAuthorize("@bandGuard.isOwner(#bandId)")`) /
+    `POST .../logo` · `POST .../banner`(밴드장, multipart). `BandResponse` 에 `memberCount` 포함.
+    **V2**: `bands.description varchar(500)` nullable. `BandMemberRepository.countByBandId` 추가.
+    파일: `common/storage/{StorageService,LocalStorageService,StorageProperties}` (인터페이스 뒤 로컬디스크 구현, Phase 5 에서 S3 교체).
+    `WebMvcConfig` 가 `/files/**` → 로컬 업로드 디렉토리 서빙 (SecurityConfig permitAll). `spring.servlet.multipart` 5MB.
+    `SecurityConfig`: `GET /api/bands/my` 인증, `/files/**` 공개 추가. 테스트: `BandControllerTest`(@WebMvcTest) 7 + `BandServiceTest`(RepositoryTest) 7. 총 64 그린.
+  - 4-2 초대(Redis 캐시)  4-3 밴드 멤버  4-4 곡(+SongPart·투표·승격·배정)  4-5 일정(+출결)  4-6 미디어(visibility 필터)
 - **Phase 5 — 파일 업로드 / 외부 음원 검색**: `StorageService`(로컬 dev / S3 prod),
   곡 검색은 MANUAL 우선 완성 · SEARCH 는 스텁 후 실 API 연동
 - **Phase 6 — 프론트 연동**: `frontend/src/api/*` 레이어, `AppContext` 액션을 실제 호출로 교체, 목 제거

@@ -15,4 +15,6 @@ public interface BandMemberRepository extends JpaRepository<BandMember, Long> {
 
 	List<BandMember> findAllByUserId(Long userId);
 
+	long countByBandId(Long bandId);
+
 }

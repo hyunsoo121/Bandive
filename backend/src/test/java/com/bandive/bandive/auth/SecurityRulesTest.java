@@ -30,7 +30,7 @@ class SecurityRulesTest extends IntegrationTest {
 
 	@Test
 	void GET_api_는_비회원도_통과한다() throws Exception {
-		// 컨트롤러가 아직 없어 404 지만, 401/403 이 아니라는 게 핵심 (보안 통과)
+		// 밴드가 없어 404 지만, 401/403 이 아니라는 게 핵심 (보안 통과)
 		mvc.perform(get("/api/bands/1")).andExpect(status().isNotFound());
 	}
 
@@ -48,13 +48,19 @@ class SecurityRulesTest extends IntegrationTest {
 	@Test
 	void 쓰기_요청은_유효한_access_토큰이면_보안을_통과한다() throws Exception {
 		String token = jwtProvider.createAccessToken(1L);
-		mvc.perform(post("/api/bands").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
+		// 아직 컨트롤러 없는 경로 — 401/403 이 아니라 404 면 보안은 통과한 것
+		mvc.perform(post("/api/schedules").header(HttpHeaders.AUTHORIZATION, "Bearer " + token))
 			.andExpect(status().isNotFound());
 	}
 
 	@Test
 	void auth_me_는_토큰_없으면_401() throws Exception {
 		mvc.perform(get("/api/auth/me")).andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void bands_my_는_토큰_없으면_401() throws Exception {
+		mvc.perform(get("/api/bands/my")).andExpect(status().isUnauthorized());
 	}
 
 }
