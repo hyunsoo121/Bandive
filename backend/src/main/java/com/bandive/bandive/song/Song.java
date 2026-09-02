@@ -80,4 +80,13 @@ public class Song extends BaseTimeEntity {
 		part.assignToSong(this);
 	}
 
+	public boolean isConfirmed() {
+		return this.status == SongStatus.CONFIRMED;
+	}
+
+	/** WISHLIST → CONFIRMED 승격. 이미 확정이면 아무 일도 안 한다 (멱등). */
+	public void confirm() {
+		this.status = SongStatus.CONFIRMED;
+	}
+
 }

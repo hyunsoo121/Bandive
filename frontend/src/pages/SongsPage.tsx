@@ -14,7 +14,6 @@ type SortKey = 'votes' | 'recent';
 export function SongsPage() {
   const { currentBand, role, songs, members, voteSong, promoteSong, assignPart } = useApp();
   const guard = useGuard();
-  const bandId = currentBand.id;
   const isOwner = role === 'owner';
   const isGuest = role === 'guest';
 
@@ -22,6 +21,9 @@ export function SongsPage() {
   const [sort, setSort] = useState<SortKey>('votes');
   const [openId, setOpenId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+
+  if (!currentBand) return null;
+  const bandId = currentBand.id;
 
   const memberNames = members.filter((m) => m.bandId === bandId).map((m) => m.name);
 

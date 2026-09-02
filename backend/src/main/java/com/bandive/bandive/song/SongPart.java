@@ -2,8 +2,6 @@ package com.bandive.bandive.song;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -23,7 +21,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * 곡의 세션 슬롯. 곡 등록 시점에 생성되며, assignedMember 는 곡이 CONFIRMED 일 때만 채워진다 (Phase 4 정책).
+ * 곡의 세션 슬롯. 곡 등록 시점에 생성되며, assignedMember 는 곡이 CONFIRMED 일 때만 채워진다. instrument 는 자유 문자열
+ * (GUITAR 등 표준값 권장이나 "색소폰" 같은 값도 허용).
  */
 @Getter
 @Entity
@@ -43,9 +42,8 @@ public class SongPart extends BaseTimeEntity {
 	@JoinColumn(name = "song_id", nullable = false)
 	private Song song;
 
-	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
-	private Instrument instrument;
+	private String instrument;
 
 	/** 동일 악기 내 순번 (1부터) */
 	@Column(name = "part_index", nullable = false)
@@ -57,6 +55,15 @@ public class SongPart extends BaseTimeEntity {
 
 	void assignToSong(Song song) {
 		this.song = song;
+	}
+
+	/** CONFIRMED 곡에서만 호출되어야 한다 (SongService 가 강제). */
+	public void assignTo(BandMember member) {
+		this.assignedMember = member;
+	}
+
+	public void unassign() {
+		this.assignedMember = null;
 	}
 
 }

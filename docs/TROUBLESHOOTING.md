@@ -204,6 +204,107 @@ cd backend && docker compose down -v && docker compose up -d
 
 ---
 
+## Phase 3 (공통 인프라)
+
+### `package com.fasterxml.jackson.databind does not exist`
+
+**원인.** Spring Boot 4 / Spring Framework 7 은 **Jackson 3** 을 쓴다. 3.x 에서 패키지 루트가
+`com.fasterxml.jackson.*` → **`tools.jackson.*`** 로 바뀌었다 (`jackson-databind` 좌표도
+`tools.jackson.core:jackson-databind`).
+
+**해결.** import 를 `tools.jackson.databind.ObjectMapper` 로. Jackson 3 에서 직렬화 예외는
+unchecked (`tools.jackson.core.JacksonException extends RuntimeException`) 라 `throws IOException`
+없어도 된다. Boot 이 만들어주는 `ObjectMapper`(사실상 `tools.jackson.databind.json.JsonMapper`) 빈은
+그대로 주입된다.
+
+### 에러 응답이 두 종류로 갈린다 (필터 vs 컨트롤러)
+
+**증상.** 컨트롤러에서 던진 예외는 `ErrorResponse` 스키마인데, 인증 실패(401)·인가 실패(403)는
+Spring Security 기본 응답.
+
+**원인.** `@RestControllerAdvice` 는 **DispatcherServlet 안**에서만 동작. 인증/인가는 그 앞
+**필터 단계**라 advice 를 안 탄다.
+
+**해결.** `RestAuthenticationEntryPoint`(401) / `RestAccessDeniedHandler`(403) 에서 `ObjectMapper` 로
+같은 `ErrorResponse` 를 직접 써준다. `@PreAuthorize`(메서드 보안) 거부는 컨트롤러 이후라
+`GlobalExceptionHandler` 의 `AuthorizationDeniedException` 핸들러가 잡는다.
+
+---
+
+## Phase 4 (도메인 API)
+
+### `@WebMvcTest` 컨텍스트 로드 실패 — `No qualifying bean of type 'JwtProvider'`
+
+**원인.** `@WebMvcTest` 슬라이스는 컨트롤러뿐 아니라 **`Filter` / `WebMvcConfigurer` / `@ControllerAdvice` 빈도
+같이 올린다.** `JwtAuthenticationFilter`(`@Component`, `OncePerRequestFilter`)가 딸려 올라오면서
+생성자 의존 `JwtProvider` 를 찾다 실패.
+
+**해결.** 그 의존을 `@MockitoBean` 으로 채운다:
+
+```java
+@WebMvcTest(BandController.class)
+class BandControllerTest {
+    @MockitoBean BandService bandService;
+    @MockitoBean(name = "bandGuard") BandGuard bandGuard;   // @PreAuthorize SpEL 용
+    @MockitoBean JwtProvider jwtProvider;                    // 딸려온 JwtAuthenticationFilter 용
+```
+
+`@PreAuthorize` 를 태우려면 슬라이스에 method security 가 필요하다 — 테스트 안 nested
+`@TestConfiguration @EnableMethodSecurity` + permit-all `SecurityFilterChain` 하나 두면 된다.
+현재 로그인 사용자는 `SecurityMockMvcRequestPostProcessors.authentication(new UsernamePasswordAuthenticationToken(new UserPrincipal(id), ...))` 로 주입 (`@CurrentUser` 가 `principal.id` 를 읽음).
+
+### 앱 기동 실패 — `Ambiguous @ExceptionHandler method mapped for [MaxUploadSizeExceededException]`
+
+**원인.** `GlobalExceptionHandler extends ResponseEntityExceptionHandler`. 최근 Spring 은
+`MaxUploadSizeExceededException`(그리고 `ErrorResponseException`, `MissingServletRequestPartException` 등)을
+**base class 가 이미 `@ExceptionHandler` 로 처리**한다. 하위에서 같은 타입을 다시 선언하면 컨텍스트 초기화 때 터진다.
+
+**해결.** base class 가 잡는 타입은 다시 선언하지 말고, 메시지/코드만 바꾸고 싶으면
+`handleExceptionInternal` 오버라이드 안에서 `statusCode` 로 분기한다 (예: `case 413 -> "파일이 너무 큽니다"`).
+
+### `.env` 값에 앞 공백이 있으면 로컬에선 되는데 다른 데선 깨진다
+
+`JWT_SECRET= abc...` 처럼 `=` 뒤에 공백을 넣으면 **Spring properties 파서는 앞뒤 공백을 잘라내서** 앱은 정상 동작하지만,
+쉘 `export` / docker env 로 같은 `.env` 를 읽으면 공백이 값에 포함돼 서명 불일치(401) 등이 난다. `.env` 값은 공백 없이 붙여 쓴다.
+
+### WARN `... cannot get proxied via CGLIB` (CustomOAuth2UserService)
+
+`CustomOAuth2UserService` 가 `DefaultOAuth2UserService` 를 상속하면서 `@Transactional` 메서드를 가져
+CGLIB 프록시가 생기는데 부모의 `final` setter 를 못 감싼다는 **경고일 뿐**(우리는 그 setter 를 안 씀). 무시 가능.
+거슬리면 upsert 로직을 별도 `@Service` 로 빼면 사라진다.
+
+### `@DataJpaTest` 삭제 테스트 — `TransientPropertyValueException: ... references an unsaved transient instance`
+
+**증상.** 서비스가 `bandRepository.delete(band)` 로 지우고 하위(band_members 등)는 DB `ON DELETE CASCADE` 에
+맡기는데, `@DataJpaTest` 에서 그 서비스를 호출하면 `em.flush()` 시점에
+`BandMember references an unsaved transient instance of Band`.
+
+**원인.** `@DataJpaTest` 는 한 테스트 = 한 트랜잭션/세션. setup 에서 `service.create(...)` 로 만든
+`BandMember` 가 영속성 컨텍스트에 **관리 상태로 남아** 있는데, 이후 `bands.delete(band)` 로 Band 가
+삭제 예약되면 그 BandMember 의 `band` 참조가 transient 로 취급된다. (운영에선 삭제가 새 트랜잭션/세션에서
+돌기 때문에 이 문제 없음 — `@PreAuthorize` 의 `BandGuard` 조회도 별도 짧은 트랜잭션.)
+
+**해결.** 테스트에서 `service.delete(...)` 호출 직전에 `em.flush(); em.clear();` 로 컨텍스트를 비운다
+(운영 상황을 흉내). 서비스 코드는 그대로 — DB cascade 방식 유지.
+
+## Phase 4-4 (곡)
+
+### 비회원도 되는 GET 에 `@CurrentUser` 를 쓰면 500
+
+**증상.** `GET /api/bands/{bandId}/songs` (공개, `votedByMe` 계산용으로 현재 유저가 필요) 를 토큰 없이
+부르면 500.
+
+**원인.** `@CurrentUser` = `@AuthenticationPrincipal(expression = "id")`. 익명 요청이면
+`AnonymousAuthenticationFilter` 가 principal 을 문자열 `"anonymousUser"` 로 채워두는데,
+거기서 SpEL `id` 를 평가하다 터진다. (인증 강제된 엔드포인트는 principal 이 항상 `UserPrincipal` 이라 문제없음.)
+
+**해결.** 선택적 인증 엔드포인트는 `@CurrentUser Long` 대신
+`@AuthenticationPrincipal UserPrincipal principal` 를 받고 `principal != null ? principal.getId() : null`.
+(`expression` 없는 `@AuthenticationPrincipal` 은 타입 불일치 시 기본값 null 을 준다.) Phase 4-5/4-6 의
+공개 목록에서도 같은 패턴.
+
+---
+
 ### pre-commit 훅이 안 걸림
 
 **증상.** 커밋해도 lint/format 검사가 안 돎.
@@ -211,3 +312,43 @@ cd backend && docker compose down -v && docker compose up -d
 **원인.** `core.hooksPath` 미설정 (clone 직후) 또는 `hooks/pre-commit` 실행권한 없음.
 
 **해결.** `sh hooks/install.sh` 한 번 실행. 훅을 우회해야 하면 `git commit --no-verify`.
+
+---
+
+## 프론트 ↔ 백엔드 연동 (frontend/src/api)
+
+### 로그인은 되는데 새로고침하면 로그아웃된다
+
+**증상.** 카카오 로그인 직후엔 멀쩡한데 F5 누르면 게스트로 돌아감.
+
+**원인.** access 토큰은 메모리에만 둔다(그게 의도). 새로고침 시엔 refresh 쿠키로 다시 받아야 하는데,
+`POST /api/auth/refresh` 가 401 이면 복구 실패.
+
+**해결.** refresh 쿠키(`refresh_token`, httpOnly, path `/api/auth`)가 브라우저에 남아 있는지 확인.
+- 백엔드가 `application-local.yaml` 로 떠서 `app.auth.cookie.secure=false` 여야 http localhost 에서 쿠키가 심긴다.
+- 프론트 fetch 는 전부 `credentials: 'include'` (client.ts) — 빠지면 쿠키가 안 실린다.
+- 로컬은 `localhost:5173` ↔ `localhost:8081` 로 **포트만 다르고 같은 site** 라 `SameSite=Strict` 쿠키도 전송된다.
+  (배포 때 프론트/백엔드가 다른 도메인이면 `SameSite=None; Secure` 로 바꿔야 함 — Phase 7 숙제)
+
+### CORS 에러 — `blocked by CORS policy` 또는 프리플라이트 실패
+
+**원인.** 백엔드 `app.cors.allowed-origins` 에 프론트 오리진이 없거나, credentials 요청인데
+와일드카드 오리진이라 브라우저가 거부.
+
+**해결.** `backend/.env` (또는 기본값)에 `APP_CORS_ALLOWED_ORIGINS=http://localhost:5173`.
+`CorsConfig` 는 이미 `allowCredentials(true)` + 명시 오리진 + 모든 헤더/메서드 허용.
+프론트 `VITE_API_ORIGIN` 이 그 오리진에서 백엔드를 가리키는지도 확인 (기본 `http://localhost:8081`).
+
+### 초대 코드가 멤버 화면에 안 보인다
+
+**증상.** 밴드장인데 멤버 탭에 초대 코드가 없음.
+
+**원인.** 버그 아님. 초대 코드 **조회** API 가 없다 (`POST` 발급/재발급만 있음). 발급을 눌러야 표시된다.
+`POST` 를 다시 부르면 이전 코드는 폐기되므로 자동 호출하지 않는 것.
+
+### 밴드장인데 밴드 전환 시트에 "사용자" 로 표시된다
+
+**원인.** `GET /api/bands/my` 응답에 아직 role 필드가 없다. 현재 밴드 화면의 권한 판정은
+멤버 목록에서 내 역할을 찾아 정확히 하지만, 내 밴드 **목록**(스위처)에는 역할 정보가 없어 전부 'member' fallback.
+
+**해결.** 백엔드가 my 응답에 role 을 실어주면 자동 해결 (`mappers.toBand` 가 이미 `dto.role` 을 읽음).

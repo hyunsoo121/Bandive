@@ -1,8 +1,13 @@
 package com.bandive.bandive.member;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.Set;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -52,5 +57,28 @@ public class BandMember extends BaseTimeEntity {
 
 	@Column(name = "joined_at", nullable = false)
 	private Instant joinedAt;
+
+	/** 이 밴드에서 맡은 파트(악기). Instrument 이름이 기본이나 자유 문자열도 허용. */
+	@Builder.Default
+	@ElementCollection(fetch = FetchType.LAZY)
+	@CollectionTable(name = "band_member_parts", joinColumns = @JoinColumn(name = "band_member_id"))
+	@Column(name = "part", length = 20, nullable = false)
+	private Set<String> parts = new LinkedHashSet<>();
+
+	public void changeRole(BandRole role) {
+		this.role = role;
+	}
+
+	/** 파트 전체 교체 (공백 제거·중복 제거). */
+	public void replaceParts(Collection<String> newParts) {
+		this.parts.clear();
+		if (newParts != null) {
+			newParts.stream()
+				.filter(part -> part != null)
+				.map(String::trim)
+				.filter(part -> !part.isEmpty())
+				.forEach(this.parts::add);
+		}
+	}
 
 }

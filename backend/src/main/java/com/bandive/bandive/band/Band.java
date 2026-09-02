@@ -30,10 +30,29 @@ public class Band extends BaseTimeEntity {
 	@Column(nullable = false, length = 100)
 	private String name;
 
+	@Column(length = 500)
+	private String description;
+
 	@Column(name = "logo_url", length = 500)
 	private String logoUrl;
 
 	@Column(name = "banner_url", length = 500)
 	private String bannerUrl;
+
+	/** 이름은 비울 수 없고, 소개는 null 로 지울 수 있다. */
+	public void updateInfo(String name, String description) {
+		if (name != null && !name.isBlank()) {
+			this.name = name;
+		}
+		this.description = description;
+	}
+
+	public void changeLogo(String logoUrl) {
+		this.logoUrl = logoUrl;
+	}
+
+	public void changeBanner(String bannerUrl) {
+		this.bannerUrl = bannerUrl;
+	}
 
 }

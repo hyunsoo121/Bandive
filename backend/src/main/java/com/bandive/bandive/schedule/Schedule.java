@@ -54,4 +54,17 @@ public class Schedule extends BaseTimeEntity {
 	@JoinColumn(name = "created_by", nullable = false)
 	private User createdBy;
 
+	/** 부분 수정 — null 인 필드는 그대로 둔다. */
+	public void updateInfo(ScheduleType type, Instant dateTime, String location) {
+		if (type != null) {
+			this.type = type;
+		}
+		if (dateTime != null) {
+			this.dateTime = dateTime;
+		}
+		if (location != null) {
+			this.location = location.isBlank() ? null : location;
+		}
+	}
+
 }

@@ -177,12 +177,61 @@
   `JwtProvider`(HS256, access 30m / refresh 14d), `JwtAuthenticationFilter`(Bearer), `@CurrentUser Long`, `BandGuard`(`@PreAuthorize("@bandGuard.isOwner(#bandId)")` + `@EnableMethodSecurity`), 401/403 JSON 핸들러.
   설정: `spring.config.import: optional:file:.env[.properties]` 로 `.env` 로드. `app.auth.*` = `AuthProperties`.
   검증: 41 테스트 (JwtProvider / SecurityRules / AuthController / CustomOAuth2UserService / OAuth2LoginSuccessHandler / BandGuard). 실제 카카오 없이 더미값 + `MockWebServer` 미사용(핸들러 직접 호출).
-- **Phase 3 — 공통 인프라**: CORS 정식화(현재 최소본 SecurityConfig 안에 있음), `@RestControllerAdvice` 전역 예외 → 일관 에러 JSON
-  (현재는 `server.error.include-stacktrace=never` 로만 막아둠), DTO 컨벤션. `BandGuard` 는 Phase 2 에서 완료.
-- **Phase 4 — 도메인 API** (CLAUDE.md 순서, 각 도메인이 승인 단위):
-  1. 밴드  2. 초대(Redis 캐시)  3. 밴드 멤버  4. 곡(+SongPart 슬롯·투표·승격·배정)
-  5. 일정(+출결)  6. 미디어(visibility 필터)
-  각 도메인: DTO → Service → Controller → `@WebMvcTest`
+- **Phase 3 — 공통 인프라 ✅ 완료 (2026-09-02)**:
+  - `common/exception/`: `BandiveException`(status+code, 직접 throw 가능) + `NotFoundException`(404)/`ForbiddenException`(403)/`ConflictException`(409)/`ValidationException`(400).
+  - `GlobalExceptionHandler`(`@RestControllerAdvice extends ResponseEntityExceptionHandler`): BandiveException / `@Valid` 실패(첫 필드 메시지 한 줄) / `AuthorizationDeniedException` / 프레임워크 예외(405·깨진 JSON·404) / 그 외 → 500 (내부 메시지 은닉).
+  - `common/response/ErrorResponse`(status, code, message, path, timestamp). **성공 응답은 래핑 안 함**.
+  - 필터단(401/403)은 `RestAuthenticationEntryPoint`/`RestAccessDeniedHandler` 가 `ObjectMapper` 로 같은 `ErrorResponse` 를 씀. `AuthController` 는 `ResponseStatusException` → `BandiveException` 으로 교체.
+  - CORS: `common/config/{CorsConfig,CorsProperties}` 로 분리. `app.cors.allowed-origins`(리스트, `${APP_CORS_ALLOWED_ORIGINS}`), `allowCredentials(true)`. `SecurityConfig` 는 `.cors(withDefaults())` 만.
+  - DTO 컨벤션: `common/dto/package-info.java` (Request=record+Bean Validation, Response=record+`from(Entity)`, 엔티티 직접 노출 금지).
+  - ⚠️ Boot 4 = **Jackson 3** → `tools.jackson.*` 패키지. 검증: 49 테스트 (GlobalExceptionHandler 6 / CorsConfig 2 신규).
+- **Phase 4 — 도메인 API** (각 도메인이 승인 단위). 각 도메인: DTO → Service → Controller → `@WebMvcTest`
+  - **4-1 밴드 ✅ 완료 (2026-09-02)**: `band/{dto,service,controller}`. `POST /api/bands`(생성자 자동 OWNER 등록, 201) /
+    `GET /api/bands/{id}`(공개) / `GET /api/bands/my`(인증) / `PATCH /api/bands/{id}`(`@PreAuthorize("@bandGuard.isOwner(#bandId)")`) /
+    `POST .../logo` · `POST .../banner`(밴드장, multipart). `BandResponse` 에 `memberCount` 포함.
+    **V2**: `bands.description varchar(500)` nullable. `BandMemberRepository.countByBandId` 추가.
+    파일: `common/storage/{StorageService,LocalStorageService,StorageProperties}` (인터페이스 뒤 로컬디스크 구현, Phase 5 에서 S3 교체).
+    `WebMvcConfig` 가 `/files/**` → 로컬 업로드 디렉토리 서빙 (SecurityConfig permitAll). `spring.servlet.multipart` 5MB.
+    `SecurityConfig`: `GET /api/bands/my` 인증, `/files/**` 공개 추가. 테스트: `BandControllerTest`(@WebMvcTest) 7 + `BandServiceTest`(RepositoryTest) 7. 총 64 그린.
+  - **4-2 초대 ✅ 완료 (2026-09-02)**: `invite/{dto,service,controller}`. `POST /api/bands/{bandId}/invite-codes`(밴드장, 201, `InviteCodeResponse{code,inviteUrl,...}`) / `POST /api/invite-codes/{code}/join`(로그인 → `BandResponse`).
+    밴드당 코드 1개(재발급 시 이전 행 삭제+캐시 evict). 코드 8자리(`0O1I` 제외), 만료·횟수 제한 없음(컬럼 유지, `used_count`만 +1).
+    join: 없는 코드 `404 INVITE_CODE_NOT_FOUND` / 이미 멤버 `409 ALREADY_MEMBER`. `InviteCodeCache`(Redis `invite:{code}→bandId`, TTL 없음, 미스 시 DB 복구).
+    신규 `app.frontend.base-url`(`common/config/{FrontendProperties,AppConfig}`), `InviteCodeRepository` 에 `existsByCode/findByBandId/deleteByBandId`. SecurityConfig 수정 없음. 74 테스트 그린.
+  - **4-3 밴드 멤버 ✅ 완료 (2026-09-02)**: `member/{dto,service,controller}`.
+    `GET /api/bands/{bandId}/members`(공개, `MemberResponse{userId,nickname,role,parts,joinedAt}`, OWNER 먼저→가입순, `findAllByBandIdWithUser` fetch join) /
+    `PATCH .../members/me`(내 파트) / `PATCH .../members/{userId}`(밴드장이 남의 파트) /
+    `DELETE .../members/{userId}`(추방, 밴드장 204) / `DELETE .../members/me`(탈퇴 204) /
+    `PUT /api/bands/{bandId}/owner`(밴드장 위임, `{userId}`, 이전 밴드장→MEMBER, 204) / `DELETE /api/bands/{bandId}`(밴드 삭제, 204).
+    추방: 없는 멤버 `404 MEMBER_NOT_FOUND`, 밴드장 대상 `409 CANNOT_KICK_OWNER`. 탈퇴: 비멤버 `404 NOT_A_MEMBER`, 밴드장 `409 OWNER_CANNOT_LEAVE`.
+    **V3**: `band_member_parts` 테이블(멤버 1:N 파트, `@ElementCollection Set<String>`). Instrument enum 이름 기본이나 자유 문자열 허용(공백/중복 제거).
+    밴드 삭제: `bands` FK 전부 `ON DELETE CASCADE` → `bandRepository.delete()` 로 하위 일괄. 로고/배너 파일·Redis 초대키는 `BandService.delete` 가 직접 정리(→ `InviteCodeRepository`+`InviteCodeCache` 주입).
+    `/me` literal 우선 매칭. SecurityConfig 수정 없음(전부 non-GET). 99 테스트 그린.
+  - **4-4 곡 ✅ 완료 (2026-09-02)**: `song/{dto,service,controller}`.
+    `GET /api/songs/search?q=`(공개, **스텁** `StubMusicSearchService` — 쿼리 echo 3건. Phase 5 실 API) /
+    `GET /api/bands/{bandId}/songs?status=`(공개, `SongResponse` 에 `voteCount`·`votedByMe`·`parts` 배치조회 fetch-join) /
+    `POST .../songs`(밴드 멤버, 세션 구성 `[{instrument,count}]` → SongPart 슬롯 생성, 항상 WISHLIST) /
+    `POST|DELETE /api/songs/{id}/vote`(**멱등**, `{voteCount,votedByMe}` 반환) /
+    `PATCH /api/songs/{id}/confirm`(밴드장, WISHLIST→CONFIRMED) /
+    `PUT /api/songs/{id}/parts/{partId}/assign`(**밴드 멤버 누구나**, `{userId}` 또는 null, **곡이 CONFIRMED 여야** — 아니면 `409 SONG_NOT_CONFIRMED`) /
+    `DELETE /api/songs/{id}`(밴드장, parts·votes cascade).
+    **`SongPart.instrument` 는 `String` 자유 문자열** (Instrument enum 삭제, member.part 와 동일 정책. V1 컬럼이 이미 varchar(20) → 마이그레이션 없음).
+    권한은 서비스 레벨(songId → song.band 로 멤버/밴드장 검사). `NOT_A_MEMBER` 403 / `NOT_BAND_OWNER` 403.
+    ⚠️ 공개 GET + 현재유저 → `@AuthenticationPrincipal UserPrincipal`(익명이면 null), `@CurrentUser` 는 익명에서 500.
+    124 테스트 그린.
+  - **4-5 일정 + 출결 ✅ 완료 (2026-09-02)**: `schedule/{dto,service,controller}`.
+    `GET /api/bands/{bandId}/schedules`(공개, dateTime 오름차순, `ScheduleResponse` 에 `attendees`(응답한 멤버만)·`counts{attending,absent,undecided}`·`myStatus`(비회원 null) — `@AuthenticationPrincipal UserPrincipal`) /
+    `POST .../schedules`(밴드 멤버, `{type,dateTime,location?}`) /
+    `PATCH /api/schedules/{id}`(**밴드 멤버 누구나**, 부분 수정 — null 필드 무시) /
+    `DELETE /api/schedules/{id}`(밴드장, attendances cascade) /
+    `POST /api/schedules/{id}/attendance`(밴드 멤버, `{status}` → 내 출결 **upsert**).
+    권한 서비스 레벨(scheduleId → schedule.band). 없는 일정 `404 SCHEDULE_NOT_FOUND`.
+    **"연결 영상 포함"은 4-6 에서** (Media 도메인 후). 마이그레이션 없음. 142 테스트 그린.
+  - **4-6 미디어 ✅ 완료 (2026-09-02) → Phase 4 전체 완료**: `media/{dto,service,controller}`.
+    `GET /api/bands/{bandId}/media?scheduleId=`(공개, **공개범위 필터**: 밴드 멤버는 전부 / 비회원·비멤버는 `LINK_PUBLIC` 만) /
+    `POST .../media`(밴드 멤버, `{externalUrl, type, visibility?, scheduleId?}` — `platform` 은 URL 로 자동 판별 `MediaPlatform.detect`, 기본 visibility `MEMBERS_ONLY`, scheduleId 는 같은 밴드여야 — 아니면 `400 SCHEDULE_BAND_MISMATCH`) /
+    `PATCH /api/media/{id}/visibility`(밴드장) / `DELETE /api/media/{id}`(**등록자 본인 또는 밴드장**).
+    **4-5 에서 미룬 것 완성**: `ScheduleResponse.media` 추가 (같은 공개범위 필터). `ScheduleService` 에 `MediaRepository` 주입.
+    마이그레이션 없음. **159 테스트 그린.**
 - **Phase 5 — 파일 업로드 / 외부 음원 검색**: `StorageService`(로컬 dev / S3 prod),
   곡 검색은 MANUAL 우선 완성 · SEARCH 는 스텁 후 실 API 연동
 - **Phase 6 — 프론트 연동**: `frontend/src/api/*` 레이어, `AppContext` 액션을 실제 호출로 교체, 목 제거

@@ -11,7 +11,6 @@ import com.bandive.bandive.song.Song;
 import com.bandive.bandive.song.SongPart;
 import com.bandive.bandive.song.SongSourceType;
 import com.bandive.bandive.song.SongStatus;
-import com.bandive.bandive.song.Instrument;
 import com.bandive.bandive.user.User;
 
 /**
@@ -45,7 +44,7 @@ public final class Fixtures {
 			.build();
 	}
 
-	public static SongPart part(Instrument instrument, int partIndex) {
+	public static SongPart part(String instrument, int partIndex) {
 		return SongPart.builder().instrument(instrument).partIndex(partIndex).build();
 	}
 

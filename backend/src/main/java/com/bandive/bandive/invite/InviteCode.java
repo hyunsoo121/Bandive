@@ -50,4 +50,16 @@ public class InviteCode extends BaseTimeEntity {
 	@Column(name = "used_count", nullable = false)
 	private int usedCount;
 
+	public boolean isExpired() {
+		return expiresAt != null && Instant.now().isAfter(expiresAt);
+	}
+
+	public boolean isExhausted() {
+		return maxUses != null && usedCount >= maxUses;
+	}
+
+	public void incrementUsedCount() {
+		this.usedCount++;
+	}
+
 }

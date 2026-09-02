@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import { NAV_ITEMS } from '../lib/nav';
 import { BrandMark } from './BrandMark';
@@ -10,6 +10,7 @@ import { DevRoleBar } from './DevRoleBar';
 import { BandSwitcher } from './BandSwitcher';
 import { LoginModal } from './LoginModal';
 import { CreateBandModal } from './CreateBandModal';
+import { FullscreenLoader } from '../pages/SystemPages';
 import './AppLayout.css';
 
 const ROLE_LABEL: Record<string, string> = { owner: '밴드장', member: '사용자', guest: '비회원' };
@@ -19,8 +20,9 @@ export function AppLayout() {
   const navigate = useNavigate();
   const {
     user,
-    bands,
+    currentBandId,
     currentBand,
+    bandLoading,
     role,
     switcherOpen,
     loginOpen,
@@ -29,16 +31,39 @@ export function AppLayout() {
     openSwitcher,
   } = useApp();
 
-  // URL 의 밴드와 컨텍스트 동기화 (뒤로가기 / 직접 URL 진입 대응)
+  // URL 의 밴드 → 컨텍스트 (뒤로가기 / 직접 URL 진입 / 밴드 전환 대응)
   useEffect(() => {
-    if (bandId && bandId !== currentBand.id && bands.some((b) => b.id === bandId)) {
-      setCurrentBandId(bandId);
-    }
-  }, [bandId, currentBand.id, bands, setCurrentBandId]);
+    if (bandId && bandId !== currentBandId) setCurrentBandId(bandId);
+  }, [bandId, currentBandId, setCurrentBandId]);
 
-  const base = `/bands/${currentBand.id}`;
   const meName = user ? user.name : '게스트';
   const meInitial = user ? user.initial : '?';
+
+  if (!currentBand) {
+    if (bandLoading || bandId !== currentBandId)
+      return <FullscreenLoader label="밴드 불러오는 중…" />;
+    return (
+      <div
+        style={{
+          minHeight: '100dvh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 14,
+          textAlign: 'center',
+        }}
+      >
+        <BrandMark size={32} />
+        <p className="muted">밴드를 찾을 수 없거나 접근할 수 없습니다.</p>
+        <Link className="btn" to="/">
+          홈으로
+        </Link>
+      </div>
+    );
+  }
+
+  const base = `/bands/${currentBand.id}`;
 
   const navList = (variant: 'side' | 'tab') =>
     NAV_ITEMS.map((item) => (
@@ -118,7 +143,7 @@ export function AppLayout() {
 
       {switcherOpen && <BandSwitcher onNavigate={(id) => navigate(`/bands/${id}`)} />}
       {loginOpen && <LoginModal />}
-      {createOpen && <CreateBandModal onCreated={(id) => navigate(`/bands/${id}`)} />}
+      {createOpen && <CreateBandModal />}
     </div>
   );
 }

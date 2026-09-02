@@ -19,7 +19,7 @@ export function BandSwitcher({ onNavigate }: Props) {
     <Modal title="밴드 전환" variant="sheet" onClose={closeSwitcher}>
       <div className="switcher__list">
         {bands.map((b) => {
-          const active = b.id === currentBand.id;
+          const active = b.id === currentBand?.id;
           return (
             <button
               key={b.id}

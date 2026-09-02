@@ -30,9 +30,9 @@ class SongRepositoryTest extends RepositoryTest {
 		Band band = em.persist(Fixtures.band("A"));
 		User user = em.persist(Fixtures.user("u1"));
 		Song song = Fixtures.song(band, user, SongStatus.WISHLIST);
-		song.addPart(Fixtures.part(Instrument.GUITAR, 1));
-		song.addPart(Fixtures.part(Instrument.GUITAR, 2));
-		song.addPart(Fixtures.part(Instrument.DRUM, 1));
+		song.addPart(Fixtures.part("GUITAR", 1));
+		song.addPart(Fixtures.part("GUITAR", 2));
+		song.addPart(Fixtures.part("DRUM", 1));
 
 		Song saved = songs.save(song);
 		em.flush();
@@ -46,8 +46,8 @@ class SongRepositoryTest extends RepositoryTest {
 		Band band = em.persist(Fixtures.band("A"));
 		User user = em.persist(Fixtures.user("u1"));
 		Song song = Fixtures.song(band, user, SongStatus.WISHLIST);
-		song.addPart(Fixtures.part(Instrument.BASS, 1));
-		song.addPart(Fixtures.part(Instrument.VOCAL, 1));
+		song.addPart(Fixtures.part("BASS", 1));
+		song.addPart(Fixtures.part("VOCAL", 1));
 		Song saved = songs.save(song);
 		em.flush();
 

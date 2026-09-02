@@ -12,12 +12,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-import org.springframework.web.server.ResponseStatusException;
 
 import com.bandive.bandive.auth.dto.AccessTokenResponse;
 import com.bandive.bandive.auth.dto.MeResponse;
 import com.bandive.bandive.auth.jwt.JwtProvider;
 import com.bandive.bandive.auth.jwt.RefreshToken;
+import com.bandive.bandive.common.exception.BandiveException;
+import com.bandive.bandive.common.exception.NotFoundException;
 import com.bandive.bandive.user.User;
 import com.bandive.bandive.user.UserRepository;
 
@@ -51,7 +52,7 @@ public class AuthController {
 			@CookieValue(name = CookieUtils.REFRESH_COOKIE, required = false) String refreshToken,
 			HttpServletResponse response) {
 		if (refreshToken == null || refreshToken.isBlank()) {
-			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "refresh 토큰이 없습니다.");
+			throw new BandiveException(HttpStatus.UNAUTHORIZED, "REFRESH_TOKEN_MISSING", "다시 로그인해 주세요.");
 		}
 
 		Claims claims;
@@ -59,12 +60,12 @@ public class AuthController {
 			claims = jwtProvider.parseRefresh(refreshToken);
 		}
 		catch (JwtException | IllegalArgumentException ex) {
-			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "유효하지 않은 refresh 토큰입니다.");
+			throw new BandiveException(HttpStatus.UNAUTHORIZED, "REFRESH_TOKEN_INVALID", "다시 로그인해 주세요.");
 		}
 
 		Long userId = Long.valueOf(claims.getSubject());
 		if (!refreshTokenStore.matches(userId, claims.getId())) {
-			throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "만료되었거나 폐기된 세션입니다.");
+			throw new BandiveException(HttpStatus.UNAUTHORIZED, "SESSION_EXPIRED", "세션이 만료되었습니다. 다시 로그인해 주세요.");
 		}
 
 		RefreshToken rotated = jwtProvider.createRefreshToken(userId);
@@ -97,7 +98,7 @@ public class AuthController {
 	@GetMapping("/me")
 	public MeResponse me(@CurrentUser Long userId) {
 		User user = users.findById(userId)
-			.orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "사용자를 찾을 수 없습니다."));
+			.orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "사용자를 찾을 수 없습니다."));
 		return MeResponse.from(user);
 	}
 
