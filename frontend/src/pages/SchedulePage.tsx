@@ -51,7 +51,7 @@ function buildCells(year: number, month: number, events: ScheduleEvent[]): Cell[
 export function SchedulePage() {
   const { currentBand, user, media: allMedia, members: allMembers } = useApp();
   const guard = useGuard();
-  const bandId = currentBand.id;
+  const bandId = currentBand?.id ?? '';
 
   const events = schedulesOfBand(bandId);
   const members = allMembers.filter((m) => m.bandId === bandId);
@@ -65,6 +65,8 @@ export function SchedulePage() {
     events.find((e) => e.day >= TODAY_DAY)?.day ?? events[events.length - 1]?.day ?? null;
   const [selectedDay, setSelectedDay] = useState<number | null>(firstUpcoming);
   const [myAtt, setMyAtt] = useState<Record<string, AttendanceStatus>>({});
+
+  if (!currentBand) return null;
 
   const cells = buildCells(view.year, view.month, monthEvents);
   const selected = isDataMonth ? (monthEvents.find((e) => e.day === selectedDay) ?? null) : null;

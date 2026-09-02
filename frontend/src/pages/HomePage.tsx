@@ -15,6 +15,8 @@ const stripe = (a: string, b: string) =>
 export function HomePage() {
   const { currentBand, role, songs: allSongs, media: allMedia } = useApp();
   const guard = useGuard();
+
+  if (!currentBand) return null;
   const bandId = currentBand.id;
 
   const songs = allSongs.filter((s) => s.bandId === bandId);

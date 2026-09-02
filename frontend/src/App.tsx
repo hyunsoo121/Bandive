@@ -6,14 +6,17 @@ import { SongsPage } from './pages/SongsPage';
 import { SchedulePage } from './pages/SchedulePage';
 import { MediaPage } from './pages/MediaPage';
 import { MembersPage } from './pages/MembersPage';
-import { BANDS } from './mock/data';
+import { HomeRedirect, InviteJoin, OAuthFailure, OAuthSuccess } from './pages/SystemPages';
 
 export default function App() {
   return (
     <BrowserRouter>
       <AppProvider>
         <Routes>
-          <Route path="/" element={<Navigate to={`/bands/${BANDS[0].id}`} replace />} />
+          <Route path="/" element={<HomeRedirect />} />
+          <Route path="/oauth/success" element={<OAuthSuccess />} />
+          <Route path="/oauth/failure" element={<OAuthFailure />} />
+          <Route path="/invite/:code" element={<InviteJoin />} />
           <Route path="/bands/:bandId" element={<AppLayout />}>
             <Route index element={<HomePage />} />
             <Route path="songs" element={<SongsPage />} />

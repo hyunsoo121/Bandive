@@ -4,19 +4,41 @@ import { Avatar } from '../components/Avatar';
 import './MembersPage.css';
 
 export function MembersPage() {
-  const { currentBand, role, members, kickMember, inviteCodes, regenerateInviteCode } = useApp();
-  const bandId = currentBand.id;
-  const isOwner = role === 'owner';
-
-  const bandMembers = members.filter((m) => m.bandId === bandId);
-  const code = inviteCodes[bandId] ?? '—';
-  const joinLink = `bandive.app/join/${code}`;
-
+  const { currentBand, role, members, kickMember, invite, issueInviteCode } = useApp();
   const [copied, setCopied] = useState(false);
+  const [issuing, setIssuing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!currentBand) return null;
+
+  const isOwner = role === 'owner';
+  const bandMembers = members.filter((m) => m.bandId === currentBand.id);
+
+  const runIssue = async () => {
+    setIssuing(true);
+    setError(null);
+    try {
+      await issueInviteCode();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '초대 코드를 발급하지 못했습니다.');
+    } finally {
+      setIssuing(false);
+    }
+  };
+
+  const runKick = async (userId: string) => {
+    setError(null);
+    try {
+      await kickMember(userId);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '멤버를 추방하지 못했습니다.');
+    }
+  };
 
   const copyLink = async () => {
+    if (!invite) return;
     try {
-      await navigator.clipboard.writeText(`https://${joinLink}`);
+      await navigator.clipboard.writeText(invite.url);
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
     } catch {
@@ -41,9 +63,6 @@ export function MembersPage() {
               <Avatar label={m.initial} size={34} color={m.avatarColor} />
               <span className="stack" style={{ flex: 1, minWidth: 0 }}>
                 <strong style={{ fontSize: 14 }}>{m.name}</strong>
-                <span className="muted" style={{ fontSize: 11 }}>
-                  {m.part}
-                </span>
               </span>
               <span
                 className="members__role"
@@ -56,7 +75,7 @@ export function MembersPage() {
                 {m.role === 'owner' ? '밴드장' : '사용자'}
               </span>
               {canKick && (
-                <button type="button" className="members__kick" onClick={() => kickMember(m.id)}>
+                <button type="button" className="members__kick" onClick={() => runKick(m.id)}>
                   추방
                 </button>
               )}
@@ -65,25 +84,43 @@ export function MembersPage() {
         })}
       </div>
 
+      {error && (
+        <p style={{ fontSize: 12, margin: '10px 0 0', color: 'var(--color-accent)' }}>{error}</p>
+      )}
+
       {isOwner && (
         <div className="members__invite panel">
           <span className="kicker">멤버 초대</span>
-          <div className="members__invite-row">
-            <span className="members__code">{code}</span>
-            <button
-              type="button"
-              className="btn btn--sm"
-              onClick={() => regenerateInviteCode(bandId)}
-            >
-              코드 재발급
-            </button>
-            <button type="button" className="btn btn--sm btn--primary" onClick={copyLink}>
-              {copied ? '복사됨 ✓' : '링크 복사'}
-            </button>
-          </div>
-          <span className="muted" style={{ fontSize: 11 }}>
-            {joinLink} · 7일 후 만료
-          </span>
+          {invite ? (
+            <>
+              <div className="members__invite-row">
+                <span className="members__code">{invite.code}</span>
+                <button type="button" className="btn btn--sm" disabled={issuing} onClick={runIssue}>
+                  {issuing ? '발급 중…' : '코드 재발급'}
+                </button>
+                <button type="button" className="btn btn--sm btn--primary" onClick={copyLink}>
+                  {copied ? '복사됨 ✓' : '링크 복사'}
+                </button>
+              </div>
+              <span className="muted" style={{ fontSize: 11, wordBreak: 'break-all' }}>
+                {invite.url}
+              </span>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="btn btn--sm btn--primary"
+                disabled={issuing}
+                onClick={runIssue}
+              >
+                {issuing ? '발급 중…' : '초대 코드 발급'}
+              </button>
+              <span className="muted" style={{ fontSize: 11 }}>
+                발급하면 코드와 초대 링크가 여기에 표시됩니다. 재발급 시 이전 코드는 폐기됩니다.
+              </span>
+            </>
+          )}
         </div>
       )}
 

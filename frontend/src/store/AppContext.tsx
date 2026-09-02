@@ -1,4 +1,13 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
+import { useNavigate } from 'react-router-dom';
 import type {
   Band,
   MediaItem,
@@ -11,7 +20,12 @@ import type {
   User,
   Visibility,
 } from '../types';
-import { BANDS, CURRENT_USER, MEDIA, MEMBERS, SONGS } from '../mock/data';
+import { MEDIA, SONGS } from '../mock/data';
+import * as authApi from '../api/auth';
+import * as bandApi from '../api/bands';
+import * as inviteApi from '../api/invites';
+import * as memberApi from '../api/members';
+import { toBand, toMember, toUser } from '../api/mappers';
 
 export interface NewSongInput {
   bandId: string;
@@ -23,13 +37,6 @@ export interface NewSongInput {
   sessions: SessionShape;
 }
 
-const SEED_INVITE_CODES: Record<string, string> = {
-  b1: 'BLT-7K29',
-  b2: 'LHX-3M18',
-  b3: 'THN-9Q40',
-};
-const randomInviteCode = () => `BND-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-
 export interface NewMediaInput {
   bandId: string;
   url: string;
@@ -40,52 +47,71 @@ export interface NewMediaInput {
   scheduleDay: number | null;
 }
 
+/** 현재 밴드의 초대 코드 (밴드장이 발급/재발급한 뒤에만 채워진다 — 조회 전용 API 가 없어서). */
+export interface InviteInfo {
+  code: string;
+  url: string;
+}
+
 /**
- * 앱 전역 상태 — 세션(로그인 유저 / 역할), 현재 밴드, 공용 모달.
- * 백엔드가 붙으면 login/logout 은 실제 카카오 OAuth 플로우로, BANDS 는 GET /api/bands/my 로 교체.
+ * 앱 전역 상태.
+ * - 인증(카카오 OAuth) · 밴드 · 멤버 · 초대는 백엔드 API 연동됨.
+ * - 곡 · 영상 · 일정은 백엔드 Phase 4-4~4-6 전까지 mock 유지.
  */
 interface AppState {
   user: User | null;
+  /** 내가 속한 밴드 (GET /api/bands/my). 게스트는 빈 배열 */
   bands: Band[];
-  currentBand: Band;
+  /** URL 의 현재 밴드 id */
+  currentBandId: string | null;
+  /** 현재 밴드 상세 (GET /api/bands/{id}). 로딩 중이거나 없으면 null */
+  currentBand: Band | null;
+  /** 세션 복구(첫 refresh) 진행 중 */
+  bootLoading: boolean;
+  /** 현재 밴드 상세/멤버 로딩 중 */
+  bandLoading: boolean;
   /** 화면 권한 판정에 쓰는 최종 역할 (게스트 포함) */
   role: Role;
-  /** 백엔드 전 프리뷰용 역할 강제 (null 이면 실제 멤버십 기준) */
+  /** 개발용 역할 강제 (null 이면 실제 멤버십 기준). 곡/영상 등 mock 화면 프리뷰용 */
   devRole: Role | null;
 
   switcherOpen: boolean;
   loginOpen: boolean;
   createOpen: boolean;
 
-  /** 전체 곡 (모든 밴드). 화면에서 밴드로 필터. → 백엔드 시 GET /api/bands/{id}/songs */
+  /** 전체 곡 (mock). 화면에서 밴드로 필터. → 백엔드 Phase 4-4 */
   songs: Song[];
-  /** 전체 영상 (모든 밴드). 화면에서 밴드로 필터. → 백엔드 시 GET /api/bands/{id}/media */
+  /** 전체 영상 (mock). 화면에서 밴드로 필터. → 백엔드 Phase 4-6 */
   media: MediaItem[];
-  /** 전체 멤버 (모든 밴드). 화면에서 밴드로 필터. → 백엔드 시 GET /api/bands/{id}/members */
+  /** 현재 밴드 멤버 (GET /api/bands/{id}/members) */
   members: Member[];
-  /** 밴드별 현재 초대 코드. → 백엔드 시 POST /api/bands/{id}/invite-codes */
-  inviteCodes: Record<string, string>;
+  /** 현재 밴드 초대 코드 (발급 후에만) */
+  invite: InviteInfo | null;
 
   setCurrentBandId: (id: string) => void;
   setDevRole: (role: Role | null) => void;
+  /** 카카오 로그인 시작 (페이지 이동) */
   login: () => void;
   logout: () => void;
-  createBand: (name: string) => void;
+  /** 밴드 생성 → 내 밴드에 추가하고 해당 밴드로 이동 */
+  createBand: (name: string) => Promise<void>;
+  /** 초대 코드로 가입 → 가입한 밴드 반환 */
+  joinByInvite: (code: string) => Promise<Band>;
 
-  /** 투표 토글 (1인 1표). 비회원 가드는 호출부(useGuard)에서 */
+  /** 투표 토글 (mock) */
   voteSong: (songId: string) => void;
-  /** 위시리스트 → 합주곡 승격 (밴드장) */
+  /** 위시리스트 → 합주곡 승격 (mock) */
   promoteSong: (songId: string) => void;
-  /** 파트 슬롯에 멤버 배정/해제 ('' 이면 해제). 합주곡 상태에서만 */
+  /** 파트 슬롯 배정/해제 (mock) */
   assignPart: (songId: string, slotKey: string, memberName: string) => void;
-  /** 곡 추가 (위시리스트로) */
+  /** 곡 추가 (mock) */
   addSong: (input: NewSongInput) => void;
-  /** 영상 URL 첨부 */
+  /** 영상 URL 첨부 (mock) */
   addMedia: (input: NewMediaInput) => void;
-  /** 멤버 추방 (밴드장, OWNER 는 불가) */
-  kickMember: (memberId: string) => void;
-  /** 초대 코드 재발급 (밴드장) */
-  regenerateInviteCode: (bandId: string) => void;
+  /** 멤버 추방 (밴드장) — userId */
+  kickMember: (userId: string) => Promise<void>;
+  /** 초대 코드 발급/재발급 (밴드장) */
+  issueInviteCode: () => Promise<void>;
 
   openSwitcher: () => void;
   closeSwitcher: () => void;
@@ -98,62 +124,147 @@ interface AppState {
 const AppContext = createContext<AppState | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(CURRENT_USER);
-  const [bands, setBands] = useState<Band[]>(BANDS);
-  const [currentBandId, setCurrentBandId] = useState<string>(BANDS[0].id);
+  const navigate = useNavigate();
+
+  const [user, setUser] = useState<User | null>(null);
+  const [bands, setBands] = useState<Band[]>([]);
+  const [currentBandId, setCurrentBandIdState] = useState<string | null>(null);
+  const [currentBand, setCurrentBand] = useState<Band | null>(null);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [invite, setInvite] = useState<InviteInfo | null>(null);
+  const [bootLoading, setBootLoading] = useState(true);
+  const [bandLoading, setBandLoading] = useState(false);
   const [devRole, setDevRole] = useState<Role | null>(null);
 
   const [songs, setSongs] = useState<Song[]>(SONGS);
   const [media, setMedia] = useState<MediaItem[]>(MEDIA);
-  const [members, setMembers] = useState<Member[]>(MEMBERS);
-  const [inviteCodes, setInviteCodes] = useState<Record<string, string>>(SEED_INVITE_CODES);
 
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
 
-  const currentBand = useMemo(
-    () => bands.find((b) => b.id === currentBandId) ?? bands[0],
-    [bands, currentBandId],
-  );
-
-  const role: Role = devRole ?? (user ? currentBand.myRole : 'guest');
-
-  const login = useCallback(() => {
-    setUser(CURRENT_USER);
-    setDevRole((r) => (r === 'guest' ? null : r));
-    setLoginOpen(false);
+  // 세션 복구: refresh 쿠키로 access 재발급 → 내 정보 + 내 밴드
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const ok = await authApi.restoreSession();
+      if (ok && alive) {
+        try {
+          const [me, mine] = await Promise.all([authApi.fetchMe(), bandApi.getMyBands()]);
+          if (!alive) return;
+          setUser(toUser(me));
+          setBands(mine.map(toBand));
+        } catch {
+          // 복구 실패 → 게스트로 진행
+        }
+      }
+      if (alive) setBootLoading(false);
+    })();
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  const logout = useCallback(() => {
-    setUser(null);
-    setDevRole(null);
-  }, []);
+  // 현재 밴드 상세 + 멤버 로드
+  useEffect(() => {
+    if (!currentBandId) {
+      setCurrentBand(null);
+      setMembers([]);
+      return;
+    }
+    let alive = true;
+    setBandLoading(true);
+    setInvite(null);
+    (async () => {
+      try {
+        const [band, mem] = await Promise.all([
+          bandApi.getBand(currentBandId),
+          memberApi.listMembers(currentBandId),
+        ]);
+        if (!alive) return;
+        setCurrentBand(toBand(band));
+        setMembers(mem.map((m) => toMember(m, currentBandId)));
+      } catch {
+        if (alive) {
+          setCurrentBand(null);
+          setMembers([]);
+        }
+      } finally {
+        if (alive) setBandLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [currentBandId]);
 
-  const createBand = useCallback((name: string) => {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    setBands((prev) => {
-      const id = `n${prev.length + 1}`;
-      const band: Band = {
-        id,
-        name: trimmed,
-        initial: [...trimmed][0] ?? '밴',
-        memberCount: 1,
-        myRole: 'owner',
-        note: '합주곡 0 · 위시 0',
-      };
-      setCurrentBandId(id);
-      setInviteCodes((codes) => ({ ...codes, [id]: randomInviteCode() }));
-      return [...prev, band];
-    });
-    setCreateOpen(false);
+  const setCurrentBandId = useCallback((id: string) => {
+    setCurrentBandIdState(id);
     setSwitcherOpen(false);
   }, []);
 
-  const regenerateInviteCode = useCallback((bandId: string) => {
-    setInviteCodes((prev) => ({ ...prev, [bandId]: randomInviteCode() }));
+  // 실제 역할: devRole 우선, 아니면 현재 밴드 멤버 목록에서 내 역할 (없으면 member), 비로그인은 guest
+  const role: Role = useMemo(() => {
+    if (devRole) return devRole;
+    if (!user) return 'guest';
+    return members.find((m) => m.id === user.id)?.role ?? 'member';
+  }, [devRole, user, members]);
+
+  const login = useCallback(() => {
+    authApi.startKakaoLogin();
   }, []);
+
+  const logout = useCallback(async () => {
+    await authApi.logout();
+    setUser(null);
+    setBands([]);
+    setDevRole(null);
+    navigate('/');
+  }, [navigate]);
+
+  const createBand = useCallback(
+    async (name: string) => {
+      const trimmed = name.trim();
+      if (!trimmed) return;
+      const dto = await bandApi.createBand(trimmed);
+      const band = toBand({ ...dto, role: 'OWNER' });
+      setBands((prev) => [...prev, band]);
+      setCreateOpen(false);
+      setSwitcherOpen(false);
+      navigate(`/bands/${band.id}`);
+    },
+    [navigate],
+  );
+
+  const joinByInvite = useCallback(async (code: string) => {
+    const dto = await inviteApi.joinByCode(code);
+    const band = toBand({ ...dto, role: 'MEMBER' });
+    setBands((prev) => (prev.some((b) => b.id === band.id) ? prev : [...prev, band]));
+    return band;
+  }, []);
+
+  const kickMember = useCallback(
+    async (userId: string) => {
+      if (!currentBandId) return;
+      await memberApi.kickMember(currentBandId, userId);
+      setMembers((prev) => prev.filter((m) => m.id !== userId));
+      setCurrentBand((prev) =>
+        prev ? { ...prev, memberCount: Math.max(1, prev.memberCount - 1) } : prev,
+      );
+      setBands((prev) =>
+        prev.map((b) =>
+          b.id === currentBandId ? { ...b, memberCount: Math.max(1, b.memberCount - 1) } : b,
+        ),
+      );
+    },
+    [currentBandId],
+  );
+
+  const issueInviteCode = useCallback(async () => {
+    if (!currentBandId) return;
+    const dto = await inviteApi.issueInviteCode(currentBandId);
+    setInvite({ code: dto.code, url: dto.inviteUrl });
+  }, [currentBandId]);
 
   const voteSong = useCallback((songId: string) => {
     setSongs((prev) =>
@@ -224,45 +335,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setMedia((prev) => [item, ...prev]);
   }, []);
 
-  const kickMember = useCallback((memberId: string) => {
-    const target = MEMBERS.find((m) => m.id === memberId);
-    if (!target || target.role === 'owner') return;
-    setMembers((prev) => prev.filter((m) => m.id !== memberId));
-    setBands((prev) =>
-      prev.map((b) =>
-        b.id === target.bandId ? { ...b, memberCount: Math.max(1, b.memberCount - 1) } : b,
-      ),
-    );
-  }, []);
-
   const value: AppState = {
     user,
     bands,
+    currentBandId,
     currentBand,
+    bootLoading,
+    bandLoading,
     role,
     devRole,
     songs,
     media,
     members,
-    inviteCodes,
+    invite,
     switcherOpen,
     loginOpen,
     createOpen,
-    setCurrentBandId: (id) => {
-      setCurrentBandId(id);
-      setSwitcherOpen(false);
-    },
+    setCurrentBandId,
     setDevRole,
     login,
     logout,
     createBand,
+    joinByInvite,
     voteSong,
     promoteSong,
     assignPart,
     addSong,
     addMedia,
     kickMember,
-    regenerateInviteCode,
+    issueInviteCode,
     openSwitcher: () => setSwitcherOpen(true),
     closeSwitcher: () => setSwitcherOpen(false),
     openLogin: () => setLoginOpen(true),

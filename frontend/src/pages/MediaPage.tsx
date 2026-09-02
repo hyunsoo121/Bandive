@@ -22,11 +22,13 @@ const stripe = (a: string, b: string) =>
 export function MediaPage() {
   const { currentBand, role, media: allMedia } = useApp();
   const guard = useGuard();
-  const bandId = currentBand.id;
   const isGuest = role === 'guest';
 
   const [filter, setFilter] = useState<Filter>('전체');
   const [addOpen, setAddOpen] = useState(false);
+
+  if (!currentBand) return null;
+  const bandId = currentBand.id;
 
   const schedules = schedulesOfBand(bandId);
   const scheduleByDay = new Map(schedules.map((s) => [s.day, s]));
