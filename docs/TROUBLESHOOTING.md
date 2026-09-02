@@ -287,6 +287,22 @@ CGLIB 프록시가 생기는데 부모의 `final` setter 를 못 감싼다는 **
 **해결.** 테스트에서 `service.delete(...)` 호출 직전에 `em.flush(); em.clear();` 로 컨텍스트를 비운다
 (운영 상황을 흉내). 서비스 코드는 그대로 — DB cascade 방식 유지.
 
+## Phase 4-4 (곡)
+
+### 비회원도 되는 GET 에 `@CurrentUser` 를 쓰면 500
+
+**증상.** `GET /api/bands/{bandId}/songs` (공개, `votedByMe` 계산용으로 현재 유저가 필요) 를 토큰 없이
+부르면 500.
+
+**원인.** `@CurrentUser` = `@AuthenticationPrincipal(expression = "id")`. 익명 요청이면
+`AnonymousAuthenticationFilter` 가 principal 을 문자열 `"anonymousUser"` 로 채워두는데,
+거기서 SpEL `id` 를 평가하다 터진다. (인증 강제된 엔드포인트는 principal 이 항상 `UserPrincipal` 이라 문제없음.)
+
+**해결.** 선택적 인증 엔드포인트는 `@CurrentUser Long` 대신
+`@AuthenticationPrincipal UserPrincipal principal` 를 받고 `principal != null ? principal.getId() : null`.
+(`expression` 없는 `@AuthenticationPrincipal` 은 타입 불일치 시 기본값 null 을 준다.) Phase 4-5/4-6 의
+공개 목록에서도 같은 패턴.
+
 ---
 
 ### pre-commit 훅이 안 걸림

@@ -206,7 +206,19 @@
     **V3**: `band_member_parts` 테이블(멤버 1:N 파트, `@ElementCollection Set<String>`). Instrument enum 이름 기본이나 자유 문자열 허용(공백/중복 제거).
     밴드 삭제: `bands` FK 전부 `ON DELETE CASCADE` → `bandRepository.delete()` 로 하위 일괄. 로고/배너 파일·Redis 초대키는 `BandService.delete` 가 직접 정리(→ `InviteCodeRepository`+`InviteCodeCache` 주입).
     `/me` literal 우선 매칭. SecurityConfig 수정 없음(전부 non-GET). 99 테스트 그린.
-  - 4-4 곡(+SongPart·투표·승격·배정)  4-5 일정(+출결)  4-6 미디어(visibility 필터)
+  - **4-4 곡 ✅ 완료 (2026-09-02)**: `song/{dto,service,controller}`.
+    `GET /api/songs/search?q=`(공개, **스텁** `StubMusicSearchService` — 쿼리 echo 3건. Phase 5 실 API) /
+    `GET /api/bands/{bandId}/songs?status=`(공개, `SongResponse` 에 `voteCount`·`votedByMe`·`parts` 배치조회 fetch-join) /
+    `POST .../songs`(밴드 멤버, 세션 구성 `[{instrument,count}]` → SongPart 슬롯 생성, 항상 WISHLIST) /
+    `POST|DELETE /api/songs/{id}/vote`(**멱등**, `{voteCount,votedByMe}` 반환) /
+    `PATCH /api/songs/{id}/confirm`(밴드장, WISHLIST→CONFIRMED) /
+    `PUT /api/songs/{id}/parts/{partId}/assign`(**밴드 멤버 누구나**, `{userId}` 또는 null, **곡이 CONFIRMED 여야** — 아니면 `409 SONG_NOT_CONFIRMED`) /
+    `DELETE /api/songs/{id}`(밴드장, parts·votes cascade).
+    **`SongPart.instrument` 는 `String` 자유 문자열** (Instrument enum 삭제, member.part 와 동일 정책. V1 컬럼이 이미 varchar(20) → 마이그레이션 없음).
+    권한은 서비스 레벨(songId → song.band 로 멤버/밴드장 검사). `NOT_A_MEMBER` 403 / `NOT_BAND_OWNER` 403.
+    ⚠️ 공개 GET + 현재유저 → `@AuthenticationPrincipal UserPrincipal`(익명이면 null), `@CurrentUser` 는 익명에서 500.
+    124 테스트 그린.
+  - 4-5 일정(+출결)  4-6 미디어(visibility 필터)
 - **Phase 5 — 파일 업로드 / 외부 음원 검색**: `StorageService`(로컬 dev / S3 prod),
   곡 검색은 MANUAL 우선 완성 · SEARCH 는 스텁 후 실 API 연동
 - **Phase 6 — 프론트 연동**: `frontend/src/api/*` 레이어, `AppContext` 액션을 실제 호출로 교체, 목 제거

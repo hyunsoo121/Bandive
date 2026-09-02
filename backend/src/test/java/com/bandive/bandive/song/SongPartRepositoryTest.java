@@ -27,11 +27,11 @@ class SongPartRepositoryTest extends RepositoryTest {
 		User user = em.persist(Fixtures.user("u1"));
 		Song song = em.persist(Fixtures.song(band, user, SongStatus.WISHLIST));
 
-		parts.save(SongPart.builder().song(song).instrument(Instrument.KEYBOARD).partIndex(1).build());
+		parts.save(SongPart.builder().song(song).instrument("KEYBOARD").partIndex(1).build());
 		em.flush();
 
 		assertThatThrownBy(() -> {
-			parts.save(SongPart.builder().song(song).instrument(Instrument.KEYBOARD).partIndex(1).build());
+			parts.save(SongPart.builder().song(song).instrument("KEYBOARD").partIndex(1).build());
 			em.flush();
 		}).isInstanceOf(DataIntegrityViolationException.class);
 	}
