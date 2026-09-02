@@ -66,4 +66,8 @@ public class Media extends BaseTimeEntity {
 	@JoinColumn(name = "uploaded_by", nullable = false)
 	private User uploadedBy;
 
+	public void changeVisibility(MediaVisibility visibility) {
+		this.visibility = visibility;
+	}
+
 }

@@ -1,4 +1,4 @@
-package com.bandive.bandive.schedule.controller;
+package com.bandive.bandive.media.controller;
 
 import java.time.Instant;
 import java.util.List;
@@ -8,16 +8,16 @@ import org.junit.jupiter.api.Test;
 import com.bandive.bandive.auth.UserPrincipal;
 import com.bandive.bandive.auth.jwt.JwtProvider;
 import com.bandive.bandive.common.security.BandGuard;
-import com.bandive.bandive.schedule.ScheduleType;
-import com.bandive.bandive.schedule.dto.ScheduleResponse;
-import com.bandive.bandive.schedule.dto.ScheduleResponse.Counts;
-import com.bandive.bandive.schedule.service.ScheduleService;
+import com.bandive.bandive.media.MediaPlatform;
+import com.bandive.bandive.media.MediaType;
+import com.bandive.bandive.media.MediaVisibility;
+import com.bandive.bandive.media.dto.MediaResponse;
+import com.bandive.bandive.media.service.MediaService;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
-import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -40,18 +40,20 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@WebMvcTest(ScheduleController.class)
-class ScheduleControllerTest {
+@WebMvcTest(MediaController.class)
+class MediaControllerTest {
 
-	private static final ScheduleResponse SCHEDULE = new ScheduleResponse(3L, 1L, ScheduleType.REHEARSAL,
-			Instant.parse("2026-10-01T10:00:00Z"), "연습실", 7L, "나", new Counts(1, 0, 0), null, List.of(), List.of(),
+	private static final String JSON = "application/json";
+
+	private static final MediaResponse MEDIA = new MediaResponse(5L, 1L, null, MediaType.PERFORMANCE,
+			"https://youtu.be/x", MediaPlatform.YOUTUBE, MediaVisibility.MEMBERS_ONLY, 7L, "나",
 			Instant.parse("2026-09-02T00:00:00Z"));
 
 	@Autowired
 	private MockMvc mvc;
 
 	@MockitoBean
-	private ScheduleService scheduleService;
+	private MediaService mediaService;
 
 	@MockitoBean(name = "bandGuard")
 	private BandGuard bandGuard;
@@ -65,77 +67,61 @@ class ScheduleControllerTest {
 	}
 
 	@Test
-	void 일정_목록은_공개다() throws Exception {
-		given(scheduleService.list(eq(1L), any())).willReturn(List.of(SCHEDULE));
+	void 영상_목록은_공개다() throws Exception {
+		given(mediaService.list(eq(1L), any(), any())).willReturn(List.of(MEDIA));
 
-		mvc.perform(get("/api/bands/1/schedules"))
+		mvc.perform(get("/api/bands/1/media"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$[0].id").value(3))
-			.andExpect(jsonPath("$[0].counts.attending").value(1));
+			.andExpect(jsonPath("$[0].id").value(5))
+			.andExpect(jsonPath("$[0].platform").value("YOUTUBE"));
 	}
 
 	@Test
-	void 일정_등록은_밴드_멤버면_201() throws Exception {
+	void 등록은_밴드_멤버면_201() throws Exception {
 		given(bandGuard.isMember(1L)).willReturn(true);
-		given(scheduleService.create(eq(1L), eq(7L), any())).willReturn(SCHEDULE);
+		given(mediaService.create(eq(1L), eq(7L), any())).willReturn(MEDIA);
 
-		mvc.perform(post("/api/bands/1/schedules").with(asUser(7L))
-			.contentType(MediaType.APPLICATION_JSON)
-			.content("{\"type\":\"REHEARSAL\",\"dateTime\":\"2026-10-01T10:00:00Z\",\"location\":\"연습실\"}"))
+		mvc.perform(post("/api/bands/1/media").with(asUser(7L))
+			.contentType(JSON)
+			.content("{\"externalUrl\":\"https://youtu.be/x\",\"type\":\"PERFORMANCE\"}"))
 			.andExpect(status().isCreated())
-			.andExpect(jsonPath("$.id").value(3));
+			.andExpect(jsonPath("$.id").value(5));
 	}
 
 	@Test
-	void 일정_등록은_비멤버면_403() throws Exception {
+	void 등록은_비멤버면_403() throws Exception {
 		given(bandGuard.isMember(1L)).willReturn(false);
 
-		mvc.perform(post("/api/bands/1/schedules").with(asUser(7L))
-			.contentType(MediaType.APPLICATION_JSON)
-			.content("{\"type\":\"REHEARSAL\",\"dateTime\":\"2026-10-01T10:00:00Z\"}"))
+		mvc.perform(post("/api/bands/1/media").with(asUser(7L))
+			.contentType(JSON)
+			.content("{\"externalUrl\":\"https://youtu.be/x\",\"type\":\"PERFORMANCE\"}"))
 			.andExpect(status().isForbidden());
 	}
 
 	@Test
-	void 일시_없이_등록하면_400() throws Exception {
+	void URL_형식이_아니면_400() throws Exception {
 		given(bandGuard.isMember(1L)).willReturn(true);
 
-		mvc.perform(post("/api/bands/1/schedules").with(asUser(7L))
-			.contentType(MediaType.APPLICATION_JSON)
-			.content("{\"type\":\"REHEARSAL\"}"))
+		mvc.perform(post("/api/bands/1/media").with(asUser(7L))
+			.contentType(JSON)
+			.content("{\"externalUrl\":\"not a url\",\"type\":\"PERFORMANCE\"}"))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
 	}
 
 	@Test
-	void 일정_수정() throws Exception {
-		given(scheduleService.update(eq(3L), eq(7L), any())).willReturn(SCHEDULE);
+	void 공개범위_변경() throws Exception {
+		given(mediaService.changeVisibility(eq(5L), eq(7L), eq(MediaVisibility.LINK_PUBLIC))).willReturn(MEDIA);
 
-		mvc.perform(patch("/api/schedules/3").with(asUser(7L))
-			.contentType(MediaType.APPLICATION_JSON)
-			.content("{\"location\":\"새 장소\"}")).andExpect(status().isOk());
+		mvc.perform(patch("/api/media/5/visibility").with(asUser(7L))
+			.contentType(JSON)
+			.content("{\"visibility\":\"LINK_PUBLIC\"}")).andExpect(status().isOk());
 	}
 
 	@Test
-	void 일정_삭제는_204() throws Exception {
-		mvc.perform(delete("/api/schedules/3").with(asUser(7L))).andExpect(status().isNoContent());
-		then(scheduleService).should().delete(3L, 7L);
-	}
-
-	@Test
-	void 출결_등록() throws Exception {
-		given(scheduleService.setAttendance(eq(3L), eq(7L), any())).willReturn(SCHEDULE);
-
-		mvc.perform(post("/api/schedules/3/attendance").with(asUser(7L))
-			.contentType(MediaType.APPLICATION_JSON)
-			.content("{\"status\":\"ATTENDING\"}")).andExpect(status().isOk());
-	}
-
-	@Test
-	void 잘못된_출결값은_400() throws Exception {
-		mvc.perform(post("/api/schedules/3/attendance").with(asUser(7L))
-			.contentType(MediaType.APPLICATION_JSON)
-			.content("{\"status\":\"MAYBE\"}")).andExpect(status().isBadRequest());
+	void 삭제는_204() throws Exception {
+		mvc.perform(delete("/api/media/5").with(asUser(7L))).andExpect(status().isNoContent());
+		then(mediaService).should().delete(5L, 7L);
 	}
 
 	@TestConfiguration

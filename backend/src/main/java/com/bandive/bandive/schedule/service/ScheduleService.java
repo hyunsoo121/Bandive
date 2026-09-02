@@ -12,6 +12,8 @@ import com.bandive.bandive.band.Band;
 import com.bandive.bandive.band.BandRepository;
 import com.bandive.bandive.common.exception.ForbiddenException;
 import com.bandive.bandive.common.exception.NotFoundException;
+import com.bandive.bandive.media.Media;
+import com.bandive.bandive.media.MediaRepository;
 import com.bandive.bandive.member.BandMember;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
@@ -34,16 +36,19 @@ public class ScheduleService {
 
 	private final AttendanceRepository attendances;
 
+	private final MediaRepository media;
+
 	private final BandRepository bands;
 
 	private final BandMemberRepository bandMembers;
 
 	private final UserRepository users;
 
-	public ScheduleService(ScheduleRepository schedules, AttendanceRepository attendances, BandRepository bands,
-			BandMemberRepository bandMembers, UserRepository users) {
+	public ScheduleService(ScheduleRepository schedules, AttendanceRepository attendances, MediaRepository media,
+			BandRepository bands, BandMemberRepository bandMembers, UserRepository users) {
 		this.schedules = schedules;
 		this.attendances = attendances;
+		this.media = media;
 		this.bands = bands;
 		this.bandMembers = bandMembers;
 		this.users = users;
@@ -58,13 +63,19 @@ public class ScheduleService {
 			return List.of();
 		}
 		List<Long> ids = found.stream().map(Schedule::getId).toList();
-		Map<Long, List<Attendance>> bySchedule = attendances.findAllByScheduleIds(ids)
+		Map<Long, List<Attendance>> attendeesBySchedule = attendances.findAllByScheduleIds(ids)
 			.stream()
 			.collect(Collectors.groupingBy(attendance -> attendance.getSchedule().getId()));
 
+		boolean isMember = currentUserId != null && bandMembers.existsByBandIdAndUserId(bandId, currentUserId);
+		Map<Long, List<Media>> mediaBySchedule = media.findVisibleByScheduleIds(ids, isMember)
+			.stream()
+			.collect(Collectors.groupingBy(item -> item.getSchedule().getId()));
+
 		return found.stream()
-			.map(schedule -> ScheduleResponse.from(schedule, bySchedule.getOrDefault(schedule.getId(), List.of()),
-					currentUserId))
+			.map(schedule -> ScheduleResponse.from(schedule,
+					attendeesBySchedule.getOrDefault(schedule.getId(), List.of()),
+					mediaBySchedule.getOrDefault(schedule.getId(), List.of()), currentUserId))
 			.toList();
 	}
 
@@ -82,7 +93,7 @@ public class ScheduleService {
 			.dateTime(request.dateTime())
 			.location(trimToNull(request.location()))
 			.build());
-		return ScheduleResponse.from(schedule, List.of(), userId);
+		return ScheduleResponse.from(schedule, List.of(), List.of(), userId);
 	}
 
 	@Transactional
@@ -124,7 +135,10 @@ public class ScheduleService {
 	}
 
 	private ScheduleResponse toResponse(Schedule schedule, Long currentUserId) {
-		return ScheduleResponse.from(schedule, attendances.findAllByScheduleId(schedule.getId()), currentUserId);
+		// update/setAttendance 를 부른 시점엔 currentUserId 가 멤버로 검증돼 있음 → 멤버전용 영상까지 포함
+		List<Media> linkedMedia = media.findVisible(schedule.getBand().getId(), schedule.getId(), true);
+		return ScheduleResponse.from(schedule, attendances.findAllByScheduleId(schedule.getId()), linkedMedia,
+				currentUserId);
 	}
 
 	private void requireMember(Long bandId, Long userId) {

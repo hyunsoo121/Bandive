@@ -226,7 +226,12 @@
     `POST /api/schedules/{id}/attendance`(밴드 멤버, `{status}` → 내 출결 **upsert**).
     권한 서비스 레벨(scheduleId → schedule.band). 없는 일정 `404 SCHEDULE_NOT_FOUND`.
     **"연결 영상 포함"은 4-6 에서** (Media 도메인 후). 마이그레이션 없음. 142 테스트 그린.
-  - 4-6 미디어(visibility 필터)
+  - **4-6 미디어 ✅ 완료 (2026-09-02) → Phase 4 전체 완료**: `media/{dto,service,controller}`.
+    `GET /api/bands/{bandId}/media?scheduleId=`(공개, **공개범위 필터**: 밴드 멤버는 전부 / 비회원·비멤버는 `LINK_PUBLIC` 만) /
+    `POST .../media`(밴드 멤버, `{externalUrl, type, visibility?, scheduleId?}` — `platform` 은 URL 로 자동 판별 `MediaPlatform.detect`, 기본 visibility `MEMBERS_ONLY`, scheduleId 는 같은 밴드여야 — 아니면 `400 SCHEDULE_BAND_MISMATCH`) /
+    `PATCH /api/media/{id}/visibility`(밴드장) / `DELETE /api/media/{id}`(**등록자 본인 또는 밴드장**).
+    **4-5 에서 미룬 것 완성**: `ScheduleResponse.media` 추가 (같은 공개범위 필터). `ScheduleService` 에 `MediaRepository` 주입.
+    마이그레이션 없음. **159 테스트 그린.**
 - **Phase 5 — 파일 업로드 / 외부 음원 검색**: `StorageService`(로컬 dev / S3 prod),
   곡 검색은 MANUAL 우선 완성 · SEARCH 는 스텁 후 실 API 연동
 - **Phase 6 — 프론트 연동**: `frontend/src/api/*` 레이어, `AppContext` 액션을 실제 호출로 교체, 목 제거

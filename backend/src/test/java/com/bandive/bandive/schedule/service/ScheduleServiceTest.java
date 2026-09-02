@@ -10,10 +10,16 @@ import com.bandive.bandive.band.Band;
 import com.bandive.bandive.band.BandRepository;
 import com.bandive.bandive.common.exception.ForbiddenException;
 import com.bandive.bandive.common.exception.NotFoundException;
+import com.bandive.bandive.media.Media;
+import com.bandive.bandive.media.MediaPlatform;
+import com.bandive.bandive.media.MediaType;
+import com.bandive.bandive.media.MediaVisibility;
+import com.bandive.bandive.media.dto.MediaResponse;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
 import com.bandive.bandive.schedule.AttendanceRepository;
 import com.bandive.bandive.schedule.AttendanceStatus;
+import com.bandive.bandive.schedule.Schedule;
 import com.bandive.bandive.schedule.ScheduleRepository;
 import com.bandive.bandive.schedule.ScheduleType;
 import com.bandive.bandive.schedule.dto.ScheduleCreateRequest;
@@ -47,6 +53,9 @@ class ScheduleServiceTest extends RepositoryTest {
 	private com.bandive.bandive.user.UserRepository users;
 
 	@Autowired
+	private com.bandive.bandive.media.MediaRepository media;
+
+	@Autowired
 	private TestEntityManager em;
 
 	private ScheduleService service;
@@ -59,7 +68,7 @@ class ScheduleServiceTest extends RepositoryTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new ScheduleService(schedules, attendances, bands, bandMembers, users);
+		service = new ScheduleService(schedules, attendances, media, bands, bandMembers, users);
 		band = em.persist(Fixtures.band("A"));
 		ownerId = joinMember("owner", BandRole.OWNER);
 		memberId = joinMember("member", BandRole.MEMBER);
@@ -174,6 +183,37 @@ class ScheduleServiceTest extends RepositoryTest {
 
 		assertThat(attendances.findAllByScheduleId(scheduleId)).hasSize(1);
 		assertThat(afterChange.myStatus()).isEqualTo(AttendanceStatus.ABSENT);
+	}
+
+	@Test
+	void 일정_목록에_공개범위_필터된_연결_영상이_포함된다() {
+		Long scheduleId = service.create(band.getId(), ownerId, req()).id();
+		Schedule schedule = schedules.findById(scheduleId).orElseThrow();
+		User uploader = users.findById(memberId).orElseThrow();
+		media.save(Media.builder()
+			.band(band)
+			.schedule(schedule)
+			.uploadedBy(uploader)
+			.type(MediaType.REHEARSAL)
+			.externalUrl("https://a/pub")
+			.platform(MediaPlatform.OTHER)
+			.visibility(MediaVisibility.LINK_PUBLIC)
+			.build());
+		media.save(Media.builder()
+			.band(band)
+			.schedule(schedule)
+			.uploadedBy(uploader)
+			.type(MediaType.REHEARSAL)
+			.externalUrl("https://a/priv")
+			.platform(MediaPlatform.OTHER)
+			.visibility(MediaVisibility.MEMBERS_ONLY)
+			.build());
+		em.flush();
+		em.clear();
+
+		assertThat(service.list(band.getId(), memberId).getFirst().media()).hasSize(2);
+		assertThat(service.list(band.getId(), null).getFirst().media()).extracting(MediaResponse::externalUrl)
+			.containsExactly("https://a/pub");
 	}
 
 	@Test
