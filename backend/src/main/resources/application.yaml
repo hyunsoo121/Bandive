@@ -69,6 +69,8 @@ app:
   storage:
     local-dir: ${APP_STORAGE_LOCAL_DIR:./uploads}
     public-base-url: ${APP_STORAGE_PUBLIC_BASE_URL:http://localhost:8081}
+  frontend:
+    base-url: ${APP_FRONTEND_BASE_URL:http://localhost:5173}
 
 management:
   endpoints:

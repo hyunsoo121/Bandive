@@ -63,4 +63,9 @@ class SecurityRulesTest extends IntegrationTest {
 		mvc.perform(get("/api/bands/my")).andExpect(status().isUnauthorized());
 	}
 
+	@Test
+	void 초대_가입은_토큰_없으면_401() throws Exception {
+		mvc.perform(post("/api/invite-codes/ABCD2345/join")).andExpect(status().isUnauthorized());
+	}
+
 }
