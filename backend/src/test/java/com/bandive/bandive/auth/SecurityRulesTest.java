@@ -30,8 +30,9 @@ class SecurityRulesTest extends IntegrationTest {
 
 	@Test
 	void GET_api_는_비회원도_통과한다() throws Exception {
-		// 밴드가 없어 404 지만, 401/403 이 아니라는 게 핵심 (보안 통과)
-		mvc.perform(get("/api/bands/1")).andExpect(status().isNotFound());
+		// 존재하지 않는 밴드라 404 지만, 401/403 이 아니라는 게 핵심 (보안 통과).
+		// 공유 컨테이너에 다른 테스트가 만든 밴드가 남을 수 있어 아주 큰 id 를 쓴다.
+		mvc.perform(get("/api/bands/999999999")).andExpect(status().isNotFound());
 	}
 
 	@Test

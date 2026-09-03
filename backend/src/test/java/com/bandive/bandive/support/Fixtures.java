@@ -11,6 +11,7 @@ import com.bandive.bandive.song.Song;
 import com.bandive.bandive.song.SongPart;
 import com.bandive.bandive.song.SongSourceType;
 import com.bandive.bandive.song.SongStatus;
+import com.bandive.bandive.user.AuthProvider;
 import com.bandive.bandive.user.User;
 
 /**
@@ -22,7 +23,12 @@ public final class Fixtures {
 	}
 
 	public static User user(String kakaoId) {
-		return User.builder().kakaoId(kakaoId).nickname("nick-" + kakaoId).email(kakaoId + "@example.com").build();
+		return User.builder()
+			.kakaoId(kakaoId)
+			.nickname("nick-" + kakaoId)
+			.email(kakaoId + "@example.com")
+			.provider(AuthProvider.KAKAO)
+			.build();
 	}
 
 	public static Band band(String name) {

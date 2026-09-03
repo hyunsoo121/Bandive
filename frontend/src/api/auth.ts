@@ -1,9 +1,25 @@
 import { api, loginUrl, setAccessToken, tryRefresh } from './client';
-import type { MeDto } from './types';
+import type { AccessTokenDto, MeDto } from './types';
 
 /** 카카오 로그인 시작 — 브라우저를 백엔드 인가 엔드포인트로 보낸다. 성공 시 /oauth/success 로 복귀. */
 export function startKakaoLogin(): void {
   window.location.href = loginUrl();
+}
+
+/** 이메일 회원가입 → 바로 로그인 상태 (access 토큰을 메모리에 저장). */
+export async function signupWithEmail(
+  email: string,
+  password: string,
+  nickname: string,
+): Promise<void> {
+  const r = await api.post<AccessTokenDto>('/api/auth/signup', { email, password, nickname });
+  setAccessToken(r.accessToken);
+}
+
+/** 이메일 로그인. */
+export async function loginWithEmail(email: string, password: string): Promise<void> {
+  const r = await api.post<AccessTokenDto>('/api/auth/login', { email, password });
+  setAccessToken(r.accessToken);
 }
 
 /** refresh 쿠키로 access 토큰을 복구. 로그인 상태면 true. */

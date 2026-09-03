@@ -241,7 +241,13 @@
   ⚠️ Spotify 는 `/v1/search` 가 앱 소유 계정 Premium 필요(무료계정 403, 2026-09-03 확인)라 배제. 앨범아트는 추후 (iTunes `artworkUrl100` 로 가능).
   → **S3 `StorageService` 는 Phase 7(배포)로 이동** (로컬은 `LocalStorageService` 로 충분, 버킷·IAM 은 배포 인프라와 함께).
 - **Phase 6 — 프론트 연동 ✅ 완료 (2026-09-03)**: `frontend/src/api/*` 레이어, `AppContext` 액션 전부 실제 호출, 목 제거.
-  곡/일정/미디어까지 연동 + 브라우저 E2E 확인. (곡 검색 UI 는 stub 이든 spotify 든 그대로 동작 — 응답 형태 동일)
+  곡/일정/미디어까지 연동 + 브라우저 E2E 확인.
+- **Phase 6.5 — 배포 전 개선 (2026-09-03~, 브랜치 `feature/10`)**: 사용자 요청 묶음. `V4` media.title, `V5` local login.
+  - ✅ 자잘한 것: `bands/my` 응답에 `role`, `LoginModal` 주석, Redis 볼륨(appendonly)
+  - ✅ ① 밴드 로고·배너 업로드 UI 연결 (백엔드는 이미 있었음)
+  - ✅ ②③ 영상 제목(`media.title`)·썸네일(`MediaThumbnail`, YouTube/Drive URL→이미지, 미저장)·`PATCH /api/media/{id}`(부분수정, 등록자/밴드장)·OTHER 링크 경고
+  - ✅ ⑤ 이메일 로그인: `users`에 `password_hash`·`provider`, `POST /api/auth/{signup,login}`, `SessionIssuer`(카카오 성공핸들러와 공통), 비번 8자+영문숫자, 이메일 인증 없음, 복구 없음 (ADR-010)
+  - ⬜ ④ 곡 폴더 + 순서 (V6 예정, 드래그 핸들 `@dnd-kit`, 폴더 CRUD 밴드장, 위시/합주 폴더 별도, 항상 폴더 그룹핑+폴더 내부만 정렬)
 - **Phase 7 — 배포**: Dockerfile, prod compose, CI/CD (push → AWS 자동 배포).
   **+ S3 `StorageService` 구현체** (Phase 5 에서 이동 — `app.storage.type=s3`, AWS SDK v2, 버킷·IAM).
   ⚠️ 로컬에서 비켜쓴 포트를 **기본값으로 복구**: Postgres 5432, Redis 6379, 앱 8080

@@ -45,7 +45,7 @@ class AuthControllerTest extends IntegrationTest {
 
 	@BeforeEach
 	void setUp() {
-		userId = users.save(User.builder().kakaoId("kakao-" + UUID.randomUUID()).nickname("테스터").build()).getId();
+		userId = users.save(User.ofKakao("kakao-" + UUID.randomUUID(), "테스터")).getId();
 	}
 
 	@AfterEach
@@ -110,6 +110,64 @@ class AuthControllerTest extends IntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.id").value(userId))
 			.andExpect(jsonPath("$.nickname").value("테스터"));
+	}
+
+	@Test
+	void 이메일_회원가입은_201_과_access_토큰_그리고_refresh_쿠키() throws Exception {
+		String email = "signup-" + UUID.randomUUID() + "@example.com";
+
+		mvc.perform(post("/api/auth/signup").contentType("application/json")
+			.content("{\"email\":\"" + email + "\",\"password\":\"pass1234\",\"nickname\":\"이메일가입자\"}"))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.accessToken").isNotEmpty())
+			.andExpect(cookie().exists(CookieUtils.REFRESH_COOKIE));
+
+		User created = users.findByEmail(email).orElseThrow();
+		assertThat(created.getPasswordHash()).isNotBlank().isNotEqualTo("pass1234");
+		users.deleteById(created.getId());
+	}
+
+	@Test
+	void 약한_비밀번호는_400() throws Exception {
+		mvc.perform(post("/api/auth/signup").contentType("application/json")
+			.content("{\"email\":\"weak@example.com\",\"password\":\"onlyletters\",\"nickname\":\"약비번\"}"))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+	}
+
+	@Test
+	void 이미_가입된_이메일이면_409() throws Exception {
+		String email = "dup-" + UUID.randomUUID() + "@example.com";
+		String body = "{\"email\":\"" + email + "\",\"password\":\"pass1234\",\"nickname\":\"먼저\"}";
+		mvc.perform(post("/api/auth/signup").contentType("application/json").content(body))
+			.andExpect(status().isCreated());
+
+		mvc.perform(post("/api/auth/signup").contentType("application/json").content(body))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("EMAIL_TAKEN"));
+
+		users.findByEmail(email).ifPresent(u -> users.deleteById(u.getId()));
+	}
+
+	@Test
+	void 이메일_로그인_성공과_틀린_비밀번호_401() throws Exception {
+		String email = "login-" + UUID.randomUUID() + "@example.com";
+		mvc.perform(post("/api/auth/signup").contentType("application/json")
+			.content("{\"email\":\"" + email + "\",\"password\":\"pass1234\",\"nickname\":\"로그인유저\"}"))
+			.andExpect(status().isCreated());
+
+		mvc.perform(post("/api/auth/login").contentType("application/json")
+			.content("{\"email\":\"" + email + "\",\"password\":\"pass1234\"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.accessToken").isNotEmpty())
+			.andExpect(cookie().exists(CookieUtils.REFRESH_COOKIE));
+
+		mvc.perform(post("/api/auth/login").contentType("application/json")
+			.content("{\"email\":\"" + email + "\",\"password\":\"wrongpass1\"}"))
+			.andExpect(status().isUnauthorized())
+			.andExpect(jsonPath("$.code").value("LOGIN_FAILED"));
+
+		users.findByEmail(email).ifPresent(u -> users.deleteById(u.getId()));
 	}
 
 }

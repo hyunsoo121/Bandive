@@ -118,6 +118,10 @@ interface AppState {
   setDevRole: (role: Role | null) => void;
   /** 카카오 로그인 시작 (페이지 이동) */
   login: () => void;
+  /** 이메일 로그인 — 성공 시 세션 반영 + 로그인 모달 닫힘 */
+  emailLogin: (email: string, password: string) => Promise<void>;
+  /** 이메일 회원가입 — 성공 시 바로 로그인 상태 */
+  signup: (email: string, password: string, nickname: string) => Promise<void>;
   logout: () => void;
   /** 밴드 생성 → 내 밴드에 추가하고 해당 밴드로 이동 */
   createBand: (name: string) => Promise<void>;
@@ -273,6 +277,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const login = useCallback(() => {
     authApi.startKakaoLogin();
   }, []);
+
+  // 이메일 로그인/가입 성공 후 공통: 내 정보 + 내 밴드를 불러와 세션에 반영하고 모달을 닫는다.
+  const finishAuth = useCallback(async () => {
+    const [me, mine] = await Promise.all([authApi.fetchMe(), bandApi.getMyBands()]);
+    setUser(toUser(me));
+    setBands(mine.map(toBand));
+    setDevRole(null);
+    setLoginOpen(false);
+  }, []);
+
+  const emailLogin = useCallback(
+    async (email: string, password: string) => {
+      await authApi.loginWithEmail(email.trim(), password);
+      await finishAuth();
+    },
+    [finishAuth],
+  );
+
+  const signup = useCallback(
+    async (email: string, password: string, nickname: string) => {
+      await authApi.signupWithEmail(email.trim(), password, nickname.trim());
+      await finishAuth();
+    },
+    [finishAuth],
+  );
 
   const logout = useCallback(async () => {
     await authApi.logout();
@@ -508,6 +537,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCurrentBandId,
     setDevRole,
     login,
+    emailLogin,
+    signup,
     logout,
     createBand,
     joinByInvite,

@@ -40,8 +40,7 @@ public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 	User provision(Map<String, Object> attributes) {
 		String kakaoId = String.valueOf(attributes.get("id"));
 		String nickname = extractNickname(attributes, kakaoId);
-		return users.findByKakaoId(kakaoId)
-			.orElseGet(() -> users.save(User.builder().kakaoId(kakaoId).nickname(nickname).build()));
+		return users.findByKakaoId(kakaoId).orElseGet(() -> users.save(User.ofKakao(kakaoId, nickname)));
 	}
 
 	@SuppressWarnings("unchecked")

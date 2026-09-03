@@ -30,3 +30,12 @@
   align-self: flex-start;
   padding-left: 0;
 }
+.login-modal__or {
+  text-align: center;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--color-neutral-600);
+}
+.login-modal .field {
+  gap: 4px;
+}
