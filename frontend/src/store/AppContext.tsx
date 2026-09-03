@@ -9,29 +9,37 @@ import {
 } from 'react';
 import { useNavigate } from 'react-router-dom';
 import type {
+  AttendanceStatus,
   Band,
   MediaItem,
   MediaKind,
   Member,
   Role,
+  ScheduleEvent,
+  ScheduleType,
   SessionShape,
   Song,
   SourceType,
   User,
   Visibility,
 } from '../types';
-import { MEDIA, SONGS } from '../mock/data';
 import * as authApi from '../api/auth';
 import * as bandApi from '../api/bands';
 import * as inviteApi from '../api/invites';
 import * as memberApi from '../api/members';
-import { toBand, toMember, toUser } from '../api/mappers';
+import * as songApi from '../api/songs';
+import * as scheduleApi from '../api/schedules';
+import * as mediaApi from '../api/media';
+import { toBand, toMedia, toMember, toSchedule, toSong, toUser } from '../api/mappers';
+import { ATT_TO_EN, byDateAsc } from '../lib/schedule';
 
 export interface NewSongInput {
   bandId: string;
   title: string;
   artist: string;
   sourceType: SourceType;
+  /** SEARCH 일 때 검색 결과의 트랙 식별자 (백엔드 필수) */
+  externalTrackId?: string | null;
   memo: string;
   referenceVideoUrl: string;
   sessions: SessionShape;
@@ -40,11 +48,18 @@ export interface NewSongInput {
 export interface NewMediaInput {
   bandId: string;
   url: string;
-  title: string;
   kind: MediaKind;
   visibility: Visibility;
-  /** 연결할 일정의 day. 없으면 null */
-  scheduleDay: number | null;
+  /** 연결할 일정 id. 없으면 null */
+  scheduleId: string | null;
+}
+
+export interface NewScheduleInput {
+  bandId: string;
+  type: ScheduleType;
+  /** ISO-8601 (Instant) */
+  dateTime: string;
+  location: string;
 }
 
 /** 현재 밴드의 초대 코드 (밴드장이 발급/재발급한 뒤에만 채워진다 — 조회 전용 API 가 없어서). */
@@ -54,9 +69,8 @@ export interface InviteInfo {
 }
 
 /**
- * 앱 전역 상태.
- * - 인증(카카오 OAuth) · 밴드 · 멤버 · 초대는 백엔드 API 연동됨.
- * - 곡 · 영상 · 일정은 백엔드 Phase 4-4~4-6 전까지 mock 유지.
+ * 앱 전역 상태. 인증(카카오 OAuth) · 밴드 · 멤버 · 초대 · 곡 · 일정 · 영상 모두 백엔드 API 연동됨.
+ * 현재 밴드가 바뀌면 곡/일정/영상을 그 밴드 것으로 다시 불러온다.
  */
 interface AppState {
   user: User | null;
@@ -68,20 +82,22 @@ interface AppState {
   currentBand: Band | null;
   /** 세션 복구(첫 refresh) 진행 중 */
   bootLoading: boolean;
-  /** 현재 밴드 상세/멤버 로딩 중 */
+  /** 현재 밴드 상세/멤버/콘텐츠 로딩 중 */
   bandLoading: boolean;
   /** 화면 권한 판정에 쓰는 최종 역할 (게스트 포함) */
   role: Role;
-  /** 개발용 역할 강제 (null 이면 실제 멤버십 기준). 곡/영상 등 mock 화면 프리뷰용 */
+  /** 개발용 역할 강제 (null 이면 실제 멤버십 기준) */
   devRole: Role | null;
 
   switcherOpen: boolean;
   loginOpen: boolean;
   createOpen: boolean;
 
-  /** 전체 곡 (mock). 화면에서 밴드로 필터. → 백엔드 Phase 4-4 */
+  /** 현재 밴드 곡 (GET /api/bands/{id}/songs) */
   songs: Song[];
-  /** 전체 영상 (mock). 화면에서 밴드로 필터. → 백엔드 Phase 4-6 */
+  /** 현재 밴드 일정 (GET /api/bands/{id}/schedules), dateTime 오름차순 */
+  schedules: ScheduleEvent[];
+  /** 현재 밴드 영상 (GET /api/bands/{id}/media) */
   media: MediaItem[];
   /** 현재 밴드 멤버 (GET /api/bands/{id}/members) */
   members: Member[];
@@ -98,16 +114,29 @@ interface AppState {
   /** 초대 코드로 가입 → 가입한 밴드 반환 */
   joinByInvite: (code: string) => Promise<Band>;
 
-  /** 투표 토글 (mock) */
-  voteSong: (songId: string) => void;
-  /** 위시리스트 → 합주곡 승격 (mock) */
-  promoteSong: (songId: string) => void;
-  /** 파트 슬롯 배정/해제 (mock) */
-  assignPart: (songId: string, slotKey: string, memberName: string) => void;
-  /** 곡 추가 (mock) */
-  addSong: (input: NewSongInput) => void;
-  /** 영상 URL 첨부 (mock) */
-  addMedia: (input: NewMediaInput) => void;
+  /** 투표 토글 (POST/DELETE /api/songs/{id}/vote) */
+  voteSong: (songId: string) => Promise<void>;
+  /** 위시리스트 → 합주곡 승격 (PATCH /api/songs/{id}/confirm) */
+  promoteSong: (songId: string) => Promise<void>;
+  /** 파트 슬롯 배정/해제 (PUT /api/songs/{id}/parts/{partId}/assign) */
+  assignPart: (songId: string, slotKey: string, memberName: string) => Promise<void>;
+  /** 곡 추가 (POST /api/bands/{id}/songs) */
+  addSong: (input: NewSongInput) => Promise<void>;
+  /** 곡 삭제 (밴드장) */
+  removeSong: (songId: string) => Promise<void>;
+
+  /** 일정 등록 (POST /api/bands/{id}/schedules) */
+  addSchedule: (input: NewScheduleInput) => Promise<void>;
+  /** 일정 삭제 (밴드장) */
+  removeSchedule: (scheduleId: string) => Promise<void>;
+  /** 내 참석 여부 등록/변경 (POST /api/schedules/{id}/attendance) */
+  setAttendance: (scheduleId: string, status: AttendanceStatus) => Promise<void>;
+
+  /** 영상 URL 첨부 (POST /api/bands/{id}/media) */
+  addMedia: (input: NewMediaInput) => Promise<void>;
+  /** 영상 삭제 (등록자 본인 또는 밴드장) */
+  removeMedia: (mediaId: string) => Promise<void>;
+
   /** 멤버 추방 (밴드장) — userId */
   kickMember: (userId: string) => Promise<void>;
   /** 초대 코드 발급/재발급 (밴드장) */
@@ -123,6 +152,8 @@ interface AppState {
 
 const AppContext = createContext<AppState | null>(null);
 
+const sortSchedules = (list: ScheduleEvent[]): ScheduleEvent[] => [...list].sort(byDateAsc);
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
 
@@ -136,8 +167,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [bandLoading, setBandLoading] = useState(false);
   const [devRole, setDevRole] = useState<Role | null>(null);
 
-  const [songs, setSongs] = useState<Song[]>(SONGS);
-  const [media, setMedia] = useState<MediaItem[]>(MEDIA);
+  const [songs, setSongs] = useState<Song[]>([]);
+  const [schedules, setSchedules] = useState<ScheduleEvent[]>([]);
+  const [media, setMedia] = useState<MediaItem[]>([]);
 
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -165,11 +197,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // 현재 밴드 상세 + 멤버 로드
+  // 현재 밴드 상세 + 멤버 + 곡/일정/영상 로드
   useEffect(() => {
     if (!currentBandId) {
       setCurrentBand(null);
       setMembers([]);
+      setSongs([]);
+      setSchedules([]);
+      setMedia([]);
       return;
     }
     let alive = true;
@@ -177,17 +212,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setInvite(null);
     (async () => {
       try {
-        const [band, mem] = await Promise.all([
+        const [band, mem, songList, schedList, mediaList] = await Promise.all([
           bandApi.getBand(currentBandId),
           memberApi.listMembers(currentBandId),
+          songApi.listSongs(currentBandId),
+          scheduleApi.listSchedules(currentBandId),
+          mediaApi.listMedia(currentBandId),
         ]);
         if (!alive) return;
         setCurrentBand(toBand(band));
         setMembers(mem.map((m) => toMember(m, currentBandId)));
+        setSongs(songList.map(toSong));
+        setSchedules(sortSchedules(schedList.map(toSchedule)));
+        setMedia(mediaList.map(toMedia));
       } catch {
         if (alive) {
           setCurrentBand(null);
           setMembers([]);
+          setSongs([]);
+          setSchedules([]);
+          setMedia([]);
         }
       } finally {
         if (alive) setBandLoading(false);
@@ -266,73 +310,112 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setInvite({ code: dto.code, url: dto.inviteUrl });
   }, [currentBandId]);
 
-  const voteSong = useCallback((songId: string) => {
-    setSongs((prev) =>
-      prev.map((s) => {
-        if (s.id !== songId) return s;
-        return s.votedByMe
-          ? { ...s, votedByMe: false, votes: Math.max(0, s.votes - 1) }
-          : { ...s, votedByMe: true, votes: s.votes + 1 };
-      }),
-    );
-  }, []);
-
-  const promoteSong = useCallback((songId: string) => {
-    setSongs((prev) => prev.map((s) => (s.id === songId ? { ...s, status: 'CONFIRMED' } : s)));
-  }, []);
-
-  const assignPart = useCallback((songId: string, slotKey: string, memberName: string) => {
-    setSongs((prev) =>
-      prev.map((s) => {
-        if (s.id !== songId) return s;
-        const assignments = { ...s.assignments };
-        if (memberName) assignments[slotKey] = memberName;
-        else delete assignments[slotKey];
-        return { ...s, assignments };
-      }),
-    );
-  }, []);
-
-  const addSong = useCallback(
-    (input: NewSongInput) => {
-      setSongs((prev) => {
-        const maxOrder = prev.reduce((m, s) => Math.max(m, s.addedOrder), 0);
-        const song: Song = {
-          id: `u${Date.now()}`,
-          bandId: input.bandId,
-          title: input.title.trim(),
-          artist: input.artist.trim(),
-          status: 'WISHLIST',
-          sourceType: input.sourceType,
-          proposer: user?.name ?? '게스트',
-          memo: input.memo.trim(),
-          referenceVideoUrl: input.referenceVideoUrl.trim(),
-          sessions: input.sessions,
-          votes: 0,
-          votedByMe: false,
-          addedOrder: maxOrder + 1,
-          assignments: {},
-        };
-        return [...prev, song];
-      });
+  const voteSong = useCallback(
+    async (songId: string) => {
+      const song = songs.find((s) => s.id === songId);
+      if (!song) return;
+      try {
+        const result = song.votedByMe
+          ? await songApi.unvoteSong(songId)
+          : await songApi.voteSong(songId);
+        setSongs((prev) =>
+          prev.map((s) =>
+            s.id === songId ? { ...s, votes: result.voteCount, votedByMe: result.votedByMe } : s,
+          ),
+        );
+      } catch (e) {
+        console.error('투표 처리 실패', e);
+      }
     },
-    [user],
+    [songs],
   );
 
-  const addMedia = useCallback((input: NewMediaInput) => {
-    const url = input.url.trim();
-    const source: MediaItem['source'] = /drive\.google/i.test(url) ? 'Google Drive' : 'YouTube';
-    const item: MediaItem = {
-      id: `um${Date.now()}`,
-      bandId: input.bandId,
+  const promoteSong = useCallback(async (songId: string) => {
+    try {
+      const dto = await songApi.confirmSong(songId);
+      setSongs((prev) => prev.map((s) => (s.id === songId ? toSong(dto) : s)));
+    } catch (e) {
+      console.error('합주곡 승격 실패', e);
+    }
+  }, []);
+
+  const assignPart = useCallback(
+    async (songId: string, slotKey: string, memberName: string) => {
+      const song = songs.find((s) => s.id === songId);
+      if (!song) return;
+      const hashAt = slotKey.lastIndexOf('#');
+      const instrument = slotKey.slice(0, hashAt);
+      const partIndex = Number(slotKey.slice(hashAt + 1));
+      const part = song.parts.find((p) => p.instrument === instrument && p.partIndex === partIndex);
+      if (!part) return;
+      const userId = memberName ? (members.find((m) => m.name === memberName)?.id ?? null) : null;
+      try {
+        const dto = await songApi.assignPart(songId, part.id, userId);
+        setSongs((prev) => prev.map((s) => (s.id === songId ? toSong(dto) : s)));
+      } catch (e) {
+        console.error('파트 배정 실패', e);
+      }
+    },
+    [songs, members],
+  );
+
+  const addSong = useCallback(async (input: NewSongInput) => {
+    const sessions = Object.entries(input.sessions)
+      .filter(([, count]) => (count ?? 0) > 0)
+      .map(([instrument, count]) => ({ instrument, count: count as number }));
+    const dto = await songApi.addSong(input.bandId, {
       title: input.title.trim(),
-      source,
-      date: '방금 등록',
-      kind: input.kind,
-      visibility: input.visibility,
-      scheduleDay: input.scheduleDay,
-    };
-    setMedia((prev) => [item, ...prev]);
+      artist: input.artist.trim(),
+      sourceType: input.sourceType,
+      externalTrackId: input.externalTrackId ?? null,
+      memo: input.memo.trim(),
+      referenceVideoUrl: input.referenceVideoUrl.trim(),
+      sessions,
+    });
+    setSongs((prev) => [...prev, toSong(dto)]);
+  }, []);
+
+  const removeSong = useCallback(async (songId: string) => {
+    await songApi.deleteSong(songId);
+    setSongs((prev) => prev.filter((s) => s.id !== songId));
+  }, []);
+
+  const addSchedule = useCallback(async (input: NewScheduleInput) => {
+    const dto = await scheduleApi.createSchedule(input.bandId, {
+      type: input.type,
+      dateTime: input.dateTime,
+      location: input.location.trim() || undefined,
+    });
+    setSchedules((prev) => sortSchedules([...prev, toSchedule(dto)]));
+  }, []);
+
+  const removeSchedule = useCallback(async (scheduleId: string) => {
+    await scheduleApi.deleteSchedule(scheduleId);
+    setSchedules((prev) => prev.filter((s) => s.id !== scheduleId));
+  }, []);
+
+  const setAttendance = useCallback(async (scheduleId: string, status: AttendanceStatus) => {
+    try {
+      const dto = await scheduleApi.setAttendance(scheduleId, ATT_TO_EN[status]);
+      setSchedules((prev) => prev.map((s) => (s.id === scheduleId ? toSchedule(dto) : s)));
+    } catch (e) {
+      console.error('출결 저장 실패', e);
+    }
+  }, []);
+
+  const addMedia = useCallback(async (input: NewMediaInput) => {
+    const dto = await mediaApi.addMedia(input.bandId, {
+      externalUrl: input.url.trim(),
+      type: input.kind === '공연' ? 'PERFORMANCE' : 'REHEARSAL',
+      visibility: input.visibility === '링크 공개' ? 'LINK_PUBLIC' : 'MEMBERS_ONLY',
+      scheduleId: input.scheduleId ? Number(input.scheduleId) : null,
+    });
+    setMedia((prev) => [toMedia(dto), ...prev]);
+  }, []);
+
+  const removeMedia = useCallback(async (mediaId: string) => {
+    await mediaApi.deleteMedia(mediaId);
+    setMedia((prev) => prev.filter((m) => m.id !== mediaId));
   }, []);
 
   const value: AppState = {
@@ -345,6 +428,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     role,
     devRole,
     songs,
+    schedules,
     media,
     members,
     invite,
@@ -361,7 +445,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     promoteSong,
     assignPart,
     addSong,
+    removeSong,
+    addSchedule,
+    removeSchedule,
+    setAttendance,
     addMedia,
+    removeMedia,
     kickMember,
     issueInviteCode,
     openSwitcher: () => setSwitcherOpen(true),

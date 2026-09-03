@@ -1,28 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { useGuard } from '../hooks/useGuard';
-import { KIND_LABEL, schedulesOfBand } from '../mock/selectors';
-import type { AttendanceStatus, ScheduleEvent } from '../types';
+import { KIND_LABEL, byDateAsc, toUi, type UiSchedule } from '../lib/schedule';
+import type { AttendanceStatus } from '../types';
 import { Avatar } from '../components/Avatar';
 import { Fab } from '../components/Fab';
+import { AddScheduleModal } from '../components/AddScheduleModal';
 import './SchedulePage.css';
 
-const DOW = ['일', '월', '화', '수', '목', '금', '토'];
 const ATT_OPTIONS: AttendanceStatus[] = ['참석', '미정', '불참'];
-
-/** 목업 시드 데이터가 있는 달 (2026년 8월, month 는 0-indexed) */
-const DATA_YEAR = 2026;
-const DATA_MONTH = 7;
-const TODAY_DAY = 28;
-
-/** 멤버별 기본 출결 (목업 하드코딩값) — '내' 응답은 UI 선택으로 덮어씀 */
-const BASE_ATTENDANCE: Record<string, AttendanceStatus> = {
-  김현수: '참석',
-  전환: '참석',
-  송민호: '참석',
-  김시훈: '미정',
-  윤수빈: '불참',
-};
 
 function statusStyle(s: AttendanceStatus): { background: string; color: string } {
   if (s === '참석')
@@ -34,43 +20,61 @@ function statusStyle(s: AttendanceStatus): { background: string; color: string }
 
 interface Cell {
   day: number | null;
-  event: ScheduleEvent | null;
+  events: UiSchedule[];
 }
 
-function buildCells(year: number, month: number, events: ScheduleEvent[]): Cell[] {
+function buildCells(year: number, month: number, events: UiSchedule[]): Cell[] {
   const startDow = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const byDay = new Map(events.map((e) => [e.day, e]));
   return Array.from({ length: 42 }, (_, i) => {
     const day = i - startDow + 1;
     const inMonth = day >= 1 && day <= daysInMonth;
-    return { day: inMonth ? day : null, event: inMonth ? (byDay.get(day) ?? null) : null };
+    return {
+      day: inMonth ? day : null,
+      events: inMonth ? events.filter((e) => e.day === day) : [],
+    };
   });
 }
 
+const DOW = ['일', '월', '화', '수', '목', '금', '토'];
+
 export function SchedulePage() {
-  const { currentBand, user, media: allMedia, members: allMembers } = useApp();
+  const { currentBand, media: allMedia, members: allMembers, schedules, setAttendance } = useApp();
   const guard = useGuard();
   const bandId = currentBand?.id ?? '';
 
-  const events = schedulesOfBand(bandId);
+  const uiEvents = useMemo(() => [...schedules].sort(byDateAsc).map(toUi), [schedules]);
   const members = allMembers.filter((m) => m.bandId === bandId);
   const media = allMedia.filter((m) => m.bandId === bandId);
 
-  const [view, setView] = useState({ year: DATA_YEAR, month: DATA_MONTH });
-  const isDataMonth = view.year === DATA_YEAR && view.month === DATA_MONTH;
-  const monthEvents = isDataMonth ? events : [];
+  const [view, setView] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() };
+  });
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [addOpen, setAddOpen] = useState(false);
+  const [pending, setPending] = useState(false);
 
-  const firstUpcoming =
-    events.find((e) => e.day >= TODAY_DAY)?.day ?? events[events.length - 1]?.day ?? null;
-  const [selectedDay, setSelectedDay] = useState<number | null>(firstUpcoming);
-  const [myAtt, setMyAtt] = useState<Record<string, AttendanceStatus>>({});
+  // 밴드가 바뀌면 이전 밴드의 선택을 버린다 → 아래 초점 effect 가 새 밴드 기준으로 다시 돈다.
+  useEffect(() => {
+    setSelectedId(null);
+  }, [bandId]);
+
+  // 데이터가 들어오면 가장 가까운(또는 마지막) 일정으로 초점을 맞춘다.
+  useEffect(() => {
+    if (selectedId || uiEvents.length === 0) return;
+    const now = new Date();
+    const focus = uiEvents.find((e) => e.at >= now) ?? uiEvents[uiEvents.length - 1];
+    setSelectedId(focus.id);
+    setView({ year: focus.year, month: focus.month });
+  }, [uiEvents, selectedId]);
 
   if (!currentBand) return null;
 
+  const monthEvents = uiEvents.filter((e) => e.year === view.year && e.month === view.month);
   const cells = buildCells(view.year, view.month, monthEvents);
-  const selected = isDataMonth ? (monthEvents.find((e) => e.day === selectedDay) ?? null) : null;
-  const selectedMedia = selected ? media.filter((m) => m.scheduleDay === selected.day) : [];
+  const selected = uiEvents.find((e) => e.id === selectedId) ?? null;
+  const selectedMedia = selected ? media.filter((m) => selected.mediaIds.includes(m.id)) : [];
 
   const shiftMonth = (delta: number) => {
     setView((v) => {
@@ -79,16 +83,22 @@ export function SchedulePage() {
     });
   };
 
-  const myName = user?.name ?? '';
   const attendanceRows = members.map((m) => {
-    const status =
-      m.name === myName
-        ? (myAtt[selected?.id ?? ''] ?? BASE_ATTENDANCE[m.name] ?? '미정')
-        : (BASE_ATTENDANCE[m.name] ?? '미정');
-    return { ...m, status };
+    const found = selected?.attendees.find((a) => a.userId === m.id);
+    return { ...m, status: found?.status ?? ('미정' as AttendanceStatus) };
   });
-  const goingCount = attendanceRows.filter((r) => r.status === '참석').length;
-  const myStatus = selected ? (myAtt[selected.id] ?? BASE_ATTENDANCE[myName]) : undefined;
+  const goingCount = selected?.counts.attending ?? 0;
+  const myStatus = selected?.myStatus ?? undefined;
+
+  const chooseAttendance = async (opt: AttendanceStatus) => {
+    if (!selected) return;
+    setPending(true);
+    try {
+      await setAttendance(selected.id, opt);
+    } finally {
+      setPending(false);
+    }
+  };
 
   return (
     <div className="sched">
@@ -120,19 +130,20 @@ export function SchedulePage() {
       </div>
       <div className="sched__grid">
         {cells.map((c, i) => {
-          const isSel = c.day != null && c.day === selectedDay && isDataMonth;
+          const ev = c.events[0] ?? null;
+          const isSel = ev != null && ev.id === selectedId;
           return (
             <button
               key={i}
               type="button"
               className={`sched__cell${isSel ? ' is-sel' : ''}`}
               disabled={c.day == null}
-              onClick={() => c.day != null && setSelectedDay(c.day)}
+              onClick={() => ev && setSelectedId(ev.id)}
             >
               <span
                 className="sched__cell-n"
                 style={{
-                  fontWeight: isSel ? 800 : c.event ? 700 : 500,
+                  fontWeight: isSel ? 800 : ev ? 700 : 500,
                   color: i % 7 === 0 ? 'var(--color-accent-700)' : 'var(--color-text)',
                 }}
               >
@@ -141,14 +152,17 @@ export function SchedulePage() {
               <span
                 className="sched__dot"
                 style={{
-                  background: c.event
-                    ? c.event.type === 'PERFORMANCE'
+                  background: ev
+                    ? ev.type === 'PERFORMANCE'
                       ? 'var(--color-neutral-800)'
                       : 'var(--color-accent)'
                     : 'transparent',
                 }}
               />
-              <span className="sched__cell-tag">{c.event ? KIND_LABEL[c.event.type] : ''}</span>
+              <span className="sched__cell-tag">
+                {ev ? KIND_LABEL[ev.type] : ''}
+                {c.events.length > 1 ? ` +${c.events.length - 1}` : ''}
+              </span>
             </button>
           );
         })}
@@ -175,8 +189,8 @@ export function SchedulePage() {
               <button
                 key={e.id}
                 type="button"
-                className={`sched__event${e.day === selectedDay ? ' is-sel' : ''}`}
-                onClick={() => setSelectedDay(e.day)}
+                className={`sched__event${e.id === selectedId ? ' is-sel' : ''}`}
+                onClick={() => setSelectedId(e.id)}
               >
                 <span className="sched__event-date">
                   <strong>{e.day}</strong>
@@ -196,12 +210,12 @@ export function SchedulePage() {
                       {KIND_LABEL[e.type]}
                     </span>
                     <span className="muted" style={{ fontSize: 11 }}>
-                      {e.time}
+                      {e.timeLabel}
                     </span>
                   </span>
-                  <strong style={{ fontSize: 14 }}>{e.title}</strong>
+                  <strong style={{ fontSize: 14 }}>{e.location || KIND_LABEL[e.type]}</strong>
                   <span className="muted" style={{ fontSize: 11 }}>
-                    {e.place}
+                    {e.location || '장소 미정'}
                   </span>
                 </span>
               </button>
@@ -227,14 +241,14 @@ export function SchedulePage() {
                     {KIND_LABEL[selected.type]}
                   </span>
                   <span className="muted" style={{ fontSize: 11 }}>
-                    {view.month + 1}월 {selected.day}일 {selected.dow} · {selected.time}
+                    {selected.month + 1}월 {selected.day}일 {selected.dow} · {selected.timeLabel}
                   </span>
                 </span>
                 <strong style={{ fontFamily: 'var(--font-heading)', fontSize: 18 }}>
-                  {selected.title}
+                  {selected.location || KIND_LABEL[selected.type]}
                 </strong>
                 <span className="muted" style={{ fontSize: 12 }}>
-                  {selected.place}
+                  {selected.location || '장소 미정'}
                 </span>
               </div>
 
@@ -245,8 +259,11 @@ export function SchedulePage() {
                     <button
                       key={opt}
                       type="button"
+                      disabled={pending}
                       className={`sched__att${myStatus === opt ? ' is-on' : ''}`}
-                      onClick={guard(() => setMyAtt((prev) => ({ ...prev, [selected.id]: opt })))}
+                      onClick={guard(() => {
+                        void chooseAttendance(opt);
+                      })}
                     >
                       {opt}
                     </button>
@@ -259,17 +276,25 @@ export function SchedulePage() {
                 {selectedMedia.length > 0 ? (
                   <div className="stack" style={{ gap: 8 }}>
                     {selectedMedia.map((m) => (
-                      <div key={m.id} className="sched__vid">
+                      <a
+                        key={m.id}
+                        className="sched__vid"
+                        href={m.url}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
                         <span className="sched__vid-thumb">
                           <span className="sched__vid-play" />
                         </span>
                         <span className="stack" style={{ minWidth: 0, flex: 1 }}>
-                          <strong style={{ fontSize: 12 }}>{m.title}</strong>
+                          <strong style={{ fontSize: 12, wordBreak: 'break-all' }}>
+                            {m.title}
+                          </strong>
                           <span className="muted" style={{ fontSize: 10 }}>
                             {m.source} · {m.date} · {m.visibility}
                           </span>
                         </span>
-                      </div>
+                      </a>
                     ))}
                   </div>
                 ) : (
@@ -305,15 +330,23 @@ export function SchedulePage() {
             </div>
           ) : (
             <div className="panel sched__empty">
-              {isDataMonth
-                ? '일정을 선택하면 출결·영상이 표시됩니다.'
-                : '이 달에는 일정이 없습니다.'}
+              {uiEvents.length === 0
+                ? '아직 등록된 일정이 없습니다.'
+                : '일정을 선택하면 출결·영상이 표시됩니다.'}
             </div>
           )}
         </section>
       </div>
 
-      <Fab label="＋ 일정 등록" onClick={guard(() => {})} />
+      <Fab label="＋ 일정 등록" onClick={guard(() => setAddOpen(true))} />
+
+      {addOpen && (
+        <AddScheduleModal
+          bandId={bandId}
+          onClose={() => setAddOpen(false)}
+          onSubmitted={() => setAddOpen(false)}
+        />
+      )}
     </div>
   );
 }

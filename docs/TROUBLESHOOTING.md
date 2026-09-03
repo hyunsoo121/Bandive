@@ -352,3 +352,37 @@ CGLIB 프록시가 생기는데 부모의 `final` setter 를 못 감싼다는 **
 멤버 목록에서 내 역할을 찾아 정확히 하지만, 내 밴드 **목록**(스위처)에는 역할 정보가 없어 전부 'member' fallback.
 
 **해결.** 백엔드가 my 응답에 role 을 실어주면 자동 해결 (`mappers.toBand` 가 이미 `dto.role` 을 읽음).
+
+### 곡 "검색" 탭에 무슨 단어를 쳐도 결과 3건이 똑같이 나온다
+
+**원인.** 버그 아님. `GET /api/songs/search` 는 백엔드 스텁(`StubMusicSearchService`)이라 쿼리를 그대로
+3건으로 echo 한다 (Phase 5 에서 실 음원 API). 결과를 **클릭해서 골라야** `sourceType=SEARCH` +
+`externalTrackId` 로 등록되고, 안 고르고 "직접 입력" 값만 쓰면 `MANUAL` 로 등록된다
+(백엔드는 SEARCH 인데 `externalTrackId` 가 비면 `400 EXTERNAL_TRACK_ID_REQUIRED`).
+
+### 영상 카드/일정 리스트에 "제목"이 안 뜬다
+
+**원인.** 백엔드 `Media` · `Schedule` 엔티티에 title 필드가 없다 (Media = URL·종류·공개범위,
+Schedule = 종류·일시·장소). 목업엔 있던 제목 입력칸을 프론트에서 뺐다.
+
+**동작.** 영상은 URL 을 짧게 줄인 문자열(`mappers.toMedia` 의 `prettyUrl`)을 라벨로 쓰고 클릭 시 원본으로 연다.
+일정은 `장소`(없으면 "연습"/"공연" 라벨)를 헤딩으로 쓴다.
+
+### 일정 캘린더가 이번 달이 아니라 다른 달로 열린다
+
+**원인.** 버그 아님. `SchedulePage` 는 데이터가 들어오면 "지금 이후 가장 가까운 일정"이 있는 달로
+`view` 를 한 번 맞춘다 (`lib/schedule.nextSchedule`). 다가오는 일정이 없으면 마지막 일정의 달.
+등록된 일정이 하나도 없으면 실제 이번 달로 연다.
+
+### 파트 배정 select 를 바꿔도 반영이 안 되고 콘솔에 `SONG_NOT_CONFIRMED`
+
+**원인.** `PUT /api/songs/{id}/parts/{partId}/assign` 은 곡이 `CONFIRMED` 여야 한다(그 외 409).
+UI 는 `CONFIRMED` 곡에서만 select 를 보여주므로 보통은 안 나지만, 승격 직후 응답 반영 전 클릭하면 날 수 있다.
+
+**참고.** 프론트는 슬롯키(`"기타#2"`)를 `Song.parts` 에서 `partId` 로, 멤버 이름을 `members` 에서
+`userId` 로 되짚어 호출한다. 동명이인이 있으면 첫 번째 멤버로 배정된다(엣지 케이스).
+
+### 곡/일정/영상이 로그인 전에도 보이는데 액션만 막힌다
+
+정상. GET 은 전부 공개라 게스트도 목록을 받는다. 투표·등록·출결·배정은 `useGuard` 가 로그인 모달을 띄우고,
+서버도 비회원 액션은 401/403 으로 막는다. `media` 는 비회원에게 `LINK_PUBLIC` 만 내려온다(공개범위 필터).
