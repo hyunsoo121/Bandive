@@ -232,10 +232,18 @@
     `PATCH /api/media/{id}/visibility`(밴드장) / `DELETE /api/media/{id}`(**등록자 본인 또는 밴드장**).
     **4-5 에서 미룬 것 완성**: `ScheduleResponse.media` 추가 (같은 공개범위 필터). `ScheduleService` 에 `MediaRepository` 주입.
     마이그레이션 없음. **159 테스트 그린.**
-- **Phase 5 — 파일 업로드 / 외부 음원 검색**: `StorageService`(로컬 dev / S3 prod),
-  곡 검색은 MANUAL 우선 완성 · SEARCH 는 스텁 후 실 API 연동
-- **Phase 6 — 프론트 연동**: `frontend/src/api/*` 레이어, `AppContext` 액션을 실제 호출로 교체, 목 제거
+- **Phase 5 — 외부 음원 검색 ✅ 완료 (2026-09-03)**: `song/service/ItunesMusicSearchService`
+  (Apple iTunes Search API — 인증·API 키 불필요. 응답이 `Content-Type: text/javascript` 라 문자열로 받아 `ObjectMapper` 로 파싱.
+  외부 장애·깨진 본문은 빈 목록으로 삼킴). `app.music.provider=itunes` 면 활성, 그 외 모든 값은 `StubMusicSearchService`
+  (`MusicSearchConfig` 의 두 `@Bean` + `@ConditionalOnMissingBean` fallback). `song/config/{MusicProperties(provider,limit,country),MusicSearchConfig}`.
+  `.env` 는 `MUSIC_PROVIDER`(+옵션 `MUSIC_COUNTRY`) 한 줄. `ItunesMusicSearchServiceTest`(MockRestServiceServer) 4개. 총 163 그린.
+  실검색 스모크 통과: `GET /api/songs/search?q=yesterday` → 실 트랙, SEARCH 타입 곡 추가 OK.
+  ⚠️ Spotify 는 `/v1/search` 가 앱 소유 계정 Premium 필요(무료계정 403, 2026-09-03 확인)라 배제. 앨범아트는 추후 (iTunes `artworkUrl100` 로 가능).
+  → **S3 `StorageService` 는 Phase 7(배포)로 이동** (로컬은 `LocalStorageService` 로 충분, 버킷·IAM 은 배포 인프라와 함께).
+- **Phase 6 — 프론트 연동 ✅ 완료 (2026-09-03)**: `frontend/src/api/*` 레이어, `AppContext` 액션 전부 실제 호출, 목 제거.
+  곡/일정/미디어까지 연동 + 브라우저 E2E 확인. (곡 검색 UI 는 stub 이든 spotify 든 그대로 동작 — 응답 형태 동일)
 - **Phase 7 — 배포**: Dockerfile, prod compose, CI/CD (push → AWS 자동 배포).
+  **+ S3 `StorageService` 구현체** (Phase 5 에서 이동 — `app.storage.type=s3`, AWS SDK v2, 버킷·IAM).
   ⚠️ 로컬에서 비켜쓴 포트를 **기본값으로 복구**: Postgres 5432, Redis 6379, 앱 8080
   (`application-prod.yaml` / prod compose / `SERVER_PORT`). 프로덕션 호스트엔 충돌 없음.
 

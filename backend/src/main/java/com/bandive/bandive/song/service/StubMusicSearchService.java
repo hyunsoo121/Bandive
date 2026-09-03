@@ -2,14 +2,13 @@ package com.bandive.bandive.song.service;
 
 import java.util.List;
 
-import org.springframework.stereotype.Service;
-
 import com.bandive.bandive.song.dto.TrackSearchResult;
 
 /**
- * 실제 음원 API 붙기 전 스텁. 쿼리를 echo 한 가짜 결과를 준다 (프론트 "곡 검색" 모달 연동/테스트용).
+ * 실제 음원 API 를 안 쓸 때의 기본 구현. 쿼리를 echo 한 가짜 결과를 준다 (프론트 "곡 검색" 모달 연동/테스트용).
+ * {@code app.music.provider=itunes} 로 바꾸면 {@link ItunesMusicSearchService} 가 대신 뜬다
+ * ({@code MusicSearchConfig} 에서 빈 선택).
  */
-@Service
 public class StubMusicSearchService implements MusicSearchService {
 
 	@Override
