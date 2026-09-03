@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import com.bandive.bandive.auth.UserPrincipal;
 import com.bandive.bandive.auth.jwt.JwtProvider;
 import com.bandive.bandive.band.dto.BandResponse;
+import com.bandive.bandive.member.BandRole;
 import com.bandive.bandive.common.security.BandGuard;
 import com.bandive.bandive.invite.dto.InviteCodeResponse;
 import com.bandive.bandive.invite.service.InviteService;
@@ -39,7 +40,7 @@ class InviteControllerTest {
 	private static final InviteCodeResponse CODE = new InviteCodeResponse("ABCD2345",
 			"http://localhost:5173/invite/ABCD2345", null, null, 0);
 
-	private static final BandResponse BAND = new BandResponse(1L, "내 밴드", null, null, null, 2,
+	private static final BandResponse BAND = new BandResponse(1L, "내 밴드", null, null, null, 2, BandRole.MEMBER,
 			Instant.parse("2026-09-02T00:00:00Z"));
 
 	@Autowired

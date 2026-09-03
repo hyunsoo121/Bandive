@@ -18,7 +18,6 @@ export function LoginModal() {
         <p className="muted">
           열람은 누구나 가능하지만 투표와 출결 체크는 밴드 멤버만 할 수 있습니다.
         </p>
-        {/* 백엔드 붙기 전: 클릭 시 목 유저로 로그인 처리 */}
         <button type="button" className="login-modal__kakao" onClick={login}>
           카카오로 3초 만에 시작하기
         </button>

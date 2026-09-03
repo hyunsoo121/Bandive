@@ -62,7 +62,7 @@ public class BandService {
 		bandMembers
 			.save(BandMember.builder().band(band).user(owner).role(BandRole.OWNER).joinedAt(Instant.now()).build());
 
-		return BandResponse.from(band, 1);
+		return BandResponse.from(band, 1, BandRole.OWNER);
 	}
 
 	public BandResponse get(Long bandId) {
@@ -73,8 +73,8 @@ public class BandService {
 	public List<BandResponse> myBands(Long userId) {
 		return bandMembers.findAllByUserId(userId)
 			.stream()
-			.map(BandMember::getBand)
-			.map(band -> BandResponse.from(band, bandMembers.countByBandId(band.getId())))
+			.map(membership -> BandResponse.from(membership.getBand(),
+					bandMembers.countByBandId(membership.getBand().getId()), membership.getRole()))
 			.toList();
 	}
 

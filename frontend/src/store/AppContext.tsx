@@ -271,7 +271,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const trimmed = name.trim();
       if (!trimmed) return;
       const dto = await bandApi.createBand(trimmed);
-      const band = toBand({ ...dto, role: 'OWNER' });
+      const band = toBand(dto); // 생성 응답에 role: 'OWNER' 포함됨
       setBands((prev) => [...prev, band]);
       setCreateOpen(false);
       setSwitcherOpen(false);
@@ -282,7 +282,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const joinByInvite = useCallback(async (code: string) => {
     const dto = await inviteApi.joinByCode(code);
-    const band = toBand({ ...dto, role: 'MEMBER' });
+    const band = toBand(dto); // 가입 응답에 role: 'MEMBER' 포함됨
     setBands((prev) => (prev.some((b) => b.id === band.id) ? prev : [...prev, band]));
     return band;
   }, []);

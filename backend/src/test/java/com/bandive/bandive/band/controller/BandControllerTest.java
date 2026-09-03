@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import com.bandive.bandive.auth.UserPrincipal;
 import com.bandive.bandive.auth.jwt.JwtProvider;
 import com.bandive.bandive.band.dto.BandResponse;
+import com.bandive.bandive.member.BandRole;
 import com.bandive.bandive.band.service.BandService;
 import com.bandive.bandive.common.security.BandGuard;
 
@@ -44,7 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(BandController.class)
 class BandControllerTest {
 
-	private static final BandResponse SAMPLE = new BandResponse(1L, "내 밴드", "소개", null, null, 1,
+	private static final BandResponse SAMPLE = new BandResponse(1L, "내 밴드", "소개", null, null, 1, BandRole.OWNER,
 			Instant.parse("2026-09-02T00:00:00Z"));
 
 	@Autowired

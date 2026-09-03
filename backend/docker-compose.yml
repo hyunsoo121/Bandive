@@ -21,8 +21,11 @@ services:
   redis:
     image: redis:7-alpine
     container_name: bandive-redis
+    command: ["redis-server", "--appendonly", "yes"]   # 재시작해도 refresh 토큰 세션 유지
     ports:
       - "6380:6379"   # 호스트 6380 — 다른 프로젝트의 6379 와 충돌 방지
+    volumes:
+      - bandive-redisdata:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -31,3 +34,4 @@ services:
 
 volumes:
   bandive-pgdata:
+  bandive-redisdata:
