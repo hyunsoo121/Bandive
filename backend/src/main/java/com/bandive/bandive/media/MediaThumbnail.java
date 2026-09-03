@@ -7,7 +7,8 @@ import java.util.regex.Pattern;
  * 외부 URL 에서 썸네일 이미지 주소를 뽑아낸다. 우리가 저장하지 않고 응답 시 계산해서 내려준다.
  * <ul>
  * <li>YouTube — 영상 id → {@code img.youtube.com/vi/{id}/hqdefault.jpg} (무인증)</li>
- * <li>Google Drive — 파일 id → {@code drive.google.com/thumbnail?id={id}&sz=w400} (공유 설정에 따라 실패할 수 있음)</li>
+ * <li>Google Drive — 파일 id → {@code drive.google.com/thumbnail?id={id}&sz=w400} (공유 설정에
+ * 따라 실패할 수 있음)</li>
  * <li>그 외 — null</li>
  * </ul>
  */

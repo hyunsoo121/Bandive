@@ -75,8 +75,8 @@ public class Media extends BaseTimeEntity {
 	}
 
 	/** 부분 수정 후 서비스가 계산한 최종값으로 한 번에 갱신. */
-	public void edit(String externalUrl, MediaPlatform platform, MediaType type, MediaVisibility visibility, String title,
-			Schedule schedule) {
+	public void edit(String externalUrl, MediaPlatform platform, MediaType type, MediaVisibility visibility,
+			String title, Schedule schedule) {
 		this.externalUrl = externalUrl;
 		this.platform = platform;
 		this.type = type;

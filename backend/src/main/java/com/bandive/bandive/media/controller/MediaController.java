@@ -21,6 +21,7 @@ import com.bandive.bandive.auth.CurrentUser;
 import com.bandive.bandive.auth.UserPrincipal;
 import com.bandive.bandive.media.dto.MediaCreateRequest;
 import com.bandive.bandive.media.dto.MediaResponse;
+import com.bandive.bandive.media.dto.MediaUpdateRequest;
 import com.bandive.bandive.media.dto.VisibilityRequest;
 import com.bandive.bandive.media.service.MediaService;
 
@@ -47,6 +48,13 @@ public class MediaController {
 	public MediaResponse create(@PathVariable Long bandId, @CurrentUser Long userId,
 			@Valid @RequestBody MediaCreateRequest request) {
 		return mediaService.create(bandId, userId, request);
+	}
+
+	/** 부분 수정 (URL·제목·종류·공개범위·연결일정) — 등록자 본인 또는 밴드장. */
+	@PatchMapping("/api/media/{mediaId}")
+	public MediaResponse update(@PathVariable Long mediaId, @CurrentUser Long userId,
+			@Valid @RequestBody MediaUpdateRequest request) {
+		return mediaService.update(mediaId, userId, request);
 	}
 
 	@PatchMapping("/api/media/{mediaId}/visibility")

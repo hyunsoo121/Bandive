@@ -106,12 +106,20 @@ export interface MediaItem {
   bandId: string;
   /** 외부 영상 URL (유튜브/구글드라이브 등) */
   url: string;
-  /** 표시용 라벨 (백엔드에 제목 필드가 없어 URL 에서 파생) */
+  /** 표시용 제목. 실제 제목이 없으면 URL 파생 라벨 */
   title: string;
+  /** 백엔드에 저장된 실제 제목 (수정 폼 프리필용). 없으면 null */
+  rawTitle: string | null;
+  /** 계산된 썸네일 이미지 URL. 없으면 null → 플랫폼 아이콘 */
+  thumbnailUrl: string | null;
   source: string;
+  /** 'YouTube' | 'Google Drive' | '링크' — 아이콘/경고 판단용 */
+  platform: 'youtube' | 'drive' | 'other';
   date: string;
   kind: MediaKind;
   visibility: Visibility;
+  /** 등록자 userId (수정·삭제 권한 판단) */
+  uploadedByUserId: string;
   /** 연결된 일정 id. 없으면 null */
   scheduleId: string | null;
 }

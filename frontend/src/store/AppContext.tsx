@@ -48,9 +48,19 @@ export interface NewSongInput {
 export interface NewMediaInput {
   bandId: string;
   url: string;
+  /** 사용자가 붙인 제목 (선택) */
+  title: string;
   kind: MediaKind;
   visibility: Visibility;
   /** 연결할 일정 id. 없으면 null */
+  scheduleId: string | null;
+}
+
+export interface EditMediaInput {
+  url: string;
+  title: string;
+  kind: MediaKind;
+  visibility: Visibility;
   scheduleId: string | null;
 }
 
@@ -138,6 +148,8 @@ interface AppState {
 
   /** 영상 URL 첨부 (POST /api/bands/{id}/media) */
   addMedia: (input: NewMediaInput) => Promise<void>;
+  /** 영상 수정 (PATCH /api/media/{id}) — 등록자 본인 또는 밴드장 */
+  editMedia: (mediaId: string, input: EditMediaInput) => Promise<void>;
   /** 영상 삭제 (등록자 본인 또는 밴드장) */
   removeMedia: (mediaId: string) => Promise<void>;
 
@@ -438,6 +450,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async (input: NewMediaInput) => {
       const dto = await mediaApi.addMedia(input.bandId, {
         externalUrl: input.url.trim(),
+        title: input.title.trim() || undefined,
         type: input.kind === '공연' ? 'PERFORMANCE' : 'REHEARSAL',
         visibility: input.visibility === '링크 공개' ? 'LINK_PUBLIC' : 'MEMBERS_ONLY',
         scheduleId: input.scheduleId ? Number(input.scheduleId) : null,
@@ -446,6 +459,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (input.scheduleId) await refreshSchedules(input.bandId);
     },
     [refreshSchedules],
+  );
+
+  const editMedia = useCallback(
+    async (mediaId: string, input: EditMediaInput) => {
+      const before = media.find((m) => m.id === mediaId)?.scheduleId ?? null;
+      const dto = await mediaApi.updateMedia(mediaId, {
+        externalUrl: input.url.trim(),
+        title: input.title.trim(), // 빈 문자열 → 백엔드에서 제목 제거
+        type: input.kind === '공연' ? 'PERFORMANCE' : 'REHEARSAL',
+        visibility: input.visibility === '링크 공개' ? 'LINK_PUBLIC' : 'MEMBERS_ONLY',
+        scheduleId: input.scheduleId ? Number(input.scheduleId) : null,
+      });
+      const next = toMedia(dto);
+      setMedia((prev) => prev.map((m) => (m.id === mediaId ? next : m)));
+      if ((before || next.scheduleId) && currentBandId) await refreshSchedules(currentBandId);
+    },
+    [media, currentBandId, refreshSchedules],
   );
 
   const removeMedia = useCallback(
@@ -492,6 +522,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     removeSchedule,
     setAttendance,
     addMedia,
+    editMedia,
     removeMedia,
     kickMember,
     issueInviteCode,

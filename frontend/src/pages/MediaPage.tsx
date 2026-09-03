@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { useGuard } from '../hooks/useGuard';
 import { KIND_LABEL, toUi } from '../lib/schedule';
-import type { MediaKind } from '../types';
+import type { MediaItem, MediaKind } from '../types';
 import { Fab } from '../components/Fab';
 import { AddMediaModal } from '../components/AddMediaModal';
 import './MediaPage.css';
@@ -19,13 +19,20 @@ const STRIPE_SHADES = [
 const stripe = (a: string, b: string) =>
   `repeating-linear-gradient(135deg, ${a} 0 12px, ${b} 12px 24px)`;
 
+const PLATFORM_ICON: Record<MediaItem['platform'], string> = {
+  youtube: '▶',
+  drive: '△',
+  other: '🔗',
+};
+
 export function MediaPage() {
-  const { currentBand, role, media: allMedia, schedules } = useApp();
+  const { currentBand, role, user, media: allMedia, schedules, removeMedia } = useApp();
   const guard = useGuard();
   const isGuest = role === 'guest';
 
   const [filter, setFilter] = useState<Filter>('전체');
   const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState<MediaItem | null>(null);
 
   if (!currentBand) return null;
   const bandId = currentBand.id;
@@ -37,6 +44,9 @@ export function MediaPage() {
   const visible = bandMedia.filter((m) => !isGuest || m.visibility === '링크 공개');
   const hiddenCount = bandMedia.length - visible.length;
   const list = visible.filter((m) => filter === '전체' || m.kind === filter);
+
+  const canManage = (m: MediaItem) =>
+    role === 'owner' || (user != null && m.uploadedByUserId === user.id);
 
   return (
     <div className="media">
@@ -75,10 +85,14 @@ export function MediaPage() {
                 href={m.url}
                 target="_blank"
                 rel="noreferrer"
-                style={{ background: stripe(a, b) }}
+                style={m.thumbnailUrl ? undefined : { background: stripe(a, b) }}
               >
-                <span className="media__play" />
+                {m.thumbnailUrl && (
+                  <img className="media__thumb-img" src={m.thumbnailUrl} alt="" loading="lazy" />
+                )}
+                <span className="media__play">{PLATFORM_ICON[m.platform]}</span>
                 <span className="media__kind">{m.kind}</span>
+                {m.platform === 'other' && <span className="media__warn">링크 아님</span>}
               </a>
               <div className="media__card-body">
                 <a
@@ -101,15 +115,39 @@ export function MediaPage() {
                     ? `일정 · ${evUi.month + 1}/${evUi.day} ${KIND_LABEL[evUi.type]}`
                     : '연결된 일정 없음'}
                 </span>
-                <span
-                  className="media__scope"
-                  style={{
-                    background: memberOnly ? 'var(--color-neutral-200)' : 'var(--color-accent-200)',
-                    color: memberOnly ? 'var(--color-neutral-800)' : 'var(--color-accent-800)',
-                  }}
-                >
-                  {m.visibility}
-                </span>
+                <div className="media__card-foot">
+                  <span
+                    className="media__scope"
+                    style={{
+                      background: memberOnly
+                        ? 'var(--color-neutral-200)'
+                        : 'var(--color-accent-200)',
+                      color: memberOnly ? 'var(--color-neutral-800)' : 'var(--color-accent-800)',
+                    }}
+                  >
+                    {m.visibility}
+                  </span>
+                  {canManage(m) && (
+                    <span className="media__actions">
+                      <button
+                        type="button"
+                        className="media__act"
+                        onClick={guard(() => setEditing(m))}
+                      >
+                        수정
+                      </button>
+                      <button
+                        type="button"
+                        className="media__act media__act--danger"
+                        onClick={guard(() => {
+                          if (confirm('이 영상을 삭제할까요?')) void removeMedia(m.id);
+                        })}
+                      >
+                        삭제
+                      </button>
+                    </span>
+                  )}
+                </div>
               </div>
             </article>
           );
@@ -126,13 +164,18 @@ export function MediaPage() {
 
       <Fab label="＋ 영상 URL 첨부" onClick={guard(() => setAddOpen(true))} />
 
-      {addOpen && (
+      {(addOpen || editing) && (
         <AddMediaModal
           bandId={bandId}
           schedules={schedules}
-          onClose={() => setAddOpen(false)}
+          editing={editing ?? undefined}
+          onClose={() => {
+            setAddOpen(false);
+            setEditing(null);
+          }}
           onSubmitted={() => {
             setAddOpen(false);
+            setEditing(null);
             setFilter('전체');
           }}
         />

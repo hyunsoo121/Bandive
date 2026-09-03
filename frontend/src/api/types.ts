@@ -154,7 +154,11 @@ export interface MediaDto {
   scheduleId: number | null;
   type: MediaTypeDto;
   externalUrl: string;
+  /** 사용자가 붙인 제목. 없으면 null */
+  title: string | null;
   platform: MediaPlatformDto;
+  /** 계산된 썸네일 URL (YouTube/Drive). 없으면 null */
+  thumbnailUrl: string | null;
   visibility: MediaVisibilityDto;
   uploadedByUserId: number;
   uploadedByNickname: string;
@@ -164,6 +168,16 @@ export interface MediaDto {
 export interface MediaCreateBody {
   externalUrl: string;
   type: MediaTypeDto;
+  title?: string;
+  visibility?: MediaVisibilityDto;
+  scheduleId?: number | null;
+}
+
+/** 부분 수정 — 보낸 필드만 반영. */
+export interface MediaUpdateBody {
+  externalUrl?: string;
+  type?: MediaTypeDto;
+  title?: string;
   visibility?: MediaVisibilityDto;
   scheduleId?: number | null;
 }

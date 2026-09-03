@@ -13,9 +13,11 @@ import com.bandive.bandive.common.exception.ValidationException;
 import com.bandive.bandive.media.Media;
 import com.bandive.bandive.media.MediaPlatform;
 import com.bandive.bandive.media.MediaRepository;
+import com.bandive.bandive.media.MediaType;
 import com.bandive.bandive.media.MediaVisibility;
 import com.bandive.bandive.media.dto.MediaCreateRequest;
 import com.bandive.bandive.media.dto.MediaResponse;
+import com.bandive.bandive.media.dto.MediaUpdateRequest;
 import com.bandive.bandive.member.BandMember;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
@@ -72,17 +74,38 @@ public class MediaService {
 			.uploadedBy(uploader)
 			.type(request.type())
 			.externalUrl(request.externalUrl().trim())
+			.title(trimToNull(request.title()))
 			.platform(MediaPlatform.detect(request.externalUrl()))
 			.visibility(visibility)
 			.build());
 		return MediaResponse.from(saved);
 	}
 
-	/** 공개 범위 변경 (밴드장). */
+	/**
+	 * 부분 수정 — 등록자 본인 또는 밴드장. null 필드는 유지. URL 이 바뀌면 platform 을 다시 판별한다.
+	 */
+	@Transactional
+	public MediaResponse update(Long mediaId, Long userId, MediaUpdateRequest request) {
+		Media found = findMedia(mediaId);
+		requireUploaderOrOwner(found, userId);
+
+		String url = request.externalUrl() != null ? request.externalUrl().trim() : found.getExternalUrl();
+		MediaPlatform platform = request.externalUrl() != null ? MediaPlatform.detect(url) : found.getPlatform();
+		MediaType type = request.type() != null ? request.type() : found.getType();
+		MediaVisibility visibility = request.visibility() != null ? request.visibility() : found.getVisibility();
+		String title = request.title() != null ? trimToNull(request.title()) : found.getTitle();
+		Schedule schedule = request.scheduleId() != null
+				? resolveSchedule(request.scheduleId(), found.getBand().getId()) : found.getSchedule();
+
+		found.edit(url, platform, type, visibility, title, schedule);
+		return MediaResponse.from(found);
+	}
+
+	/** 공개 범위 변경 — 등록자 본인 또는 밴드장. */
 	@Transactional
 	public MediaResponse changeVisibility(Long mediaId, Long userId, MediaVisibility visibility) {
 		Media found = findMedia(mediaId);
-		requireOwner(found.getBand().getId(), userId);
+		requireUploaderOrOwner(found, userId);
 		found.changeVisibility(visibility);
 		return MediaResponse.from(found);
 	}
@@ -91,10 +114,22 @@ public class MediaService {
 	@Transactional
 	public void delete(Long mediaId, Long userId) {
 		Media found = findMedia(mediaId);
-		if (!found.getUploadedBy().getId().equals(userId)) {
-			requireOwner(found.getBand().getId(), userId);
-		}
+		requireUploaderOrOwner(found, userId);
 		media.delete(found);
+	}
+
+	private static String trimToNull(String value) {
+		if (value == null) {
+			return null;
+		}
+		String trimmed = value.trim();
+		return trimmed.isEmpty() ? null : trimmed;
+	}
+
+	private void requireUploaderOrOwner(Media media, Long userId) {
+		if (!media.getUploadedBy().getId().equals(userId)) {
+			requireOwner(media.getBand().getId(), userId);
+		}
 	}
 
 	private Schedule resolveSchedule(Long scheduleId, Long bandId) {

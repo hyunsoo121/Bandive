@@ -134,16 +134,26 @@ function shortDate(iso: string): string {
   return `${d.getMonth() + 1}월 ${d.getDate()}일`;
 }
 
+const PLATFORM_KEY: Record<MediaPlatformDto, MediaItem['platform']> = {
+  YOUTUBE: 'youtube',
+  GOOGLE_DRIVE: 'drive',
+  OTHER: 'other',
+};
+
 export function toMedia(dto: MediaDto): MediaItem {
   return {
     id: String(dto.id),
     bandId: String(dto.bandId),
     url: dto.externalUrl,
-    title: prettyUrl(dto.externalUrl),
+    title: dto.title?.trim() || prettyUrl(dto.externalUrl),
+    rawTitle: dto.title?.trim() || null,
+    thumbnailUrl: dto.thumbnailUrl,
     source: PLATFORM_LABEL[dto.platform],
+    platform: PLATFORM_KEY[dto.platform],
     date: shortDate(dto.createdAt),
     kind: dto.type === 'PERFORMANCE' ? '공연' : '합주',
     visibility: dto.visibility === 'LINK_PUBLIC' ? '링크 공개' : '멤버만',
+    uploadedByUserId: String(dto.uploadedByUserId),
     scheduleId: dto.scheduleId != null ? String(dto.scheduleId) : null,
   };
 }

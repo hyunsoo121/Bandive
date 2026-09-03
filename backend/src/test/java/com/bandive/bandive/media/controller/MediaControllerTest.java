@@ -46,8 +46,8 @@ class MediaControllerTest {
 	private static final String JSON = "application/json";
 
 	private static final MediaResponse MEDIA = new MediaResponse(5L, 1L, null, MediaType.PERFORMANCE,
-			"https://youtu.be/x", MediaPlatform.YOUTUBE, MediaVisibility.MEMBERS_ONLY, 7L, "나",
-			Instant.parse("2026-09-02T00:00:00Z"));
+			"https://youtu.be/x", "공연 영상", MediaPlatform.YOUTUBE, "https://img.youtube.com/vi/x/hqdefault.jpg",
+			MediaVisibility.MEMBERS_ONLY, 7L, "나", Instant.parse("2026-09-02T00:00:00Z"));
 
 	@Autowired
 	private MockMvc mvc;
@@ -116,6 +116,23 @@ class MediaControllerTest {
 		mvc.perform(patch("/api/media/5/visibility").with(asUser(7L))
 			.contentType(JSON)
 			.content("{\"visibility\":\"LINK_PUBLIC\"}")).andExpect(status().isOk());
+	}
+
+	@Test
+	void 부분수정_PATCH() throws Exception {
+		given(mediaService.update(eq(5L), eq(7L), any())).willReturn(MEDIA);
+
+		mvc.perform(patch("/api/media/5").with(asUser(7L))
+			.contentType(JSON)
+			.content("{\"title\":\"새 제목\",\"type\":\"REHEARSAL\"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.title").value("공연 영상"));
+	}
+
+	@Test
+	void 부분수정_URL_형식_틀리면_400() throws Exception {
+		mvc.perform(patch("/api/media/5").with(asUser(7L)).contentType(JSON).content("{\"externalUrl\":\"ftp://x\"}"))
+			.andExpect(status().isBadRequest());
 	}
 
 	@Test
