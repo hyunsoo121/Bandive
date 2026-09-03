@@ -68,6 +68,10 @@ public class Song extends BaseTimeEntity {
 	@Column(name = "reference_video_url", length = 500)
 	private String referenceVideoUrl;
 
+	/** 앨범 커버 이미지 URL (SEARCH 로 추가 시 외부 음원 API 에서). 직접 입력 곡은 null. */
+	@Column(name = "artwork_url", length = 500)
+	private String artworkUrl;
+
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "added_by", nullable = false)
 	private User addedBy;

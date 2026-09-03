@@ -82,14 +82,19 @@ public class ItunesMusicSearchService implements MusicSearchService {
 			return null;
 		}
 		return new TrackSearchResult(String.valueOf(track.trackId()), track.trackName(),
-				track.artistName() == null ? "" : track.artistName());
+				track.artistName() == null ? "" : track.artistName(), largeArtwork(track.artworkUrl100()));
+	}
+
+	/** iTunes 는 100x100 썸네일을 준다. URL 의 크기 세그먼트를 키워 더 큰 이미지를 쓴다. */
+	private static String largeArtwork(String url) {
+		return StringUtils.hasText(url) ? url.replace("100x100bb", "600x600bb") : null;
 	}
 
 	record ItunesResponse(@JsonProperty("results") List<ItunesTrack> results) {
 	}
 
 	record ItunesTrack(@JsonProperty("trackId") Long trackId, @JsonProperty("trackName") String trackName,
-			@JsonProperty("artistName") String artistName) {
+			@JsonProperty("artistName") String artistName, @JsonProperty("artworkUrl100") String artworkUrl100) {
 	}
 
 }

@@ -7,10 +7,18 @@ export interface PartSlot {
   label: string;
 }
 
+/** 세션에 쓰인 악기 이름들 — 기본 악기 순서 먼저, 그 뒤 자유 악기(들어온 순). count>0 만. */
+function instrumentsOf(sessions: Song['sessions']): string[] {
+  const keys = Object.keys(sessions).filter((k) => (sessions[k] ?? 0) > 0);
+  const known = INSTRUMENTS.filter((i) => keys.includes(i));
+  const custom = keys.filter((k) => !INSTRUMENTS.includes(k as (typeof INSTRUMENTS)[number]));
+  return [...known, ...custom];
+}
+
 /** 곡의 세션 구성(악기별 인원)으로부터 파트 슬롯 목록 생성 */
 export function slotsOf(song: Song): PartSlot[] {
   const out: PartSlot[] = [];
-  for (const inst of INSTRUMENTS) {
+  for (const inst of instrumentsOf(song.sessions)) {
     const n = song.sessions[inst] ?? 0;
     for (let i = 1; i <= n; i++) {
       out.push({ key: `${inst}#${i}`, label: n > 1 ? `${inst} ${i}` : inst });
@@ -21,7 +29,5 @@ export function slotsOf(song: Song): PartSlot[] {
 
 /** "보컬 1", "기타 2" 형태의 세션 구성 칩 텍스트 */
 export function sessionChips(song: Song): string[] {
-  return INSTRUMENTS.filter((i) => (song.sessions[i] ?? 0) > 0).map(
-    (i) => `${i} ${song.sessions[i]}`,
-  );
+  return instrumentsOf(song.sessions).map((i) => `${i} ${song.sessions[i]}`);
 }

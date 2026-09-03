@@ -357,7 +357,7 @@ CGLIB 프록시가 생기는데 부모의 `final` setter 를 못 감싼다는 **
 
 **원인.** `GET /api/songs/search` 가 스텁 모드다. `app.music.provider` 기본값이 `stub`
 (`StubMusicSearchService` — 쿼리를 3건으로 echo). 실 검색을 켜려면 `backend/.env` 에 **한 줄** `MUSIC_PROVIDER=itunes`
-(Apple iTunes Search API — 인증·API 키 불필요. 선택: `MUSIC_COUNTRY=KR`). 응답 형태(`TrackSearchResult`)는
+(Apple iTunes Search API — 인증·API 키 불필요. `MUSIC_COUNTRY` 기본 `US`, 아래 항목 참고). 응답 형태(`TrackSearchResult`)는
 두 모드가 동일해서 프론트는 그대로 동작한다. 외부 장애(타임아웃·4xx·5xx·깨진 본문)는 `ItunesMusicSearchService` 가
 삼켜서 빈 목록으로 준다(500 대신 결과 없음).
 결과를 **클릭해서 골라야** `sourceType=SEARCH` +
@@ -376,6 +376,21 @@ Premium** 일 때만 200 으로 준다. 무료 계정이 만든 앱은 토큰만
 `MUSIC_PROVIDER=itunes` 한 줄. iTunes 는 `Content-Type: text/javascript` 로 JSON 을 주므로 `ItunesMusicSearchService`
 가 문자열로 받아 `ObjectMapper` 로 파싱한다. 다른 무인증 후보로 Deezer(`api.deezer.com/search`) 도 있음.
 (Spotify 로 가려면 앱 소유 계정을 Premium 으로 만들고 `MusicSearchService` 구현체만 되돌리면 됨.)
+
+### iTunes 실 검색을 켰는데 무슨 단어를 쳐도 결과가 0건이다
+
+**증상.** `MUSIC_PROVIDER=itunes` 인데 `GET /api/songs/search?q=coldplay` 가 `[]`. 스텁도 아니고
+타임아웃도 아님(백엔드 로그에 "iTunes 검색 실패" 도 안 뜸). `curl "https://itunes.apple.com/search?term=coldplay"`
+는 결과가 나온다.
+
+**원인.** `MUSIC_COUNTRY=KR` 이었다. KR iTunes 스토어는 Search API `entity=song` 조합에 대해 **항상 빈 배열**을
+준다 (`entity=song&country=KR` → `resultCount:0`, `entity=song&country=US` → 정상, `entity=musicTrack&country=KR`
+→ 정상). 2026-09-03 확인.
+
+**해결 (2026-09-03, feature/10).** `MUSIC_COUNTRY` 기본값을 `US` 로 바꿨다 (`MusicProperties`,
+`application.yaml`, `.env.example`). US 카탈로그는 한글 검색어("아이유 좋은날" → `Good Day` by IU)도 정상
+매칭되므로 지역화를 포기해도 실사용에 문제 없음. KR 을 꼭 써야 하면 `entity` 를 `musicTrack` 으로 바꿔야 한다
+(뮤직비디오가 섞여 들어오는 트레이드오프).
 
 ### 영상 카드/일정 리스트에 "제목"이 안 뜬다
 

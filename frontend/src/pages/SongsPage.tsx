@@ -423,6 +423,10 @@ function SongRow({
         <span className="songrow__no">{String(index + 1).padStart(2, '0')}</span>
       )}
 
+      {song.artworkUrl && (
+        <img className="songrow__art" src={song.artworkUrl} alt="" loading="lazy" />
+      )}
+
       <div className="songrow__main">
         <button type="button" className="songrow__title-btn" onClick={onToggle}>
           <span className="stack" style={{ gap: 4 }}>

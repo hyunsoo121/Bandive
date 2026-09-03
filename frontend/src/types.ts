@@ -3,6 +3,7 @@
 
 export type Role = 'owner' | 'member' | 'guest';
 
+/** 자주 쓰는 악기 (기본 세션 구성). 이 외에 자유 문자열도 허용된다. */
 export type Instrument = '보컬' | '기타' | '베이스' | '드럼' | '건반';
 export const INSTRUMENTS: Instrument[] = ['보컬', '기타', '베이스', '드럼', '건반'];
 
@@ -53,8 +54,8 @@ export interface Member {
   avatarColor: string;
 }
 
-/** 악기별 필요 인원 (세션 구성) */
-export type SessionShape = Partial<Record<Instrument, number>>;
+/** 악기 이름 → 필요 인원. 기본 악기 + 자유 문자열 악기(실로폰 등). */
+export type SessionShape = Record<string, number>;
 
 /** 곡의 파트 슬롯 하나. 백엔드 SongPart 를 화면에서 쓰기 좋게 줄인 것. */
 export interface SongPartLite {
@@ -76,6 +77,8 @@ export interface Song {
   proposer: string;
   memo: string;
   referenceVideoUrl: string;
+  /** 앨범 커버 이미지 URL (SEARCH 로 추가 시). 없으면 null */
+  artworkUrl: string | null;
   sessions: SessionShape;
   votes: number;
   votedByMe: boolean;

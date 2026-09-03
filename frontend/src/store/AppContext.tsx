@@ -50,6 +50,8 @@ export interface NewSongInput {
   sourceType: SourceType;
   /** SEARCH 일 때 검색 결과의 트랙 식별자 (백엔드 필수) */
   externalTrackId?: string | null;
+  /** SEARCH 일 때 앨범 커버 URL */
+  artworkUrl?: string | null;
   memo: string;
   referenceVideoUrl: string;
   sessions: SessionShape;
@@ -461,6 +463,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       artist: input.artist.trim(),
       sourceType: input.sourceType,
       externalTrackId: input.externalTrackId ?? null,
+      artworkUrl: input.artworkUrl ?? null,
       memo: input.memo.trim(),
       referenceVideoUrl: input.referenceVideoUrl.trim(),
       sessions,

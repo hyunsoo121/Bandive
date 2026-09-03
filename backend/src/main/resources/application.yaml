@@ -74,7 +74,7 @@ app:
   music:
     provider: ${MUSIC_PROVIDER:stub}   # stub | itunes
     limit: 8
-    country: ${MUSIC_COUNTRY:KR}        # iTunes 스토어 국가 코드
+    country: ${MUSIC_COUNTRY:US}        # iTunes 스토어 국가 코드 (KR 스토어는 entity=song 결과가 비어 US 사용)
 
 management:
   endpoints:

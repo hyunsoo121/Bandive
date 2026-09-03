@@ -27,7 +27,8 @@ class ItunesMusicSearchServiceTest {
 
 	private static final String RESPONSE_JSON = """
 			{"resultCount":3,"results":[
-			  {"trackId":409076748,"trackName":"좋은 날","artistName":"아이유","kind":"song"},
+			  {"trackId":409076748,"trackName":"좋은 날","artistName":"아이유","kind":"song",
+			   "artworkUrl100":"https://is1.mzstatic.com/x/100x100bb.jpg"},
 			  {"trackId":1441164805,"trackName":"Yesterday","artistName":"The Beatles"},
 			  {"trackId":null,"trackName":"이름만 있고 id 없음","artistName":"X"}
 			]}""";
@@ -40,7 +41,7 @@ class ItunesMusicSearchServiceTest {
 	void setUp() {
 		RestClient.Builder builder = RestClient.builder().baseUrl("https://itunes.apple.com");
 		this.server = MockRestServiceServer.bindTo(builder).build();
-		this.service = new ItunesMusicSearchService(new MusicProperties("itunes", 8, "KR"), builder.build(),
+		this.service = new ItunesMusicSearchService(new MusicProperties("itunes", 8, "US"), builder.build(),
 				JsonMapper.builder().build());
 	}
 
@@ -51,14 +52,15 @@ class ItunesMusicSearchServiceTest {
 			.andExpect(queryParam("term", "IU"))
 			.andExpect(queryParam("entity", "song"))
 			.andExpect(queryParam("limit", "8"))
-			.andExpect(queryParam("country", "KR"))
+			.andExpect(queryParam("country", "US"))
 			.andRespond(withSuccess(RESPONSE_JSON, ITUNES_CT));
 
 		// 응답 본문에 한글 트랙명이 섞여 있어도 그대로 매핑된다. id 없는 항목은 버린다.
 		var results = this.service.search("IU");
 
-		assertThat(results).containsExactly(new TrackSearchResult("409076748", "좋은 날", "아이유"),
-				new TrackSearchResult("1441164805", "Yesterday", "The Beatles"));
+		assertThat(results).containsExactly(
+				new TrackSearchResult("409076748", "좋은 날", "아이유", "https://is1.mzstatic.com/x/600x600bb.jpg"),
+				new TrackSearchResult("1441164805", "Yesterday", "The Beatles", null));
 		this.server.verify();
 	}
 

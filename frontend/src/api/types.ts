@@ -81,6 +81,7 @@ export interface SongDto {
   status: SongStatusDto;
   sourceType: SongSourceTypeDto;
   externalTrackId: string | null;
+  artworkUrl: string | null;
   memo: string | null;
   referenceVideoUrl: string | null;
   addedByUserId: number;
@@ -102,6 +103,8 @@ export interface TrackSearchResultDto {
   externalTrackId: string;
   title: string;
   artist: string;
+  /** 앨범 커버 URL. 없으면 null */
+  artworkUrl: string | null;
 }
 
 export interface SongCreateBody {
@@ -109,6 +112,7 @@ export interface SongCreateBody {
   artist: string;
   sourceType: SongSourceTypeDto;
   externalTrackId?: string | null;
+  artworkUrl?: string | null;
   memo?: string;
   referenceVideoUrl?: string;
   /** 악기별 필요 인원 → SongPart 슬롯 */

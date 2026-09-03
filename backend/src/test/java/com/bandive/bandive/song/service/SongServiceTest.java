@@ -84,7 +84,7 @@ class SongServiceTest extends RepositoryTest {
 	}
 
 	private SongCreateRequest manual(List<SessionSlot> sessions) {
-		return new SongCreateRequest("곡", "아티스트", SongSourceType.MANUAL, null, "메모", null, sessions);
+		return new SongCreateRequest("곡", "아티스트", SongSourceType.MANUAL, null, null, "메모", null, sessions);
 	}
 
 	// ── add ──────────────────────────────────────────────
@@ -111,7 +111,7 @@ class SongServiceTest extends RepositoryTest {
 
 	@Test
 	void SEARCH_인데_트랙id가_없으면_400() {
-		SongCreateRequest req = new SongCreateRequest("곡", "a", SongSourceType.SEARCH, "  ", null, null, null);
+		SongCreateRequest req = new SongCreateRequest("곡", "a", SongSourceType.SEARCH, "  ", null, null, null, null);
 
 		assertThatThrownBy(() -> service.add(band.getId(), memberId, req)).isInstanceOf(ValidationException.class)
 			.satisfies(ex -> assertThat(((ValidationException) ex).getCode()).isEqualTo("EXTERNAL_TRACK_ID_REQUIRED"));

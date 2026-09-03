@@ -2,16 +2,7 @@
 
 import { fileUrl } from './client';
 import { ATT_TO_KO } from '../lib/schedule';
-import type {
-  Band,
-  Instrument,
-  MediaItem,
-  Member,
-  ScheduleEvent,
-  SessionShape,
-  Song,
-  User,
-} from '../types';
+import type { Band, MediaItem, Member, ScheduleEvent, SessionShape, Song, User } from '../types';
 import type {
   BandDto,
   BandRoleDto,
@@ -70,7 +61,7 @@ export function toSong(dto: SongDto): Song {
   const sessions: SessionShape = {};
   const assignments: Record<string, string> = {};
   for (const p of dto.parts) {
-    const inst = p.instrument as Instrument;
+    const inst = p.instrument;
     sessions[inst] = (sessions[inst] ?? 0) + 1;
     if (p.assignedNickname) assignments[`${p.instrument}#${p.partIndex}`] = p.assignedNickname;
   }
@@ -84,6 +75,7 @@ export function toSong(dto: SongDto): Song {
     proposer: dto.addedByNickname,
     memo: dto.memo ?? '',
     referenceVideoUrl: dto.referenceVideoUrl ?? '',
+    artworkUrl: dto.artworkUrl,
     sessions,
     votes: dto.voteCount,
     votedByMe: dto.votedByMe,

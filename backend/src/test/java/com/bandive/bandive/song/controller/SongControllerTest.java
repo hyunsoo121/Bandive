@@ -47,7 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SongControllerTest {
 
 	private static final SongResponse SONG = new SongResponse(5L, 1L, "곡", "아티스트", SongStatus.WISHLIST,
-			SongSourceType.MANUAL, null, "메모", null, 7L, "나", 3, true, null, List.of(),
+			SongSourceType.MANUAL, null, null, "메모", null, 7L, "나", 3, true, null, List.of(),
 			Instant.parse("2026-09-02T00:00:00Z"));
 
 	@Autowired
@@ -69,7 +69,8 @@ class SongControllerTest {
 
 	@Test
 	void 음원_검색은_공개다() throws Exception {
-		given(songService.search("yes")).willReturn(List.of(new TrackSearchResult("stub:yes:1", "yes (샘플)", "아티스트")));
+		given(songService.search("yes"))
+			.willReturn(List.of(new TrackSearchResult("stub:yes:1", "yes (샘플)", "아티스트", null)));
 
 		mvc.perform(get("/api/songs/search").param("q", "yes"))
 			.andExpect(status().isOk())

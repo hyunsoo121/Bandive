@@ -118,6 +118,7 @@ public class SongService {
 			.status(SongStatus.WISHLIST)
 			.sourceType(request.sourceType())
 			.externalTrackId(trimToNull(request.externalTrackId()))
+			.artworkUrl(trimToNull(request.artworkUrl()))
 			.memo(request.memo())
 			.referenceVideoUrl(trimToNull(request.referenceVideoUrl()))
 			.build();
