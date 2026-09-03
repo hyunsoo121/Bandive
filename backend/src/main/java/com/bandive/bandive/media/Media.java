@@ -54,6 +54,10 @@ public class Media extends BaseTimeEntity {
 	@Column(name = "external_url", nullable = false, length = 500)
 	private String externalUrl;
 
+	/** 사용자가 붙인 제목. 선택 입력이라 null 가능. */
+	@Column(length = 200)
+	private String title;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
 	private MediaPlatform platform;
@@ -68,6 +72,17 @@ public class Media extends BaseTimeEntity {
 
 	public void changeVisibility(MediaVisibility visibility) {
 		this.visibility = visibility;
+	}
+
+	/** 부분 수정 후 서비스가 계산한 최종값으로 한 번에 갱신. */
+	public void edit(String externalUrl, MediaPlatform platform, MediaType type, MediaVisibility visibility, String title,
+			Schedule schedule) {
+		this.externalUrl = externalUrl;
+		this.platform = platform;
+		this.type = type;
+		this.visibility = visibility;
+		this.title = title;
+		this.schedule = schedule;
 	}
 
 }

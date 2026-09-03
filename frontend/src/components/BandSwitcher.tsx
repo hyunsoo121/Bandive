@@ -29,6 +29,7 @@ export function BandSwitcher({ onNavigate }: Props) {
             >
               <Avatar
                 label={b.initial}
+                src={b.logoUrl}
                 size={40}
                 heading
                 color={active ? 'var(--color-accent)' : 'var(--color-text)'}

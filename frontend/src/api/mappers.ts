@@ -1,5 +1,6 @@
 // 백엔드 DTO → 프론트 도메인 타입(../types). 목업 시절 화면이 기대하는 모양을 그대로 유지한다.
 
+import { fileUrl } from './client';
 import { ATT_TO_KO } from '../lib/schedule';
 import type {
   Band,
@@ -48,6 +49,8 @@ export function toBand(dto: BandDto): Band {
     memberCount: dto.memberCount,
     myRole: toRole(dto.role),
     note: dto.description ?? '',
+    logoUrl: dto.logoUrl ? fileUrl(dto.logoUrl) : null,
+    bannerUrl: dto.bannerUrl ? fileUrl(dto.bannerUrl) : null,
   };
 }
 

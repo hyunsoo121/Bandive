@@ -82,7 +82,7 @@ public class BandService {
 	public BandResponse update(Long bandId, BandUpdateRequest request) {
 		Band band = findBand(bandId);
 		band.updateInfo(request.name(), request.description());
-		return BandResponse.from(band, bandMembers.countByBandId(bandId));
+		return BandResponse.from(band, bandMembers.countByBandId(bandId), BandRole.OWNER);
 	}
 
 	@Transactional
@@ -91,7 +91,7 @@ public class BandService {
 		String previous = band.getLogoUrl();
 		band.changeLogo(storage.store(LOGO_DIR, file));
 		storage.delete(previous);
-		return BandResponse.from(band, bandMembers.countByBandId(bandId));
+		return BandResponse.from(band, bandMembers.countByBandId(bandId), BandRole.OWNER);
 	}
 
 	@Transactional
@@ -100,7 +100,7 @@ public class BandService {
 		String previous = band.getBannerUrl();
 		band.changeBanner(storage.store(BANNER_DIR, file));
 		storage.delete(previous);
-		return BandResponse.from(band, bandMembers.countByBandId(bandId));
+		return BandResponse.from(band, bandMembers.countByBandId(bandId), BandRole.OWNER);
 	}
 
 	/** 밴드장 위임 — 대상은 OWNER, 이전 밴드장은 MEMBER 로. 대상 == 본인이면 no-op. */

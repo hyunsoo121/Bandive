@@ -89,7 +89,13 @@ export function AppLayout() {
         </div>
 
         <button type="button" className="sidebar__band" onClick={openSwitcher}>
-          <Avatar label={currentBand.initial} color="var(--color-accent)" heading size={34} />
+          <Avatar
+            label={currentBand.initial}
+            src={currentBand.logoUrl}
+            color="var(--color-accent)"
+            heading
+            size={34}
+          />
           <span className="sidebar__band-text">
             <strong>{currentBand.name}</strong>
             <span className="muted">멤버 {currentBand.memberCount}명 · 밴드 전환</span>
@@ -121,7 +127,13 @@ export function AppLayout() {
             <BrandMark size={18} wordmark />
           </div>
           <button type="button" className="mobilebar__band" onClick={openSwitcher}>
-            <Avatar label={currentBand.initial} color="var(--color-accent)" heading size={26} />
+            <Avatar
+              label={currentBand.initial}
+              src={currentBand.logoUrl}
+              color="var(--color-accent)"
+              heading
+              size={26}
+            />
             <span className="mobilebar__band-name">{currentBand.name}</span>
             <span className="muted" style={{ fontSize: 11, fontWeight: 700 }}>
               전환 ▼

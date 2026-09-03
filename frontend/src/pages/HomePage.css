@@ -48,6 +48,7 @@
   background: linear-gradient(to top, rgba(32, 30, 29, 0.6), transparent);
 }
 .home__band-avatar {
+  position: relative;
   width: 60px;
   height: 60px;
   flex: none;
@@ -60,6 +61,32 @@
   font-family: var(--font-heading);
   font-weight: 800;
   font-size: 22px;
+  overflow: hidden;
+}
+.home__band-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.home__band-avatar--edit {
+  padding: 0;
+  cursor: pointer;
+}
+.home__band-avatar-hint {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 2px 0;
+  background: rgba(32, 30, 29, 0.78);
+  color: #fff;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.home__band-avatar--edit:hover .home__band-avatar-hint {
+  opacity: 1;
 }
 .home__band strong {
   font-family: var(--font-heading);

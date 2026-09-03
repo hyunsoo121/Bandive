@@ -1,8 +1,18 @@
+import { useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import { useGuard } from '../hooks/useGuard';
 import { KIND_LABEL, nextSchedule, toUi } from '../lib/schedule';
 import './HomePage.css';
+
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/** 업로드 전 클라 검증. 통과 못 하면 사유 문자열, 통과면 null. */
+function imageError(file: File): string | null {
+  if (!file.type.startsWith('image/')) return '이미지 파일만 올릴 수 있습니다.';
+  if (file.size > MAX_IMAGE_BYTES) return '5MB 이하 이미지만 올릴 수 있습니다.';
+  return null;
+}
 
 const STRIPE_SHADES = [
   ['#9b9797', '#bab6b6'],
@@ -13,8 +23,18 @@ const stripe = (a: string, b: string) =>
   `repeating-linear-gradient(135deg, ${a} 0 9px, ${b} 9px 18px)`;
 
 export function HomePage() {
-  const { currentBand, role, songs: allSongs, media: allMedia, schedules } = useApp();
+  const {
+    currentBand,
+    role,
+    songs: allSongs,
+    media: allMedia,
+    schedules,
+    uploadBandLogo,
+    uploadBandBanner,
+  } = useApp();
   const guard = useGuard();
+  const logoInput = useRef<HTMLInputElement>(null);
+  const bannerInput = useRef<HTMLInputElement>(null);
 
   if (!currentBand) return null;
   const bandId = currentBand.id;
@@ -34,18 +54,77 @@ export function HomePage() {
   const base = `/bands/${bandId}`;
   const going = upcoming?.counts.attending ?? 0;
 
+  const onPick = (kind: 'logo' | 'banner') => async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // 같은 파일 다시 고를 수 있게
+    if (!file) return;
+    const err = imageError(file);
+    if (err) {
+      alert(err);
+      return;
+    }
+    try {
+      await (kind === 'logo' ? uploadBandLogo(file) : uploadBandBanner(file));
+    } catch {
+      alert('업로드에 실패했습니다. 다시 시도해 주세요.');
+    }
+  };
+
+  const logo = currentBand.logoUrl ? (
+    <img className="home__band-logo" src={currentBand.logoUrl} alt={currentBand.name} />
+  ) : (
+    currentBand.initial
+  );
+
   return (
     <div className="home">
       {/* 배너 + 밴드 헤더 */}
-      <div className="home__banner">
-        <span className="home__banner-hint">Banner image</span>
+      <div
+        className="home__banner"
+        style={
+          currentBand.bannerUrl
+            ? {
+                backgroundImage: `url(${currentBand.bannerUrl})`,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }
+            : undefined
+        }
+      >
+        {!currentBand.bannerUrl && <span className="home__banner-hint">Banner image</span>}
         {isOwner && (
-          <button type="button" className="home__banner-upload" onClick={guard(() => {})}>
-            배너 업로드
-          </button>
+          <>
+            <input
+              ref={bannerInput}
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={onPick('banner')}
+            />
+            <input ref={logoInput} type="file" accept="image/*" hidden onChange={onPick('logo')} />
+            <button
+              type="button"
+              className="home__banner-upload"
+              onClick={guard(() => bannerInput.current?.click())}
+            >
+              배너 변경
+            </button>
+          </>
         )}
         <div className="home__band">
-          <span className="home__band-avatar">{currentBand.initial}</span>
+          {isOwner ? (
+            <button
+              type="button"
+              className="home__band-avatar home__band-avatar--edit"
+              onClick={guard(() => logoInput.current?.click())}
+              title="로고 변경"
+            >
+              {logo}
+              <span className="home__band-avatar-hint">변경</span>
+            </button>
+          ) : (
+            <span className="home__band-avatar">{logo}</span>
+          )}
           <span className="stack">
             <strong>{currentBand.name}</strong>
             <span className="home__band-sub">

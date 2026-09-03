@@ -113,6 +113,10 @@ interface AppState {
   createBand: (name: string) => Promise<void>;
   /** 초대 코드로 가입 → 가입한 밴드 반환 */
   joinByInvite: (code: string) => Promise<Band>;
+  /** 밴드 로고 이미지 업로드 (밴드장) */
+  uploadBandLogo: (file: File) => Promise<void>;
+  /** 밴드 배너 이미지 업로드 (밴드장) */
+  uploadBandBanner: (file: File) => Promise<void>;
 
   /** 투표 토글 (POST/DELETE /api/songs/{id}/vote) */
   voteSong: (songId: string) => Promise<void>;
@@ -287,6 +291,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return band;
   }, []);
 
+  const applyBandUpdate = useCallback((band: Band) => {
+    setCurrentBand(band);
+    setBands((prev) => prev.map((b) => (b.id === band.id ? band : b)));
+  }, []);
+
+  const uploadBandLogo = useCallback(
+    async (file: File) => {
+      if (!currentBandId) return;
+      applyBandUpdate(toBand(await bandApi.uploadLogo(currentBandId, file)));
+    },
+    [currentBandId, applyBandUpdate],
+  );
+
+  const uploadBandBanner = useCallback(
+    async (file: File) => {
+      if (!currentBandId) return;
+      applyBandUpdate(toBand(await bandApi.uploadBanner(currentBandId, file)));
+    },
+    [currentBandId, applyBandUpdate],
+  );
+
   const kickMember = useCallback(
     async (userId: string) => {
       if (!currentBandId) return;
@@ -456,6 +481,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     logout,
     createBand,
     joinByInvite,
+    uploadBandLogo,
+    uploadBandBanner,
     voteSong,
     promoteSong,
     assignPart,

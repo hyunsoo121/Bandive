@@ -29,6 +29,10 @@ export interface Band {
   myRole: Role;
   /** 홈 배너/서브텍스트용 요약 */
   note: string;
+  /** 밴드 로고 (절대 URL). 없으면 null → 이니셜 아바타 */
+  logoUrl: string | null;
+  /** 밴드 배너 (절대 URL). 없으면 null → 줄무늬 플레이스홀더 */
+  bannerUrl: string | null;
 }
 
 export interface Member {
