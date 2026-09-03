@@ -352,3 +352,66 @@ CGLIB 프록시가 생기는데 부모의 `final` setter 를 못 감싼다는 **
 멤버 목록에서 내 역할을 찾아 정확히 하지만, 내 밴드 **목록**(스위처)에는 역할 정보가 없어 전부 'member' fallback.
 
 **해결.** 백엔드가 my 응답에 role 을 실어주면 자동 해결 (`mappers.toBand` 가 이미 `dto.role` 을 읽음).
+
+### 곡 "검색" 탭에 무슨 단어를 쳐도 결과 3건이 똑같이 나온다
+
+**원인.** `GET /api/songs/search` 가 스텁 모드다. `app.music.provider` 기본값이 `stub`
+(`StubMusicSearchService` — 쿼리를 3건으로 echo). 실 검색을 켜려면 `backend/.env` 에 **한 줄** `MUSIC_PROVIDER=itunes`
+(Apple iTunes Search API — 인증·API 키 불필요. 선택: `MUSIC_COUNTRY=KR`). 응답 형태(`TrackSearchResult`)는
+두 모드가 동일해서 프론트는 그대로 동작한다. 외부 장애(타임아웃·4xx·5xx·깨진 본문)는 `ItunesMusicSearchService` 가
+삼켜서 빈 목록으로 준다(500 대신 결과 없음).
+결과를 **클릭해서 골라야** `sourceType=SEARCH` +
+`externalTrackId` 로 등록되고, 안 고르고 "직접 입력" 값만 쓰면 `MANUAL` 로 등록된다
+(백엔드는 SEARCH 인데 `externalTrackId` 가 비면 `400 EXTERNAL_TRACK_ID_REQUIRED`).
+
+### 왜 Spotify 가 아니라 iTunes Search API 인가
+
+**증상.** Spotify 로 시도했더니 토큰은 받아지는데 `/v1/search` 가
+`403 Forbidden: "Active premium subscription required for the owner of the app."` (2026-09-03 확인, 2회).
+
+**원인.** Spotify Web API 는 `/v1/search` 등 대부분의 데이터 엔드포인트를 **앱(Client ID) 소유자의 Spotify 계정이
+Premium** 일 때만 200 으로 준다. 무료 계정이 만든 앱은 토큰만 나오고 403.
+
+**결정.** 유료 구독이 필요 없는 **Apple iTunes Search API** 채택. 인증·키·계정 전부 불필요, 영어·한국어 모두 잘 나옴.
+`MUSIC_PROVIDER=itunes` 한 줄. iTunes 는 `Content-Type: text/javascript` 로 JSON 을 주므로 `ItunesMusicSearchService`
+가 문자열로 받아 `ObjectMapper` 로 파싱한다. 다른 무인증 후보로 Deezer(`api.deezer.com/search`) 도 있음.
+(Spotify 로 가려면 앱 소유 계정을 Premium 으로 만들고 `MusicSearchService` 구현체만 되돌리면 됨.)
+
+### 영상 카드/일정 리스트에 "제목"이 안 뜬다
+
+**원인.** 백엔드 `Media` · `Schedule` 엔티티에 title 필드가 없다 (Media = URL·종류·공개범위,
+Schedule = 종류·일시·장소). 목업엔 있던 제목 입력칸을 프론트에서 뺐다.
+
+**동작.** 영상은 URL 을 짧게 줄인 문자열(`mappers.toMedia` 의 `prettyUrl`)을 라벨로 쓰고 클릭 시 원본으로 연다.
+일정은 `장소`(없으면 "연습"/"공연" 라벨)를 헤딩으로 쓴다.
+
+### 일정 캘린더가 이번 달이 아니라 다른 달로 열린다
+
+**원인.** 버그 아님. `SchedulePage` 는 데이터가 들어오면 "지금 이후 가장 가까운 일정"이 있는 달로
+`view` 를 한 번 맞춘다 (`lib/schedule.nextSchedule`). 다가오는 일정이 없으면 마지막 일정의 달.
+등록된 일정이 하나도 없으면 실제 이번 달로 연다.
+
+### 파트 배정 select 를 바꿔도 반영이 안 되고 콘솔에 `SONG_NOT_CONFIRMED`
+
+**원인.** `PUT /api/songs/{id}/parts/{partId}/assign` 은 곡이 `CONFIRMED` 여야 한다(그 외 409).
+UI 는 `CONFIRMED` 곡에서만 select 를 보여주므로 보통은 안 나지만, 승격 직후 응답 반영 전 클릭하면 날 수 있다.
+
+**참고.** 프론트는 슬롯키(`"기타#2"`)를 `Song.parts` 에서 `partId` 로, 멤버 이름을 `members` 에서
+`userId` 로 되짚어 호출한다. 동명이인이 있으면 첫 번째 멤버로 배정된다(엣지 케이스).
+
+### 곡/일정/영상이 로그인 전에도 보이는데 액션만 막힌다
+
+정상. GET 은 전부 공개라 게스트도 목록을 받는다. 투표·등록·출결·배정은 `useGuard` 가 로그인 모달을 띄우고,
+서버도 비회원 액션은 401/403 으로 막는다. `media` 는 비회원에게 `LINK_PUBLIC` 만 내려온다(공개범위 필터).
+
+### 영상을 일정에 연결해 등록했는데 그 일정 상세 "이 일정의 영상" 에 안 뜬다
+
+**증상.** 영상 첨부 모달에서 "연결할 일정" 을 고르고 등록 → 영상 카드엔 "일정 · …" 표시가 되는데,
+일정 탭의 그 일정 상세에는 "아직 연결된 영상이 없습니다" 로 남는다. 새로고침하면 정상.
+
+**원인.** `AppContext.addMedia` 가 `media` state 만 갱신하고, 연결된 일정의 `mediaIds`(= `schedules` state)는
+그대로 뒀다. 일정 상세는 `schedules` 에서 `mediaIds` 를 읽으므로 반영이 안 됨. `removeMedia` 도 같은 문제.
+
+**해결 (2026-09-03, feature/8).** `addMedia`(`scheduleId` 있을 때) / `removeMedia`(지우는 영상이 일정에 연결돼
+있었을 때) 후 `scheduleApi.listSchedules` 로 `schedules` 를 다시 받는다 (`refreshSchedules` 헬퍼).
+백엔드는 처음부터 `ScheduleResponse.media` 를 정상으로 내려주고 있었음 — 순수 클라 상태 동기화 버그였다.

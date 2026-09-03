@@ -44,6 +44,16 @@ export interface Member {
 /** 악기별 필요 인원 (세션 구성) */
 export type SessionShape = Partial<Record<Instrument, number>>;
 
+/** 곡의 파트 슬롯 하나. 백엔드 SongPart 를 화면에서 쓰기 좋게 줄인 것. */
+export interface SongPartLite {
+  id: string;
+  instrument: string;
+  partIndex: number;
+  /** 배정된 멤버의 userId. 없으면 null */
+  assigneeId: string | null;
+  assigneeName: string | null;
+}
+
 export interface Song {
   id: string;
   bandId: string;
@@ -57,32 +67,47 @@ export interface Song {
   sessions: SessionShape;
   votes: number;
   votedByMe: boolean;
-  /** 정렬용 — 값이 클수록 최근 */
+  /** 정렬용 — 값이 클수록 최근 (createdAt epoch ms) */
   addedOrder: number;
   /** 슬롯키("기타#2") -> 멤버 이름. CONFIRMED 에서만 채운다 */
   assignments: Record<string, string>;
+  /** 원본 파트 슬롯 — 배정 API(partId 필요) 호출용 */
+  parts: SongPartLite[];
+}
+
+export interface ScheduleAttendee {
+  userId: string;
+  nickname: string;
+  status: AttendanceStatus;
 }
 
 export interface ScheduleEvent {
   id: string;
   bandId: string;
   type: ScheduleType;
-  /** 2026-08 기준 일(day). 캘린더 목업과 동일하게 단순화 */
-  day: number;
-  dow: string;
-  time: string;
-  title: string;
-  place: string;
+  /** ISO-8601 (Instant) */
+  dateTime: string;
+  location: string;
+  counts: { attending: number; absent: number; undecided: number };
+  /** 내 참석 여부. 비회원/미응답이면 null */
+  myStatus: AttendanceStatus | null;
+  /** 응답한 멤버만 */
+  attendees: ScheduleAttendee[];
+  /** 이 일정에 연결된 영상 id */
+  mediaIds: string[];
 }
 
 export interface MediaItem {
   id: string;
   bandId: string;
+  /** 외부 영상 URL (유튜브/구글드라이브 등) */
+  url: string;
+  /** 표시용 라벨 (백엔드에 제목 필드가 없어 URL 에서 파생) */
   title: string;
-  source: 'YouTube' | 'Google Drive';
+  source: string;
   date: string;
   kind: MediaKind;
   visibility: Visibility;
-  /** 연결된 일정의 day. 없으면 null */
-  scheduleDay: number | null;
+  /** 연결된 일정 id. 없으면 null */
+  scheduleId: string | null;
 }

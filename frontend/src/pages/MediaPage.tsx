@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { useGuard } from '../hooks/useGuard';
-import { schedulesOfBand } from '../mock/selectors';
+import { KIND_LABEL, toUi } from '../lib/schedule';
 import type { MediaKind } from '../types';
 import { Fab } from '../components/Fab';
 import { AddMediaModal } from '../components/AddMediaModal';
@@ -20,7 +20,7 @@ const stripe = (a: string, b: string) =>
   `repeating-linear-gradient(135deg, ${a} 0 12px, ${b} 12px 24px)`;
 
 export function MediaPage() {
-  const { currentBand, role, media: allMedia } = useApp();
+  const { currentBand, role, media: allMedia, schedules } = useApp();
   const guard = useGuard();
   const isGuest = role === 'guest';
 
@@ -30,8 +30,7 @@ export function MediaPage() {
   if (!currentBand) return null;
   const bandId = currentBand.id;
 
-  const schedules = schedulesOfBand(bandId);
-  const scheduleByDay = new Map(schedules.map((s) => [s.day, s]));
+  const scheduleById = new Map(schedules.map((s) => [s.id, s]));
 
   const bandMedia = allMedia.filter((m) => m.bandId === bandId);
   // 공개범위 적용: 비회원은 '멤버만' 영상 제외 (기획서 8.7)
@@ -65,25 +64,42 @@ export function MediaPage() {
 
       <div className="media__grid">
         {list.map((m, i) => {
-          const ev = m.scheduleDay != null ? scheduleByDay.get(m.scheduleDay) : undefined;
+          const ev = m.scheduleId ? scheduleById.get(m.scheduleId) : undefined;
+          const evUi = ev ? toUi(ev) : null;
           const [a, b] = STRIPE_SHADES[i % STRIPE_SHADES.length];
           const memberOnly = m.visibility === '멤버만';
           return (
             <article key={m.id} className="media__card">
-              <div className="media__thumb" style={{ background: stripe(a, b) }}>
+              <a
+                className="media__thumb"
+                href={m.url}
+                target="_blank"
+                rel="noreferrer"
+                style={{ background: stripe(a, b) }}
+              >
                 <span className="media__play" />
                 <span className="media__kind">{m.kind}</span>
-              </div>
+              </a>
               <div className="media__card-body">
-                <strong className="media__title">{m.title}</strong>
+                <a
+                  className="media__title"
+                  href={m.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ wordBreak: 'break-all' }}
+                >
+                  {m.title}
+                </a>
                 <span className="muted" style={{ fontSize: 11 }}>
                   {m.source} · {m.date}
                 </span>
                 <span
                   className="media__link"
-                  style={{ color: ev ? 'var(--color-accent-700)' : 'var(--color-neutral-600)' }}
+                  style={{ color: evUi ? 'var(--color-accent-700)' : 'var(--color-neutral-600)' }}
                 >
-                  {ev ? `일정 · 8/${ev.day} ${ev.title}` : '연결된 일정 없음'}
+                  {evUi
+                    ? `일정 · ${evUi.month + 1}/${evUi.day} ${KIND_LABEL[evUi.type]}`
+                    : '연결된 일정 없음'}
                 </span>
                 <span
                   className="media__scope"

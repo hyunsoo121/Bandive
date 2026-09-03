@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useApp } from '../store/AppContext';
+import { KIND_LABEL, toUi } from '../lib/schedule';
 import type { MediaKind, ScheduleEvent, Visibility } from '../types';
 import { Modal } from './Modal';
 
@@ -17,24 +18,32 @@ export function AddMediaModal({ bandId, schedules, onClose, onSubmitted }: Props
   const { addMedia } = useApp();
 
   const [url, setUrl] = useState('');
-  const [title, setTitle] = useState('');
   const [kind, setKind] = useState<MediaKind>('합주');
   const [visibility, setVisibility] = useState<Visibility>('멤버만');
-  const [scheduleDay, setScheduleDay] = useState('');
+  const [scheduleId, setScheduleId] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = url.trim().length > 0 && title.trim().length > 0;
+  const canSubmit = /^https?:\/\/.+/.test(url.trim()) && !submitting;
 
-  const submit = () => {
+  const submit = async () => {
     if (!canSubmit) return;
-    addMedia({
-      bandId,
-      url,
-      title,
-      kind,
-      visibility,
-      scheduleDay: scheduleDay ? Number(scheduleDay) : null,
-    });
-    onSubmitted();
+    setSubmitting(true);
+    setError(null);
+    try {
+      await addMedia({
+        bandId,
+        url,
+        kind,
+        visibility,
+        scheduleId: scheduleId || null,
+      });
+      onSubmitted();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '영상을 등록하지 못했습니다.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -51,7 +60,7 @@ export function AddMediaModal({ bandId, schedules, onClose, onSubmitted }: Props
             disabled={!canSubmit}
             onClick={submit}
           >
-            영상 등록
+            {submitting ? '등록 중…' : '영상 등록'}
           </button>
           <button type="button" className="btn" onClick={onClose}>
             취소
@@ -66,20 +75,12 @@ export function AddMediaModal({ bandId, schedules, onClose, onSubmitted }: Props
           className="input"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="youtu.be/… 또는 drive.google.com/…"
+          placeholder="https://youtu.be/… 또는 https://drive.google.com/…"
           autoFocus
         />
-      </div>
-
-      <div className="field">
-        <label htmlFor="media-title">제목</label>
-        <input
-          id="media-title"
-          className="input"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="예: 8/29 정기 합주 풀영상"
-        />
+        <span className="muted" style={{ fontSize: 11 }}>
+          유튜브·구글드라이브 링크는 자동으로 구분됩니다. 제목은 따로 저장하지 않습니다.
+        </span>
       </div>
 
       <div className="field">
@@ -119,20 +120,26 @@ export function AddMediaModal({ bandId, schedules, onClose, onSubmitted }: Props
         <select
           id="media-event"
           className="input"
-          value={scheduleDay}
-          onChange={(e) => setScheduleDay(e.target.value)}
+          value={scheduleId}
+          onChange={(e) => setScheduleId(e.target.value)}
         >
           <option value="">연결 안 함</option>
-          {schedules.map((ev) => (
-            <option key={ev.id} value={String(ev.day)}>
-              8/{ev.day} {ev.title}
-            </option>
-          ))}
+          {schedules.map((ev) => {
+            const u = toUi(ev);
+            return (
+              <option key={ev.id} value={ev.id}>
+                {u.month + 1}/{u.day} {KIND_LABEL[ev.type]}
+                {ev.location ? ` · ${ev.location}` : ''}
+              </option>
+            );
+          })}
         </select>
         <span className="muted" style={{ fontSize: 11 }}>
           연결하면 캘린더의 해당 일정 상세에 이 영상이 함께 표시됩니다.
         </span>
       </div>
+
+      {error && <span style={{ fontSize: 12, color: 'var(--color-accent)' }}>{error}</span>}
     </Modal>
   );
 }

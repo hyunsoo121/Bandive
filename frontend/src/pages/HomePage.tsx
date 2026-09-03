@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import { useGuard } from '../hooks/useGuard';
-import { KIND_LABEL, nextSchedule } from '../mock/selectors';
+import { KIND_LABEL, nextSchedule, toUi } from '../lib/schedule';
 import './HomePage.css';
 
 const STRIPE_SHADES = [
@@ -13,7 +13,7 @@ const stripe = (a: string, b: string) =>
   `repeating-linear-gradient(135deg, ${a} 0 9px, ${b} 9px 18px)`;
 
 export function HomePage() {
-  const { currentBand, role, songs: allSongs, media: allMedia } = useApp();
+  const { currentBand, role, songs: allSongs, media: allMedia, schedules } = useApp();
   const guard = useGuard();
 
   if (!currentBand) return null;
@@ -24,11 +24,15 @@ export function HomePage() {
   const wishlist = songs.filter((s) => s.status === 'WISHLIST');
   const media = allMedia.filter((m) => m.bandId === bandId);
   const recentSongs = [...songs].sort((a, b) => b.addedOrder - a.addedOrder).slice(0, 3);
-  const upcoming = nextSchedule(bandId);
+  const upcomingRaw = nextSchedule(schedules);
+  const upcoming = upcomingRaw ? toUi(upcomingRaw) : null;
+  const dday = upcoming
+    ? Math.max(0, Math.ceil((upcoming.at.getTime() - Date.now()) / 86_400_000))
+    : 0;
   const isOwner = role === 'owner';
 
   const base = `/bands/${bandId}`;
-  const going = 3; // 출결 상세는 일정 화면에서. 여기선 요약만.
+  const going = upcoming?.counts.attending ?? 0;
 
   return (
     <div className="home">
@@ -82,7 +86,9 @@ export function HomePage() {
               <div className="home__next-body">
                 <div className="home__next-date">
                   <strong>{upcoming.day}</strong>
-                  <span className="muted">8월 {upcoming.dow}</span>
+                  <span className="muted">
+                    {upcoming.month + 1}월 {upcoming.dow}
+                  </span>
                 </div>
                 <div className="stack" style={{ gap: 6, flex: 1 }}>
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -91,13 +97,14 @@ export function HomePage() {
                     >
                       {KIND_LABEL[upcoming.type]}
                     </span>
-                    <span className="tag">D-{Math.max(0, upcoming.day - 28)}</span>
+                    <span className="tag">D-{dday}</span>
                   </div>
                   <strong style={{ fontFamily: 'var(--font-heading)', fontSize: 16 }}>
-                    {upcoming.title}
+                    {upcoming.location || KIND_LABEL[upcoming.type]}
                   </strong>
                   <span className="muted" style={{ fontSize: 12 }}>
-                    {upcoming.time} · {upcoming.place}
+                    {upcoming.timeLabel}
+                    {upcoming.location ? ` · ${upcoming.location}` : ''}
                   </span>
                 </div>
               </div>
