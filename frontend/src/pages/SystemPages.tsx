@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
-import { startKakaoLogin } from '../api/auth';
 import { BrandMark } from '../components/BrandMark';
 import { CreateBandModal } from '../components/CreateBandModal';
 
@@ -33,7 +32,7 @@ export function FullscreenLoader({ label = '불러오는 중…' }: { label?: st
 
 /** "/" — 부팅 끝나면 첫 밴드로, 밴드가 없으면 로그인/생성 안내. */
 export function HomeRedirect() {
-  const { bootLoading, bands, user, openCreate, createOpen } = useApp();
+  const { bootLoading, bands, user, openCreate, createOpen, openLogin } = useApp();
 
   if (bootLoading) return <FullscreenLoader label="세션 확인 중…" />;
   if (bands.length > 0) return <Navigate to={`/bands/${bands[0].id}`} replace />;
@@ -55,8 +54,8 @@ export function HomeRedirect() {
           <p className="muted">
             밴드를 만들고 멤버를 초대해 합주곡·일정·영상을 한곳에서 관리하세요.
           </p>
-          <button type="button" className="btn btn--primary" onClick={startKakaoLogin}>
-            카카오로 시작하기
+          <button type="button" className="btn btn--primary" onClick={openLogin}>
+            로그인 / 회원가입
           </button>
         </>
       )}
@@ -94,7 +93,7 @@ export function OAuthFailure() {
 /** "/invite/:code" — 로그인 상태면 바로 가입, 아니면 로그인 후 이 링크로 되돌아온다. */
 export function InviteJoin() {
   const { code } = useParams();
-  const { bootLoading, user, joinByInvite } = useApp();
+  const { bootLoading, user, joinByInvite, openLogin } = useApp();
   const navigate = useNavigate();
   const ran = useRef(false);
   const [error, setError] = useState<string | null>(null);
@@ -120,11 +119,12 @@ export function InviteJoin() {
           type="button"
           className="btn btn--primary"
           onClick={() => {
+            // 카카오는 전체 리다이렉트라 코드를 세션에 보관했다가 복귀 후 이어감. 이메일 로그인은 이 페이지에서 바로 이어짐.
             if (code) sessionStorage.setItem(PENDING_INVITE_KEY, code);
-            startKakaoLogin();
+            openLogin();
           }}
         >
-          카카오로 로그인
+          로그인 / 회원가입
         </button>
       </CenterBox>
     );

@@ -8,7 +8,6 @@ import { Avatar } from './Avatar';
 import { GuestBanner } from './GuestBanner';
 import { DevRoleBar } from './DevRoleBar';
 import { BandSwitcher } from './BandSwitcher';
-import { LoginModal } from './LoginModal';
 import { CreateBandModal } from './CreateBandModal';
 import { FullscreenLoader } from '../pages/SystemPages';
 import './AppLayout.css';
@@ -25,7 +24,6 @@ export function AppLayout() {
     bandLoading,
     role,
     switcherOpen,
-    loginOpen,
     createOpen,
     setCurrentBandId,
     openSwitcher,
@@ -165,7 +163,6 @@ export function AppLayout() {
       <DevRoleBar />
 
       {switcherOpen && <BandSwitcher onNavigate={(id) => navigate(`/bands/${id}`)} />}
-      {loginOpen && <LoginModal />}
       {createOpen && <CreateBandModal />}
     </div>
   );

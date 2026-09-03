@@ -1,12 +1,19 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { AppProvider } from './store/AppContext';
+import { AppProvider, useApp } from './store/AppContext';
 import { AppLayout } from './components/AppLayout';
+import { LoginModal } from './components/LoginModal';
 import { HomePage } from './pages/HomePage';
 import { SongsPage } from './pages/SongsPage';
 import { SchedulePage } from './pages/SchedulePage';
 import { MediaPage } from './pages/MediaPage';
 import { MembersPage } from './pages/MembersPage';
 import { HomeRedirect, InviteJoin, OAuthFailure, OAuthSuccess } from './pages/SystemPages';
+
+/** 라우트와 무관하게 떠야 하는 모달 (랜딩·초대 페이지에서도 로그인 모달이 필요). */
+function GlobalModals() {
+  const { loginOpen } = useApp();
+  return loginOpen ? <LoginModal /> : null;
+}
 
 export default function App() {
   return (
@@ -26,6 +33,7 @@ export default function App() {
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <GlobalModals />
       </AppProvider>
     </BrowserRouter>
   );
