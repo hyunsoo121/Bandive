@@ -21,6 +21,14 @@ export interface User {
   initial: string;
 }
 
+export interface SongFolder {
+  id: string;
+  name: string;
+  /** 이 폴더가 위시리스트/합주곡 중 어디에 속하는지 */
+  status: 'WISHLIST' | 'CONFIRMED';
+  position: number;
+}
+
 export interface Band {
   id: string;
   name: string;
@@ -75,6 +83,8 @@ export interface Song {
   addedOrder: number;
   /** 슬롯키("기타#2") -> 멤버 이름. CONFIRMED 에서만 채운다 */
   assignments: Record<string, string>;
+  /** 속한 폴더 id. null = 미분류 */
+  folderId: string | null;
   /** 원본 파트 슬롯 — 배정 API(partId 필요) 호출용 */
   parts: SongPartLite[];
 }

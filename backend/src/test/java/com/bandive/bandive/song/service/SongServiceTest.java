@@ -55,6 +55,9 @@ class SongServiceTest extends RepositoryTest {
 	private UserRepository users;
 
 	@Autowired
+	private com.bandive.bandive.song.folder.SongFolderRepository folders;
+
+	@Autowired
 	private TestEntityManager em;
 
 	private SongService service;
@@ -67,7 +70,8 @@ class SongServiceTest extends RepositoryTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new SongService(songs, parts, votes, bands, bandMembers, users, new StubMusicSearchService());
+		service = new SongService(songs, parts, votes, bands, bandMembers, users, folders,
+				new StubMusicSearchService());
 		band = em.persist(Fixtures.band("A"));
 		ownerId = joinMember("owner", BandRole.OWNER);
 		memberId = joinMember("member", BandRole.MEMBER);
@@ -240,6 +244,57 @@ class SongServiceTest extends RepositoryTest {
 		em.flush();
 
 		assertThatThrownBy(() -> service.delete(songId, memberId)).isInstanceOf(ForbiddenException.class);
+	}
+
+	// ── folder ───────────────────────────────────────────
+
+	@Test
+	void 곡을_같은_status_폴더로만_옮길_수_있고_밴드장만() {
+		Long songId = service.add(band.getId(), memberId, manual(null)).id();
+		com.bandive.bandive.song.folder.SongFolder wishFolder = em
+			.persist(com.bandive.bandive.song.folder.SongFolder.builder()
+				.band(band)
+				.name("커버")
+				.status(SongStatus.WISHLIST)
+				.position(0)
+				.build());
+		com.bandive.bandive.song.folder.SongFolder confFolder = em
+			.persist(com.bandive.bandive.song.folder.SongFolder.builder()
+				.band(band)
+				.name("정규")
+				.status(SongStatus.CONFIRMED)
+				.position(0)
+				.build());
+		em.flush();
+
+		assertThatThrownBy(() -> service.moveToFolder(songId, memberId, wishFolder.getId()))
+			.isInstanceOf(ForbiddenException.class);
+
+		assertThat(service.moveToFolder(songId, ownerId, wishFolder.getId()).folderId()).isEqualTo(wishFolder.getId());
+
+		// WISHLIST 곡을 CONFIRMED 폴더로는 못 옮긴다
+		assertThatThrownBy(() -> service.moveToFolder(songId, ownerId, confFolder.getId()))
+			.isInstanceOf(com.bandive.bandive.common.exception.ValidationException.class);
+
+		// null 이면 미분류
+		assertThat(service.moveToFolder(songId, ownerId, null).folderId()).isNull();
+	}
+
+	@Test
+	void 승격하면_폴더에서_빠진다() {
+		Long songId = service.add(band.getId(), memberId, manual(null)).id();
+		com.bandive.bandive.song.folder.SongFolder folder = em
+			.persist(com.bandive.bandive.song.folder.SongFolder.builder()
+				.band(band)
+				.name("커버")
+				.status(SongStatus.WISHLIST)
+				.position(0)
+				.build());
+		em.flush();
+		service.moveToFolder(songId, ownerId, folder.getId());
+		em.flush();
+
+		assertThat(service.confirm(songId, ownerId).folderId()).isNull();
 	}
 
 }

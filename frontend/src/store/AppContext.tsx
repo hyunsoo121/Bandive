@@ -19,6 +19,7 @@ import type {
   ScheduleType,
   SessionShape,
   Song,
+  SongFolder,
   SourceType,
   User,
   Visibility,
@@ -28,9 +29,18 @@ import * as bandApi from '../api/bands';
 import * as inviteApi from '../api/invites';
 import * as memberApi from '../api/members';
 import * as songApi from '../api/songs';
+import * as songFolderApi from '../api/songFolders';
 import * as scheduleApi from '../api/schedules';
 import * as mediaApi from '../api/media';
-import { toBand, toMedia, toMember, toSchedule, toSong, toUser } from '../api/mappers';
+import {
+  toBand,
+  toMedia,
+  toMember,
+  toSchedule,
+  toSong,
+  toSongFolder,
+  toUser,
+} from '../api/mappers';
 import { ATT_TO_EN, byDateAsc } from '../lib/schedule';
 
 export interface NewSongInput {
@@ -105,6 +115,8 @@ interface AppState {
 
   /** 현재 밴드 곡 (GET /api/bands/{id}/songs) */
   songs: Song[];
+  /** 현재 밴드 곡 폴더 (GET /api/bands/{id}/song-folders), status·position 순 */
+  songFolders: SongFolder[];
   /** 현재 밴드 일정 (GET /api/bands/{id}/schedules), dateTime 오름차순 */
   schedules: ScheduleEvent[];
   /** 현재 밴드 영상 (GET /api/bands/{id}/media) */
@@ -142,6 +154,16 @@ interface AppState {
   addSong: (input: NewSongInput) => Promise<void>;
   /** 곡 삭제 (밴드장) */
   removeSong: (songId: string) => Promise<void>;
+  /** 곡을 폴더로 이동 (밴드장). folderId null = 미분류 */
+  moveSongToFolder: (songId: string, folderId: string | null) => Promise<void>;
+  /** 곡 폴더 생성 (밴드장) */
+  createSongFolder: (name: string, status: Song['status']) => Promise<void>;
+  /** 곡 폴더 이름 변경 (밴드장) */
+  renameSongFolder: (folderId: string, name: string) => Promise<void>;
+  /** 곡 폴더 삭제 (밴드장) — 소속 곡은 미분류로 */
+  removeSongFolder: (folderId: string) => Promise<void>;
+  /** 한 status 안에서 폴더 순서 재지정 (밴드장) */
+  reorderSongFolders: (status: Song['status'], folderIds: string[]) => Promise<void>;
 
   /** 일정 등록 (POST /api/bands/{id}/schedules) */
   addSchedule: (input: NewScheduleInput) => Promise<void>;
@@ -188,6 +210,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [devRole, setDevRole] = useState<Role | null>(null);
 
   const [songs, setSongs] = useState<Song[]>([]);
+  const [songFolders, setSongFolders] = useState<SongFolder[]>([]);
   const [schedules, setSchedules] = useState<ScheduleEvent[]>([]);
   const [media, setMedia] = useState<MediaItem[]>([]);
 
@@ -223,6 +246,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setCurrentBand(null);
       setMembers([]);
       setSongs([]);
+      setSongFolders([]);
       setSchedules([]);
       setMedia([]);
       return;
@@ -232,10 +256,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setInvite(null);
     (async () => {
       try {
-        const [band, mem, songList, schedList, mediaList] = await Promise.all([
+        const [band, mem, songList, folderList, schedList, mediaList] = await Promise.all([
           bandApi.getBand(currentBandId),
           memberApi.listMembers(currentBandId),
           songApi.listSongs(currentBandId),
+          songFolderApi.listFolders(currentBandId),
           scheduleApi.listSchedules(currentBandId),
           mediaApi.listMedia(currentBandId),
         ]);
@@ -243,6 +268,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setCurrentBand(toBand(band));
         setMembers(mem.map((m) => toMember(m, currentBandId)));
         setSongs(songList.map(toSong));
+        setSongFolders(folderList.map(toSongFolder));
         setSchedules(sortSchedules(schedList.map(toSchedule)));
         setMedia(mediaList.map(toMedia));
       } catch {
@@ -250,6 +276,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           setCurrentBand(null);
           setMembers([]);
           setSongs([]);
+          setSongFolders([]);
           setSchedules([]);
           setMedia([]);
         }
@@ -446,6 +473,50 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSongs((prev) => prev.filter((s) => s.id !== songId));
   }, []);
 
+  const moveSongToFolder = useCallback(async (songId: string, folderId: string | null) => {
+    const dto = await songApi.moveSongToFolder(songId, folderId);
+    setSongs((prev) => prev.map((s) => (s.id === songId ? toSong(dto) : s)));
+  }, []);
+
+  const createSongFolder = useCallback(
+    async (name: string, status: Song['status']) => {
+      if (!currentBandId) return;
+      const dto = await songFolderApi.createFolder(currentBandId, name.trim(), status);
+      setSongFolders((prev) => [...prev, toSongFolder(dto)]);
+    },
+    [currentBandId],
+  );
+
+  const renameSongFolder = useCallback(async (folderId: string, name: string) => {
+    const dto = await songFolderApi.renameFolder(folderId, name.trim());
+    setSongFolders((prev) => prev.map((f) => (f.id === folderId ? toSongFolder(dto) : f)));
+  }, []);
+
+  const removeSongFolder = useCallback(async (folderId: string) => {
+    await songFolderApi.deleteFolder(folderId);
+    setSongFolders((prev) => prev.filter((f) => f.id !== folderId));
+    setSongs((prev) => prev.map((s) => (s.folderId === folderId ? { ...s, folderId: null } : s)));
+  }, []);
+
+  const reorderSongFolders = useCallback(
+    async (status: Song['status'], folderIds: string[]) => {
+      if (!currentBandId) return;
+      // 낙관적 반영 후 서버 응답으로 확정
+      setSongFolders((prev) => {
+        const order = new Map(folderIds.map((id, i) => [id, i]));
+        return prev.map((f) =>
+          f.status === status && order.has(f.id)
+            ? { ...f, position: order.get(f.id) ?? f.position }
+            : f,
+        );
+      });
+      const dtos = await songFolderApi.reorderFolders(currentBandId, status, folderIds);
+      const fresh = new Map(dtos.map((d) => [String(d.id), toSongFolder(d)]));
+      setSongFolders((prev) => prev.map((f) => fresh.get(f.id) ?? f));
+    },
+    [currentBandId],
+  );
+
   const addSchedule = useCallback(async (input: NewScheduleInput) => {
     const dto = await scheduleApi.createSchedule(input.bandId, {
       type: input.type,
@@ -527,6 +598,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     role,
     devRole,
     songs,
+    songFolders,
     schedules,
     media,
     members,
@@ -549,6 +621,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     assignPart,
     addSong,
     removeSong,
+    moveSongToFolder,
+    createSongFolder,
+    renameSongFolder,
+    removeSongFolder,
+    reorderSongFolders,
     addSchedule,
     removeSchedule,
     setAttendance,

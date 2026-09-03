@@ -8,7 +8,16 @@ interface Props {
 }
 
 export function BandSwitcher({ onNavigate }: Props) {
-  const { bands, currentBand, setCurrentBandId, closeSwitcher, openCreate } = useApp();
+  const {
+    bands,
+    currentBand,
+    user,
+    setCurrentBandId,
+    closeSwitcher,
+    openCreate,
+    openLogin,
+    logout,
+  } = useApp();
 
   const pick = (id: string) => {
     setCurrentBandId(id);
@@ -52,6 +61,18 @@ export function BandSwitcher({ onNavigate }: Props) {
           <strong>새 밴드 만들기</strong>
           <span className="muted">이름·로고·배너를 설정하고 초대 코드를 발급합니다</span>
         </span>
+      </button>
+
+      <button
+        type="button"
+        className="switcher__account"
+        onClick={() => {
+          closeSwitcher();
+          if (user) logout();
+          else openLogin();
+        }}
+      >
+        {user ? `${user.name} · 로그아웃` : '로그인'}
       </button>
     </Modal>
   );

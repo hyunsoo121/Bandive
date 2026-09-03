@@ -29,6 +29,8 @@ export function AppLayout() {
     createOpen,
     setCurrentBandId,
     openSwitcher,
+    openLogin,
+    logout,
   } = useApp();
 
   // URL 의 밴드 → 컨텍스트 (뒤로가기 / 직접 URL 진입 / 밴드 전환 대응)
@@ -111,12 +113,21 @@ export function AppLayout() {
             size={30}
             color={user ? 'var(--color-text)' : 'var(--color-neutral-500)'}
           />
-          <span className="stack">
+          <span className="stack" style={{ flex: 1 }}>
             <strong style={{ fontSize: 13 }}>{meName}</strong>
             <span className="muted" style={{ fontSize: 11 }}>
               {ROLE_LABEL[role]}
             </span>
           </span>
+          {user ? (
+            <button type="button" className="sidebar__me-btn" onClick={logout}>
+              로그아웃
+            </button>
+          ) : (
+            <button type="button" className="sidebar__me-btn" onClick={openLogin}>
+              로그인
+            </button>
+          )}
         </div>
       </aside>
 

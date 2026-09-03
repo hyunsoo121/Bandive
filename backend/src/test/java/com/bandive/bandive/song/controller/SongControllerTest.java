@@ -47,7 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SongControllerTest {
 
 	private static final SongResponse SONG = new SongResponse(5L, 1L, "곡", "아티스트", SongStatus.WISHLIST,
-			SongSourceType.MANUAL, null, "메모", null, 7L, "나", 3, true, List.of(),
+			SongSourceType.MANUAL, null, "메모", null, 7L, "나", 3, true, null, List.of(),
 			Instant.parse("2026-09-02T00:00:00Z"));
 
 	@Autowired

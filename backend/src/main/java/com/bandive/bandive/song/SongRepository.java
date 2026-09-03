@@ -4,9 +4,15 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 public interface SongRepository extends JpaRepository<Song, Long> {
+
+	/** 폴더 삭제 시 소속 곡을 미분류로. */
+	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Query("update Song s set s.folder = null where s.folder.id = :folderId")
+	void clearFolder(Long folderId);
 
 	List<Song> findAllByBandId(Long bandId);
 
@@ -16,6 +22,7 @@ public interface SongRepository extends JpaRepository<Song, Long> {
 	@Query("""
 			select distinct s from Song s
 			  join fetch s.addedBy
+			  left join fetch s.folder
 			  left join fetch s.parts p
 			  left join fetch p.assignedMember m
 			  left join fetch m.user

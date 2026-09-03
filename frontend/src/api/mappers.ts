@@ -87,6 +87,7 @@ export function toSong(dto: SongDto): Song {
     sessions,
     votes: dto.voteCount,
     votedByMe: dto.votedByMe,
+    folderId: dto.folderId != null ? String(dto.folderId) : null,
     addedOrder: Date.parse(dto.createdAt) || dto.id,
     assignments,
     parts: dto.parts.map((p) => ({
@@ -115,6 +116,15 @@ export function toSchedule(dto: ScheduleDto): ScheduleEvent {
     })),
     mediaIds: dto.media.map((m) => String(m.id)),
   };
+}
+
+export function toSongFolder(dto: {
+  id: number;
+  name: string;
+  status: 'WISHLIST' | 'CONFIRMED';
+  position: number;
+}): import('../types').SongFolder {
+  return { id: String(dto.id), name: dto.name, status: dto.status, position: dto.position };
 }
 
 const PLATFORM_LABEL: Record<MediaPlatformDto, string> = {

@@ -23,6 +23,7 @@ import com.bandive.bandive.auth.UserPrincipal;
 import com.bandive.bandive.song.SongStatus;
 import com.bandive.bandive.song.dto.PartAssignRequest;
 import com.bandive.bandive.song.dto.SongCreateRequest;
+import com.bandive.bandive.song.dto.SongFolderAssignRequest;
 import com.bandive.bandive.song.dto.SongResponse;
 import com.bandive.bandive.song.dto.TrackSearchResult;
 import com.bandive.bandive.song.dto.VoteResult;
@@ -79,6 +80,13 @@ public class SongController {
 			@RequestBody(required = false) PartAssignRequest request) {
 		Long targetUserId = request == null ? null : request.userId();
 		return songService.assignPart(songId, partId, userId, targetUserId);
+	}
+
+	/** 곡을 폴더로 이동 (밴드장). {@code folderId} null 이면 미분류. */
+	@PutMapping("/api/songs/{songId}/folder")
+	public SongResponse moveToFolder(@PathVariable Long songId, @CurrentUser Long userId,
+			@RequestBody(required = false) SongFolderAssignRequest request) {
+		return songService.moveToFolder(songId, userId, request == null ? null : request.folderId());
 	}
 
 	@DeleteMapping("/api/songs/{songId}")

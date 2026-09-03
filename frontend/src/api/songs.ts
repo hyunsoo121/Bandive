@@ -36,3 +36,7 @@ export const assignPart = (songId: string, partId: string, userId: string | null
 
 /** 곡 삭제 (밴드장). parts·votes cascade. */
 export const deleteSong = (songId: string) => api.del<void>(`/api/songs/${songId}`);
+
+/** 곡을 폴더로 이동 (밴드장). folderId null 이면 미분류. */
+export const moveSongToFolder = (songId: string, folderId: string | null) =>
+  api.put<SongDto>(`/api/songs/${songId}/folder`, { folderId: folderId ? Number(folderId) : null });

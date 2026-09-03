@@ -32,6 +32,8 @@ import com.bandive.bandive.song.dto.SongCreateRequest.SessionSlot;
 import com.bandive.bandive.song.dto.SongResponse;
 import com.bandive.bandive.song.dto.TrackSearchResult;
 import com.bandive.bandive.song.dto.VoteResult;
+import com.bandive.bandive.song.folder.SongFolder;
+import com.bandive.bandive.song.folder.SongFolderRepository;
 import com.bandive.bandive.user.User;
 import com.bandive.bandive.user.UserRepository;
 
@@ -51,16 +53,20 @@ public class SongService {
 
 	private final UserRepository users;
 
+	private final SongFolderRepository folders;
+
 	private final MusicSearchService musicSearch;
 
 	public SongService(SongRepository songs, SongPartRepository parts, VoteRepository votes, BandRepository bands,
-			BandMemberRepository bandMembers, UserRepository users, MusicSearchService musicSearch) {
+			BandMemberRepository bandMembers, UserRepository users, SongFolderRepository folders,
+			MusicSearchService musicSearch) {
 		this.songs = songs;
 		this.parts = parts;
 		this.votes = votes;
 		this.bands = bands;
 		this.bandMembers = bandMembers;
 		this.users = users;
+		this.folders = folders;
 		this.musicSearch = musicSearch;
 	}
 
@@ -183,6 +189,28 @@ public class SongService {
 		Song song = findSong(songId);
 		requireOwner(song.getBand().getId(), userId);
 		songs.delete(song);
+	}
+
+	/** 곡을 폴더로 이동 (밴드장). folderId 가 null 이면 미분류. 폴더는 곡과 같은 밴드·같은 status 여야 한다. */
+	@Transactional
+	public SongResponse moveToFolder(Long songId, Long userId, Long folderId) {
+		Song song = findSongWithDetails(songId);
+		requireOwner(song.getBand().getId(), userId);
+		if (folderId == null) {
+			song.moveToFolder(null);
+		}
+		else {
+			SongFolder folder = folders.findById(folderId)
+				.orElseThrow(() -> new NotFoundException("FOLDER_NOT_FOUND", "폴더를 찾을 수 없습니다."));
+			if (!folder.getBand().getId().equals(song.getBand().getId())) {
+				throw new ValidationException("FOLDER_BAND_MISMATCH", "다른 밴드의 폴더로는 옮길 수 없습니다.");
+			}
+			if (folder.getStatus() != song.getStatus()) {
+				throw new ValidationException("FOLDER_STATUS_MISMATCH", "위시리스트/합주곡 구분이 다른 폴더입니다.");
+			}
+			song.moveToFolder(folder);
+		}
+		return toResponse(song, userId);
 	}
 
 	private Song findSong(Long songId) {
