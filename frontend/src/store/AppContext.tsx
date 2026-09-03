@@ -403,20 +403,35 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const addMedia = useCallback(async (input: NewMediaInput) => {
-    const dto = await mediaApi.addMedia(input.bandId, {
-      externalUrl: input.url.trim(),
-      type: input.kind === '공연' ? 'PERFORMANCE' : 'REHEARSAL',
-      visibility: input.visibility === '링크 공개' ? 'LINK_PUBLIC' : 'MEMBERS_ONLY',
-      scheduleId: input.scheduleId ? Number(input.scheduleId) : null,
-    });
-    setMedia((prev) => [toMedia(dto), ...prev]);
+  // 일정에 연결된 영상이 바뀌면 그 일정의 mediaIds 도 다시 받아야 상세에 반영된다.
+  const refreshSchedules = useCallback(async (bandId: string) => {
+    const list = await scheduleApi.listSchedules(bandId);
+    setSchedules(sortSchedules(list.map(toSchedule)));
   }, []);
 
-  const removeMedia = useCallback(async (mediaId: string) => {
-    await mediaApi.deleteMedia(mediaId);
-    setMedia((prev) => prev.filter((m) => m.id !== mediaId));
-  }, []);
+  const addMedia = useCallback(
+    async (input: NewMediaInput) => {
+      const dto = await mediaApi.addMedia(input.bandId, {
+        externalUrl: input.url.trim(),
+        type: input.kind === '공연' ? 'PERFORMANCE' : 'REHEARSAL',
+        visibility: input.visibility === '링크 공개' ? 'LINK_PUBLIC' : 'MEMBERS_ONLY',
+        scheduleId: input.scheduleId ? Number(input.scheduleId) : null,
+      });
+      setMedia((prev) => [toMedia(dto), ...prev]);
+      if (input.scheduleId) await refreshSchedules(input.bandId);
+    },
+    [refreshSchedules],
+  );
+
+  const removeMedia = useCallback(
+    async (mediaId: string) => {
+      const linkedScheduleId = media.find((m) => m.id === mediaId)?.scheduleId ?? null;
+      await mediaApi.deleteMedia(mediaId);
+      setMedia((prev) => prev.filter((m) => m.id !== mediaId));
+      if (linkedScheduleId && currentBandId) await refreshSchedules(currentBandId);
+    },
+    [media, currentBandId, refreshSchedules],
+  );
 
   const value: AppState = {
     user,
