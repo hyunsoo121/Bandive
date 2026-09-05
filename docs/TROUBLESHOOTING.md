@@ -389,8 +389,18 @@ Premium** 일 때만 200 으로 준다. 무료 계정이 만든 앱은 토큰만
 
 **해결 (2026-09-03, feature/10).** `MUSIC_COUNTRY` 기본값을 `US` 로 바꿨다 (`MusicProperties`,
 `application.yaml`, `.env.example`). US 카탈로그는 한글 검색어("아이유 좋은날" → `Good Day` by IU)도 정상
-매칭되므로 지역화를 포기해도 실사용에 문제 없음. KR 을 꼭 써야 하면 `entity` 를 `musicTrack` 으로 바꿔야 한다
-(뮤직비디오가 섞여 들어오는 트레이드오프).
+매칭된다.
+
+### 검색 결과 제목이 영문("Good Day")으로 나온다 — 한글로 보고 싶다
+
+**배경.** 위 항목대로 검색은 US 스토어로 하는데, US 스토어는 곡 제목/가수를 영문·로마자로 준다
+("좋은 날"→"Good Day", "잔나비"→"JANNABI"). KR 스토어로 검색하면 한글이지만 `entity=song` 이 죽어서 결과가 안 나온다.
+
+**해결 (2026-09-06, feature/10).** `ItunesMusicSearchService` 가 2단계로 동작한다: ① `country=US` 로 검색 →
+② 그 trackId 들을 `lookup?id=<전부>&country=KR` **1회** 호출해 현지화된 제목/가수로 치환. KR 스토어는 *검색*은
+죽었어도 *lookup* 은 살아 있어서 "Good Day" → "좋은 날 / 아이유", "For Lovers Who Hesitate" →
+"주저하는 연인들을 위해 / 잔나비" 로 바뀐다. KR 스토어에 없는 곡(예: Coldplay)이나 lookup 실패 시엔 US 값을 그대로 쓴다.
+앨범아트 URL 은 두 스토어가 동일. 끄려면 `MUSIC_LOCALIZE_COUNTRY=` (빈 값).
 
 ### 영상 카드/일정 리스트에 "제목"이 안 뜬다
 

@@ -250,7 +250,8 @@
   - ✅ ⑤ 이메일 로그인: `users`에 `password_hash`·`provider`, `POST /api/auth/{signup,login}`, `SessionIssuer`(카카오 성공핸들러와 공통), 비번 8자+영문숫자, 이메일 인증 없음, 복구 없음 (ADR-010)
   - ✅ ④ 곡 폴더 + 순서 (`V6` `song_folders` + `songs.folder_id` SET NULL, 드래그 핸들 `@dnd-kit`, 폴더 CRUD·reorder 밴드장, 위시/합주 폴더 별도(status), 항상 폴더 그룹핑+폴더 내부만 정렬, 승격 시 `confirm()` 이 folder 도 null)
   - ✅ ⑥ 세션 직접 입력(자유 악기 — "실로폰" 등, 프론트 `INSTRUMENTS` 하드코딩 제거 → `SessionShape = Record<string, number>`, 백엔드는 이미 String 자유값) + 앨범 아트(`V7` `songs.artwork_url`, iTunes `artworkUrl100`→`600x600bb` 치환, `SongResponse.artworkUrl`, 검색결과·곡 row 썸네일)
-  - ⚠️ `MUSIC_COUNTRY` 기본값 `KR`→`US`: KR iTunes 스토어는 Search API `entity=song` 응답이 **항상 빈 배열**(2026-09-03 확인). US 카탈로그는 한글 검색어("아이유 좋은날"→IU - Good Day)도 매칭됨
+  - ⚠️ `MUSIC_COUNTRY` 기본값 `KR`→`US`: KR iTunes 스토어는 Search API `entity=song` 응답이 **항상 빈 배열**(2026-09-03 확인). US 카탈로그는 한글 검색어("아이유 좋은날"→Good Day/IU)도 매칭됨
+  - ✅ ⑥-b 제목 현지화: `ItunesMusicSearchService` 2단계 — US 검색 → trackId 를 `lookup?id=…&country=KR`(`MUSIC_LOCALIZE_COUNTRY`, 기본 KR, 빈 값이면 끔) 1회 조회해 "Good Day"→"좋은 날/아이유" 치환. KR 미수록 곡·lookup 실패는 US 값 폴백. 앨범아트 URL 은 두 스토어 동일. `MusicProperties` 4번째 파라미터 `localizeCountry` 추가
 - **Phase 7 — 배포**: Dockerfile, prod compose, CI/CD (push → AWS 자동 배포).
   **+ S3 `StorageService` 구현체** (Phase 5 에서 이동 — `app.storage.type=s3`, AWS SDK v2, 버킷·IAM).
   ⚠️ 로컬에서 비켜쓴 포트를 **기본값으로 복구**: Postgres 5432, Redis 6379, 앱 8080
