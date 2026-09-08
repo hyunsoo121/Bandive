@@ -151,7 +151,10 @@ export interface MediaItem {
   source: string;
   /** 'YouTube' | 'Google Drive' | '링크' — 아이콘/경고 판단용 */
   platform: 'youtube' | 'drive' | 'other';
+  /** 표시용 날짜 문자열 (예: "9월 2일") */
   date: string;
+  /** 정렬용 등록 시각 (epoch ms) */
+  createdAtMs: number;
   kind: MediaKind;
   visibility: Visibility;
   /** 등록자 userId (수정·삭제 권한 판단) */

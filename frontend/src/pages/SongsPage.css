@@ -302,6 +302,29 @@
   gap: 12px;
   margin-top: 2px;
 }
+
+/* 연결된 영상 목록 */
+.songrow__media {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  border: 1px solid var(--color-neutral-300);
+  background: var(--color-bg);
+}
+.songrow__media:hover {
+  border-color: var(--color-text);
+}
+.songrow__media-thumb {
+  width: 64px;
+  height: 40px;
+  flex: none;
+  object-fit: cover;
+  border: 1px solid var(--color-neutral-300);
+}
+.songrow__media-thumb--empty {
+  background: repeating-linear-gradient(135deg, #9b9797 0 8px, #bab6b6 8px 16px);
+}
 .songrow__guest-add {
   font-size: 11px;
   font-weight: 700;

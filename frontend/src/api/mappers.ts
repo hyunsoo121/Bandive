@@ -178,6 +178,7 @@ export function toMedia(dto: MediaDto): MediaItem {
     source: PLATFORM_LABEL[dto.platform],
     platform: PLATFORM_KEY[dto.platform],
     date: shortDate(dto.createdAt),
+    createdAtMs: Date.parse(dto.createdAt) || 0,
     kind: dto.type === 'PERFORMANCE' ? '공연' : '합주',
     visibility: dto.visibility === 'LINK_PUBLIC' ? '링크 공개' : '멤버만',
     uploadedByUserId: String(dto.uploadedByUserId),

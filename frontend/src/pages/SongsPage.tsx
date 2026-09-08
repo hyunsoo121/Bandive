@@ -18,7 +18,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { useApp } from '../store/AppContext';
 import { useGuard } from '../hooks/useGuard';
 import { sessionChips, slotsOf } from '../lib/songs';
-import type { Song, SongFolder } from '../types';
+import type { MediaItem, Song, SongFolder } from '../types';
 import { Fab } from '../components/Fab';
 import { AddSongModal } from '../components/AddSongModal';
 import { PromptModal } from '../components/PromptModal';
@@ -63,6 +63,7 @@ export function SongsPage() {
     songFolders,
     members,
     guests,
+    media,
     voteSong,
     promoteSong,
     assignPart,
@@ -132,6 +133,19 @@ export function SongsPage() {
     () => songFolders.filter((f) => f.status === tab).sort((a, b) => a.position - b.position),
     [songFolders, tab],
   );
+
+  /** 곡 id → 연결된 영상들 (최근 등록 순). */
+  const mediaBySong = useMemo(() => {
+    const map = new Map<string, MediaItem[]>();
+    for (const m of media) {
+      if (m.bandId !== bandId || m.songId == null) continue;
+      const arr = map.get(m.songId) ?? [];
+      arr.push(m);
+      map.set(m.songId, arr);
+    }
+    for (const arr of map.values()) arr.sort((a, b) => b.createdAtMs - a.createdAtMs);
+    return map;
+  }, [media, bandId]);
 
   const tabSongs = useMemo(
     () => songs.filter((s) => s.bandId === bandId && s.status === tab),
@@ -333,6 +347,7 @@ export function SongsPage() {
                 folders={folders}
                 openId={openId}
                 assignOptions={assignOptions}
+                mediaBySong={mediaBySong}
                 canAddGuest={isOwner}
                 onToggleCollapse={() => g.folder && toggleCollapse(g.folder.id)}
                 onToggle={(id) => setOpenId((cur) => (cur === id ? null : id))}
@@ -404,6 +419,7 @@ interface GroupProps {
   folders: SongFolder[];
   openId: string | null;
   assignOptions: AssignOption[];
+  mediaBySong: Map<string, MediaItem[]>;
   canAddGuest: boolean;
   onToggleCollapse: () => void;
   onToggle: (id: string) => void;
@@ -426,6 +442,7 @@ function FolderGroup({
   folders,
   openId,
   assignOptions,
+  mediaBySong,
   canAddGuest,
   onToggleCollapse,
   onToggle,
@@ -540,6 +557,7 @@ function FolderGroup({
                 dragEnabled={dragEnabled}
                 open={openId === song.id}
                 assignOptions={assignOptions}
+                linkedMedia={mediaBySong.get(song.id) ?? []}
                 canAddGuest={canAddGuest}
                 folders={folders}
                 onToggle={() => onToggle(song.id)}
@@ -568,6 +586,7 @@ interface RowProps {
   dragEnabled: boolean;
   open: boolean;
   assignOptions: AssignOption[];
+  linkedMedia: MediaItem[];
   canAddGuest: boolean;
   folders: SongFolder[];
   onToggle: () => void;
@@ -587,6 +606,7 @@ function SongRow({
   dragEnabled,
   open,
   assignOptions,
+  linkedMedia,
   canAddGuest,
   folders,
   onToggle,
@@ -673,6 +693,9 @@ function SongRow({
             </span>
           ))}
           {hasRef && <span className="songrow__chip songrow__chip--ref">참고 영상</span>}
+          {linkedMedia.length > 0 && (
+            <span className="songrow__chip songrow__chip--ref">영상 {linkedMedia.length}</span>
+          )}
         </div>
 
         {!isGuest && folders.length > 0 && (
@@ -788,6 +811,38 @@ function SongRow({
                 >
                   {song.referenceVideoUrl}
                 </a>
+              </div>
+            )}
+
+            {linkedMedia.length > 0 && (
+              <div className="stack" style={{ gap: 6 }}>
+                <span className="kicker">연결된 영상 {linkedMedia.length}</span>
+                {linkedMedia.map((m) => (
+                  <a
+                    key={m.id}
+                    className="songrow__media"
+                    href={m.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {m.thumbnailUrl ? (
+                      <img
+                        className="songrow__media-thumb"
+                        src={m.thumbnailUrl}
+                        alt=""
+                        loading="lazy"
+                      />
+                    ) : (
+                      <span className="songrow__media-thumb songrow__media-thumb--empty" />
+                    )}
+                    <span className="stack" style={{ gap: 2, minWidth: 0, flex: 1 }}>
+                      <strong style={{ fontSize: 12, wordBreak: 'break-all' }}>{m.title}</strong>
+                      <span className="muted" style={{ fontSize: 10 }}>
+                        {m.kind} · {m.date} · {m.source}
+                      </span>
+                    </span>
+                  </a>
+                ))}
               </div>
             )}
           </div>
