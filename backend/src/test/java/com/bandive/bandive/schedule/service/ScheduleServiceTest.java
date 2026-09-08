@@ -225,48 +225,33 @@ class ScheduleServiceTest extends RepositoryTest {
 			.satisfies(ex -> assertThat(((NotFoundException) ex).getCode()).isEqualTo("MEMBER_NOT_FOUND"));
 	}
 
-	// ── 게스트 출결 ───────────────────────────────────────
+	// ── 게스트 참석 ───────────────────────────────────────
 
 	@Test
-	void 관리자는_게스트를_일정에_추가하고_세션을_바꾸고_제외한다() {
+	void 관리자는_게스트를_일정에_추가하고_제외한다() {
 		Long scheduleId = service.create(band.getId(), ownerId, req()).id();
 		Long guestId = em.persist(Fixtures.guest(band, "세션 드럼")).getId();
 		service.setAttendance(scheduleId, memberId, AttendanceStatus.ATTENDING);
 		em.flush();
 		em.clear();
 
-		ScheduleResponse set = service.setGuestAttendance(scheduleId, ownerId, guestId, "드럼");
+		ScheduleResponse set = service.setGuestAttendance(scheduleId, ownerId, guestId);
 		assertThat(set.attendees()).filteredOn(a -> a.guestId() != null)
 			.singleElement()
 			.satisfies(a -> assertThat(a.guestId()).isEqualTo(guestId),
 					a -> assertThat(a.nickname()).isEqualTo("세션 드럼"), a -> assertThat(a.userId()).isNull(),
-					a -> assertThat(a.session()).isEqualTo("드럼"),
 					a -> assertThat(a.status()).isEqualTo(AttendanceStatus.ATTENDING));
 		// 게스트는 멤버 참석 집계에 포함되지 않는다
 		assertThat(set.counts().attending()).isEqualTo(1);
 
-		// upsert — 세션만 바뀐다
-		service.setGuestAttendance(scheduleId, ownerId, guestId, "관객");
+		// 이미 있으면 중복 생성 안 함
+		service.setGuestAttendance(scheduleId, ownerId, guestId);
 		em.flush();
 		em.clear();
-		assertThat(attendances.findByScheduleIdAndGuestId(scheduleId, guestId).orElseThrow().getSession())
-			.isEqualTo("관객");
 		assertThat(attendances.findAllByScheduleId(scheduleId)).hasSize(2);
 
 		ScheduleResponse removed = service.removeGuestAttendance(scheduleId, ownerId, guestId);
 		assertThat(removed.attendees()).filteredOn(a -> a.guestId() != null).isEmpty();
-	}
-
-	@Test
-	void 세션_없이_게스트를_추가할_수_있다() {
-		Long scheduleId = service.create(band.getId(), ownerId, req()).id();
-		Long guestId = em.persist(Fixtures.guest(band, "관객1")).getId();
-		em.flush();
-
-		ScheduleResponse set = service.setGuestAttendance(scheduleId, ownerId, guestId, "  ");
-		assertThat(set.attendees()).filteredOn(a -> a.guestId() != null)
-			.singleElement()
-			.satisfies(a -> assertThat(a.session()).isNull());
 	}
 
 	@Test
@@ -275,7 +260,7 @@ class ScheduleServiceTest extends RepositoryTest {
 		Long guestId = em.persist(Fixtures.guest(band, "세션")).getId();
 		em.flush();
 
-		assertThatThrownBy(() -> service.setGuestAttendance(scheduleId, memberId, guestId, "드럼"))
+		assertThatThrownBy(() -> service.setGuestAttendance(scheduleId, memberId, guestId))
 			.isInstanceOf(ForbiddenException.class)
 			.satisfies(ex -> assertThat(((ForbiddenException) ex).getCode()).isEqualTo("NOT_BAND_OWNER"));
 	}
@@ -287,7 +272,7 @@ class ScheduleServiceTest extends RepositoryTest {
 		Long strayGuestId = em.persist(Fixtures.guest(other, "남")).getId();
 		em.flush();
 
-		assertThatThrownBy(() -> service.setGuestAttendance(scheduleId, ownerId, strayGuestId, "드럼"))
+		assertThatThrownBy(() -> service.setGuestAttendance(scheduleId, ownerId, strayGuestId))
 			.isInstanceOf(NotFoundException.class)
 			.satisfies(ex -> assertThat(((NotFoundException) ex).getCode()).isEqualTo("GUEST_NOT_FOUND"));
 	}

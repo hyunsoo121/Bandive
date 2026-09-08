@@ -6,26 +6,6 @@
   color: var(--color-neutral-600);
 }
 
-.guestpick__list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.guestpick__opt {
-  font-size: 12px;
-  font-weight: 700;
-  padding: 6px 10px;
-  border: 1px solid var(--color-neutral-400);
-  background: var(--color-bg);
-  color: var(--color-neutral-800);
-  cursor: pointer;
-}
-.guestpick__opt.is-on {
-  background: var(--color-text);
-  color: var(--color-bg);
-  border-color: var(--color-text);
-}
-
 .guestpick__add {
   display: flex;
   gap: 6px;
@@ -35,22 +15,44 @@
   min-width: 0;
 }
 
-.guestpick__sessions {
+/* 세로 리스트 */
+.guestpick__list {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  flex-direction: column;
+  border: 1px solid var(--color-neutral-300);
 }
-.guestpick__chip {
-  font-size: 12px;
-  font-weight: 700;
-  padding: 6px 10px;
-  border: 1px solid var(--color-neutral-400);
+.guestpick__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--color-divider);
   background: var(--color-bg);
-  color: var(--color-neutral-700);
   cursor: pointer;
+  text-align: left;
 }
-.guestpick__chip.is-on {
-  background: var(--color-accent);
-  color: #fff;
-  border-color: var(--color-accent);
+.guestpick__row:last-child {
+  border-bottom: 0;
+}
+.guestpick__row:hover:not(:disabled) {
+  background: var(--color-neutral-100);
+}
+.guestpick__row:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.guestpick__row-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.guestpick__row-session {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  background: var(--color-neutral-200);
+  color: var(--color-neutral-800);
 }

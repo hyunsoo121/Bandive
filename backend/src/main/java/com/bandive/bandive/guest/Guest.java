@@ -42,8 +42,16 @@ public class Guest extends BaseTimeEntity {
 	@Column(nullable = false, length = 50)
 	private String name;
 
+	/** 이 밴드에서 맡는 세션(악기 또는 "관객"). 미지정이면 null. */
+	@Column(length = 30)
+	private String session;
+
 	public void rename(String name) {
 		this.name = name;
+	}
+
+	public void changeSession(String session) {
+		this.session = session;
 	}
 
 }

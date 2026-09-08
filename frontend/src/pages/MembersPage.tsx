@@ -4,6 +4,7 @@ import { Avatar } from '../components/Avatar';
 import { PartsPickerModal } from '../components/PartsPickerModal';
 import { DangerConfirmModal } from '../components/DangerConfirmModal';
 import { PromptModal } from '../components/PromptModal';
+import { GuestSessionModal } from '../components/GuestSessionModal';
 import type { Guest, Member } from '../types';
 import './MembersPage.css';
 
@@ -21,6 +22,7 @@ export function MembersPage() {
     setBandLeader,
     addGuest,
     renameGuest,
+    setGuestSession,
     removeGuest,
     leaveBand,
     invite,
@@ -115,6 +117,9 @@ export function MembersPage() {
         canManage={isOwner}
         onAdd={(name) => runGuest(() => addGuest(name), '게스트를 추가하지 못했습니다.')}
         onRename={(id, name) => runGuest(() => renameGuest(id, name), '이름을 바꾸지 못했습니다.')}
+        onSetSession={(id, s) =>
+          runGuest(() => setGuestSession(id, s), '세션을 저장하지 못했습니다.')
+        }
         onRemove={(id) => runGuest(() => removeGuest(id), '게스트를 삭제하지 못했습니다.')}
       />
 
@@ -312,10 +317,18 @@ interface GuestSectionProps {
   canManage: boolean;
   onAdd: (name: string) => void;
   onRename: (id: string, name: string) => void;
+  onSetSession: (id: string, session: string | null) => void;
   onRemove: (id: string) => void;
 }
 
-function GuestSection({ guests, canManage, onAdd, onRename, onRemove }: GuestSectionProps) {
+function GuestSection({
+  guests,
+  canManage,
+  onAdd,
+  onRename,
+  onSetSession,
+  onRemove,
+}: GuestSectionProps) {
   const [open, setOpen] = useState(() => {
     try {
       return localStorage.getItem(GUESTS_OPEN_KEY) === '1';
@@ -326,6 +339,7 @@ function GuestSection({ guests, canManage, onAdd, onRename, onRemove }: GuestSec
   const [prompt, setPrompt] = useState<{ mode: 'add' } | { mode: 'rename'; guest: Guest } | null>(
     null,
   );
+  const [sessionFor, setSessionFor] = useState<Guest | null>(null);
 
   const toggle = () => {
     setOpen((v) => {
@@ -351,49 +365,70 @@ function GuestSection({ guests, canManage, onAdd, onRename, onRemove }: GuestSec
 
       {open && (
         <div className="members__guests-body">
-          {guests.length === 0 && (
-            <span className="muted" style={{ fontSize: 12 }}>
-              아직 등록된 게스트가 없습니다. 곡 세션 배정·일정 출결에 쓸 이름을 추가하세요.
-            </span>
-          )}
-          {guests.map((g) => (
-            <div key={g.id} className="members__guest-row">
-              <Avatar label={[...g.name][0] ?? '게'} size={24} color="var(--color-neutral-500)" />
-              <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600 }}>{g.name}</span>
-              {canManage && (
-                <>
-                  <button
-                    type="button"
-                    className="members__guest-btn"
-                    onClick={() => setPrompt({ mode: 'rename', guest: g })}
-                  >
-                    이름
-                  </button>
-                  <button
-                    type="button"
-                    className="members__guest-btn members__guest-btn--danger"
-                    onClick={() => {
-                      if (
-                        confirm(`게스트 "${g.name}" 를 삭제할까요? 세션 배정·출결에서도 빠집니다.`)
-                      )
-                        onRemove(g.id);
-                    }}
-                  >
-                    삭제
-                  </button>
-                </>
-              )}
-            </div>
-          ))}
-
           {canManage && (
             <button
               type="button"
               className="btn btn--sm members__guest-add"
               onClick={() => setPrompt({ mode: 'add' })}
             >
-              ＋ 게스트 추가
+              ＋ 새 게스트 추가
             </button>
+          )}
+
+          {guests.length === 0 ? (
+            <span className="muted" style={{ fontSize: 12 }}>
+              아직 등록된 게스트가 없습니다. 곡 세션 배정·일정 참석에 쓸 이름을 추가하세요.
+            </span>
+          ) : (
+            <div className="members__guest-list">
+              {guests.map((g) => (
+                <div key={g.id} className="members__guest-row">
+                  <Avatar
+                    label={[...g.name][0] ?? '게'}
+                    size={24}
+                    color="var(--color-neutral-500)"
+                  />
+                  <span className="stack" style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{g.name}</span>
+                    <span className="muted" style={{ fontSize: 10 }}>
+                      {g.session ? `세션 · ${g.session}` : '세션 미지정'}
+                    </span>
+                  </span>
+                  {canManage && (
+                    <>
+                      <button
+                        type="button"
+                        className="members__guest-btn"
+                        onClick={() => setSessionFor(g)}
+                      >
+                        세션
+                      </button>
+                      <button
+                        type="button"
+                        className="members__guest-btn"
+                        onClick={() => setPrompt({ mode: 'rename', guest: g })}
+                      >
+                        이름
+                      </button>
+                      <button
+                        type="button"
+                        className="members__guest-btn members__guest-btn--danger"
+                        onClick={() => {
+                          if (
+                            confirm(
+                              `게스트 "${g.name}" 를 삭제할까요? 세션 배정·참석에서도 빠집니다.`,
+                            )
+                          )
+                            onRemove(g.id);
+                        }}
+                      >
+                        삭제
+                      </button>
+                    </>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}
@@ -412,6 +447,18 @@ function GuestSection({ guests, canManage, onAdd, onRename, onRemove }: GuestSec
             setPrompt(null);
           }}
           onClose={() => setPrompt(null)}
+        />
+      )}
+
+      {sessionFor && (
+        <GuestSessionModal
+          name={sessionFor.name}
+          current={sessionFor.session}
+          onSave={(s) => {
+            onSetSession(sessionFor.id, s);
+            setSessionFor(null);
+          }}
+          onClose={() => setSessionFor(null)}
         />
       )}
     </div>

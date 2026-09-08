@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.bandive.bandive.auth.CurrentUser;
 import com.bandive.bandive.auth.UserPrincipal;
 import com.bandive.bandive.schedule.dto.AttendanceRequest;
-import com.bandive.bandive.schedule.dto.GuestAttendanceRequest;
 import com.bandive.bandive.schedule.dto.ScheduleCreateRequest;
 import com.bandive.bandive.schedule.dto.ScheduleResponse;
 import com.bandive.bandive.schedule.dto.ScheduleUpdateRequest;
@@ -73,12 +72,11 @@ public class ScheduleController {
 		return scheduleService.setMemberAttendance(scheduleId, actorUserId, userId, request.status());
 	}
 
-	/** 관리자가 게스트를 일정에 추가/수정 (세션 지정). */
+	/** 관리자가 게스트를 일정에 추가. */
 	@PostMapping("/api/schedules/{scheduleId}/attendance/guests/{guestId}")
 	public ScheduleResponse setGuestAttendance(@PathVariable Long scheduleId, @PathVariable Long guestId,
-			@CurrentUser Long actorUserId, @Valid @RequestBody(required = false) GuestAttendanceRequest request) {
-		return scheduleService.setGuestAttendance(scheduleId, actorUserId, guestId,
-				request == null ? null : request.session());
+			@CurrentUser Long actorUserId) {
+		return scheduleService.setGuestAttendance(scheduleId, actorUserId, guestId);
 	}
 
 	/** 관리자가 게스트를 일정에서 제외. */

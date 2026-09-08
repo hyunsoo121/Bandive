@@ -105,6 +105,20 @@ class GuestServiceTest extends RepositoryTest {
 	}
 
 	@Test
+	void 세션_설정은_관리자만_이고_빈값이면_지운다() {
+		Long guestId = service.create(band.getId(), ownerId, "세션맨").id();
+		em.flush();
+
+		assertThatThrownBy(() -> service.setSession(band.getId(), guestId, memberId, "드럼"))
+			.isInstanceOf(ForbiddenException.class);
+
+		assertThat(service.setSession(band.getId(), guestId, ownerId, "  드럼  ").session()).isEqualTo("드럼");
+		assertThat(service.setSession(band.getId(), guestId, ownerId, "관객").session()).isEqualTo("관객");
+		assertThat(service.setSession(band.getId(), guestId, ownerId, "   ").session()).isNull();
+		assertThat(service.setSession(band.getId(), guestId, ownerId, null).session()).isNull();
+	}
+
+	@Test
 	void 이름_수정_삭제는_관리자만() {
 		Long guestId = service.create(band.getId(), ownerId, "임시").id();
 		em.flush();

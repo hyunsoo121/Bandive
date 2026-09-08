@@ -73,6 +73,14 @@ public class GuestService {
 	}
 
 	@Transactional
+	public GuestResponse setSession(Long bandId, Long guestId, Long userId, String session) {
+		requireOwner(bandId, userId);
+		Guest guest = find(bandId, guestId);
+		guest.changeSession(session == null || session.isBlank() ? null : session.trim());
+		return GuestResponse.from(guest);
+	}
+
+	@Transactional
 	public void delete(Long bandId, Long guestId, Long userId) {
 		requireOwner(bandId, userId);
 		guests.delete(find(bandId, guestId));

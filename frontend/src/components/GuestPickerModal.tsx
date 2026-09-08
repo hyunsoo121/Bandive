@@ -1,10 +1,7 @@
 import { useState } from 'react';
 import type { Guest } from '../types';
-import { INSTRUMENTS } from '../types';
 import { Modal } from './Modal';
 import './GuestPickerModal.css';
-
-const SESSION_OPTIONS = [...INSTRUMENTS, '관객'];
 
 interface Props {
   /** 밴드에 등록된 게스트 전체 */
@@ -13,22 +10,17 @@ interface Props {
   addedGuestIds: string[];
   /** 새 게스트 등록 (관리자). 같은 이름이면 reject */
   onAddNew: (name: string) => Promise<Guest>;
-  /** 선택한 게스트를 일정에 추가 */
-  onConfirm: (guestId: string, session: string | null) => Promise<void>;
+  /** 선택(또는 새로 만든) 게스트를 일정에 추가 */
+  onPick: (guestId: string) => Promise<void>;
   onClose: () => void;
 }
 
-export function GuestPickerModal({ guests, addedGuestIds, onAddNew, onConfirm, onClose }: Props) {
+export function GuestPickerModal({ guests, addedGuestIds, onAddNew, onPick, onClose }: Props) {
   const available = guests.filter((g) => !addedGuestIds.includes(g.id));
 
-  const [guestId, setGuestId] = useState<string>('');
-  const [session, setSession] = useState<string>('');
-  const [customSession, setCustomSession] = useState('');
   const [newName, setNewName] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-
-  const effectiveSession = (session || customSession.trim()).slice(0, 30) || null;
 
   const addNew = async () => {
     const name = newName.trim();
@@ -37,21 +29,20 @@ export function GuestPickerModal({ guests, addedGuestIds, onAddNew, onConfirm, o
     setErr(null);
     try {
       const created = await onAddNew(name);
-      setNewName('');
-      setGuestId(created.id);
+      await onPick(created.id);
+      onClose();
     } catch (e) {
       setErr(e instanceof Error ? e.message : '게스트를 추가하지 못했습니다.');
-    } finally {
       setBusy(false);
     }
   };
 
-  const confirm = async () => {
-    if (!guestId || busy) return;
+  const pick = async (guestId: string) => {
+    if (busy) return;
     setBusy(true);
     setErr(null);
     try {
-      await onConfirm(guestId, effectiveSession);
+      await onPick(guestId);
       onClose();
     } catch (e) {
       setErr(e instanceof Error ? e.message : '일정에 추가하지 못했습니다.');
@@ -62,31 +53,44 @@ export function GuestPickerModal({ guests, addedGuestIds, onAddNew, onConfirm, o
   return (
     <Modal
       title="게스트 추가"
-      width={380}
+      width={360}
       onClose={onClose}
       footer={
-        <>
-          <button
-            type="button"
-            className="btn btn--primary"
-            style={{ flex: 1 }}
-            disabled={!guestId || busy}
-            onClick={confirm}
-          >
-            {busy ? '처리 중…' : '이 일정에 추가'}
-          </button>
-          <button type="button" className="btn" onClick={onClose} disabled={busy}>
-            취소
-          </button>
-        </>
+        <button type="button" className="btn" style={{ flex: 1 }} onClick={onClose} disabled={busy}>
+          닫기
+        </button>
       }
     >
       <div className="stack" style={{ gap: 14 }}>
-        <div className="stack" style={{ gap: 8 }}>
+        <div className="guestpick__add">
+          <input
+            className="input"
+            value={newName}
+            maxLength={50}
+            placeholder="새 게스트 이름"
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                void addNew();
+              }
+            }}
+          />
+          <button
+            type="button"
+            className="btn btn--sm btn--primary"
+            onClick={addNew}
+            disabled={!newName.trim() || busy}
+          >
+            추가
+          </button>
+        </div>
+
+        <div className="stack" style={{ gap: 6 }}>
           <span className="guestpick__label">등록된 게스트</span>
           {available.length === 0 ? (
             <span className="muted" style={{ fontSize: 12 }}>
-              선택할 수 있는 게스트가 없습니다. 아래에서 새로 추가하세요.
+              추가할 수 있는 게스트가 없습니다. 위에서 새로 만드세요.
             </span>
           ) : (
             <div className="guestpick__list">
@@ -94,70 +98,15 @@ export function GuestPickerModal({ guests, addedGuestIds, onAddNew, onConfirm, o
                 <button
                   key={g.id}
                   type="button"
-                  className={`guestpick__opt${guestId === g.id ? ' is-on' : ''}`}
-                  onClick={() => setGuestId(g.id)}
+                  className="guestpick__row"
+                  disabled={busy}
+                  onClick={() => pick(g.id)}
                 >
-                  {g.name}
+                  <span className="guestpick__row-name">{g.name}</span>
+                  {g.session && <span className="guestpick__row-session">{g.session}</span>}
                 </button>
               ))}
             </div>
-          )}
-          <div className="guestpick__add">
-            <input
-              className="input"
-              value={newName}
-              maxLength={50}
-              placeholder="새 게스트 이름"
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  void addNew();
-                }
-              }}
-            />
-            <button
-              type="button"
-              className="btn btn--sm"
-              onClick={addNew}
-              disabled={!newName.trim() || busy}
-            >
-              추가
-            </button>
-          </div>
-        </div>
-
-        <div className="stack" style={{ gap: 8 }}>
-          <span className="guestpick__label">세션 (선택)</span>
-          <div className="guestpick__sessions">
-            {SESSION_OPTIONS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                className={`guestpick__chip${session === s ? ' is-on' : ''}`}
-                onClick={() => {
-                  setSession((cur) => (cur === s ? '' : s));
-                  setCustomSession('');
-                }}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-          <input
-            className="input"
-            value={customSession}
-            maxLength={30}
-            placeholder="직접 입력 (예: 신디, 코러스)"
-            onChange={(e) => {
-              setCustomSession(e.target.value);
-              if (e.target.value) setSession('');
-            }}
-          />
-          {session === '' && customSession.trim() === '' && (
-            <span className="muted" style={{ fontSize: 11 }}>
-              비워두면 세션 미지정으로 추가됩니다.
-            </span>
           )}
         </div>
 

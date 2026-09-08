@@ -63,11 +63,13 @@ export interface Member {
 /** 악기 이름 → 필요 인원. 기본 악기 + 자유 문자열 악기(실로폰 등). */
 export type SessionShape = Record<string, number>;
 
-/** 게스트 멤버 — 계정 없이 이름만. 곡 세션 배정·일정 출결에만 쓰인다. 관리자만 관리. */
+/** 게스트 멤버 — 계정 없이 이름만. 곡 세션 배정·일정 참석에만 쓰인다. 관리자만 관리. */
 export interface Guest {
   id: string;
   bandId: string;
   name: string;
+  /** 이 밴드에서 맡는 세션(악기 또는 '관객'). 미지정이면 null */
+  session: string | null;
 }
 
 /** 곡의 파트 슬롯 하나. 백엔드 SongPart 를 화면에서 쓰기 좋게 줄인 것. */
@@ -117,8 +119,6 @@ export interface ScheduleAttendee {
   guestId: string | null;
   nickname: string;
   status: AttendanceStatus;
-  /** 게스트가 그 일정에서 맡는 세션(악기 또는 '관객'). 실멤버면 null */
-  session: string | null;
 }
 
 export interface ScheduleEvent {

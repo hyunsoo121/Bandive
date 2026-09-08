@@ -213,12 +213,8 @@ interface AppState {
     userId: string,
     status: AttendanceStatus,
   ) => Promise<void>;
-  /** 관리자가 게스트를 일정에 추가/수정 (세션 지정, upsert). null = 세션 미지정 */
-  setGuestAttendance: (
-    scheduleId: string,
-    guestId: string,
-    session: string | null,
-  ) => Promise<void>;
+  /** 관리자가 게스트를 일정에 추가 (이미 있으면 그대로). 게스트는 항상 참석 */
+  setGuestAttendance: (scheduleId: string, guestId: string) => Promise<void>;
   /** 관리자가 게스트를 일정에서 제외 */
   clearGuestAttendance: (scheduleId: string, guestId: string) => Promise<void>;
 
@@ -237,6 +233,8 @@ interface AppState {
   addGuest: (name: string) => Promise<Guest>;
   /** 게스트 이름 수정 (관리자) */
   renameGuest: (guestId: string, name: string) => Promise<void>;
+  /** 게스트 세션 설정 (관리자). null·빈 값이면 미지정 */
+  setGuestSession: (guestId: string, session: string | null) => Promise<void>;
   /** 게스트 삭제 (관리자) — 세션 배정·출결에서도 빠진다 */
   removeGuest: (guestId: string) => Promise<void>;
   /** 밴드 리더 지정/해제 (관리자). null = 리더 없음 */
@@ -570,6 +568,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [currentBandId],
   );
 
+  const setGuestSession = useCallback(
+    async (guestId: string, session: string | null) => {
+      if (!currentBandId) return;
+      const guest = toGuest(await guestApi.setGuestSession(currentBandId, guestId, session));
+      setGuests((prev) => prev.map((g) => (g.id === guestId ? guest : g)));
+    },
+    [currentBandId],
+  );
+
   const removeGuest = useCallback(
     async (guestId: string) => {
       if (!currentBandId) return;
@@ -771,17 +778,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const setGuestAttendance = useCallback(
-    async (scheduleId: string, guestId: string, session: string | null) => {
-      try {
-        const dto = await scheduleApi.setGuestAttendance(scheduleId, guestId, session);
-        setSchedules((prev) => prev.map((s) => (s.id === scheduleId ? toSchedule(dto) : s)));
-      } catch (e) {
-        console.error('게스트 추가 실패', e);
-      }
-    },
-    [],
-  );
+  const setGuestAttendance = useCallback(async (scheduleId: string, guestId: string) => {
+    try {
+      const dto = await scheduleApi.setGuestAttendance(scheduleId, guestId);
+      setSchedules((prev) => prev.map((s) => (s.id === scheduleId ? toSchedule(dto) : s)));
+    } catch (e) {
+      console.error('게스트 추가 실패', e);
+    }
+  }, []);
 
   const clearGuestAttendance = useCallback(async (scheduleId: string, guestId: string) => {
     try {
@@ -903,6 +907,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setBandLeader,
     addGuest,
     renameGuest,
+    setGuestSession,
     removeGuest,
     issueInviteCode,
     openSwitcher: () => setSwitcherOpen(true),

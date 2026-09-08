@@ -141,14 +141,12 @@ export type ScheduleTypeDto = 'REHEARSAL' | 'PERFORMANCE';
 export type AttendanceStatusDto = 'ATTENDING' | 'UNDECIDED' | 'ABSENT';
 
 export interface AttendeeDto {
-  /** 실멤버 출결이면 userId, 게스트 출결이면 null */
+  /** 실멤버 출결이면 userId, 게스트 참석이면 null */
   userId: number | null;
   /** 게스트 참석이면 guestId, 실멤버 출결이면 null */
   guestId: number | null;
   nickname: string;
   status: AttendanceStatusDto;
-  /** 게스트가 그 일정에서 맡는 세션(악기 또는 "관객"). 실멤버는 null */
-  session: string | null;
 }
 
 /* ── 게스트 멤버 (Guest) ─────────────────────────────────────── */
@@ -157,6 +155,8 @@ export interface GuestDto {
   id: number;
   bandId: number;
   name: string;
+  /** 이 밴드에서 맡는 세션(악기 또는 "관객"). 없으면 null */
+  session: string | null;
 }
 
 export interface ScheduleDto {

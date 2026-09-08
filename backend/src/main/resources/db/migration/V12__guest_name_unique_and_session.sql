@@ -2,6 +2,6 @@
 alter table band_guests
     add constraint uq_band_guest_name unique (band_id, name);
 
--- 게스트가 그 일정에서 맡는 세션(악기 또는 "관객"). 실멤버 출결에는 쓰지 않는다.
-alter table attendances
+-- 게스트가 밴드에서 맡는 세션(악기 또는 "관객"). 멤버 페이지 게스트 목록에서 설정한다.
+alter table band_guests
     add column session varchar(30);

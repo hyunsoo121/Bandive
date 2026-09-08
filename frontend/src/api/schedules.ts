@@ -34,9 +34,9 @@ export const setMemberAttendance = (
   status: AttendanceStatusDto,
 ) => api.post<ScheduleDto>(`/api/schedules/${scheduleId}/attendance/${userId}`, { status });
 
-/** 관리자가 게스트를 일정에 추가/수정 (세션 지정, upsert). 게스트는 항상 참석. */
-export const setGuestAttendance = (scheduleId: string, guestId: string, session: string | null) =>
-  api.post<ScheduleDto>(`/api/schedules/${scheduleId}/attendance/guests/${guestId}`, { session });
+/** 관리자가 게스트를 일정에 추가 (이미 있으면 그대로). 게스트는 항상 참석. */
+export const setGuestAttendance = (scheduleId: string, guestId: string) =>
+  api.post<ScheduleDto>(`/api/schedules/${scheduleId}/attendance/guests/${guestId}`);
 
 /** 관리자가 게스트를 일정에서 제외. */
 export const clearGuestAttendance = (scheduleId: string, guestId: string) =>

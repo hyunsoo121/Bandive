@@ -149,27 +149,18 @@ public class ScheduleService {
 						.build()));
 	}
 
-	/**
-	 * 관리자가 게스트를 일정에 추가/수정 (upsert). 게스트는 항상 참석(ATTENDING)이며, 그 일정에서 맡는 {@code session}(악기
-	 * 또는 "관객", null 허용)을 함께 기록한다.
-	 */
+	/** 관리자가 게스트를 일정에 추가 (이미 있으면 그대로). 게스트는 항상 참석(ATTENDING). */
 	@Transactional
-	public ScheduleResponse setGuestAttendance(Long scheduleId, Long actorUserId, Long guestId, String session) {
+	public ScheduleResponse setGuestAttendance(Long scheduleId, Long actorUserId, Long guestId) {
 		Schedule schedule = findSchedule(scheduleId);
 		Long bandId = schedule.getBand().getId();
 		requireOwner(bandId, actorUserId);
 		Guest guest = guests.findByIdAndBandId(guestId, bandId)
 			.orElseThrow(() -> new NotFoundException("GUEST_NOT_FOUND", "게스트를 찾을 수 없습니다."));
-		String cleanSession = trimToNull(session);
-		attendances.findByScheduleIdAndGuestId(scheduleId, guestId).ifPresentOrElse(existing -> {
-			existing.changeStatus(AttendanceStatus.ATTENDING);
-			existing.changeSession(cleanSession);
-		}, () -> attendances.save(Attendance.builder()
-			.schedule(schedule)
-			.guest(guest)
-			.status(AttendanceStatus.ATTENDING)
-			.session(cleanSession)
-			.build()));
+		if (attendances.findByScheduleIdAndGuestId(scheduleId, guestId).isEmpty()) {
+			attendances
+				.save(Attendance.builder().schedule(schedule).guest(guest).status(AttendanceStatus.ATTENDING).build());
+		}
 		return toResponse(schedule, actorUserId);
 	}
 

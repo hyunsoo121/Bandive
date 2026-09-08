@@ -62,7 +62,12 @@ export function toBand(dto: BandDto): Band {
 }
 
 export function toGuest(dto: GuestDto): Guest {
-  return { id: String(dto.id), bandId: String(dto.bandId), name: dto.name };
+  return {
+    id: String(dto.id),
+    bandId: String(dto.bandId),
+    name: dto.name,
+    session: dto.session ?? null,
+  };
 }
 
 export function toMember(dto: MemberDto, bandId: string): Member {
@@ -129,7 +134,6 @@ export function toSchedule(dto: ScheduleDto): ScheduleEvent {
       guestId: a.guestId != null ? String(a.guestId) : null,
       nickname: a.nickname,
       status: ATT_TO_KO[a.status],
-      session: a.session ?? null,
     })),
     mediaIds: dto.media.map((m) => String(m.id)),
   };

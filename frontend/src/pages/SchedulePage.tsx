@@ -108,10 +108,16 @@ export function SchedulePage() {
       return { ...m, status: found?.status ?? ('미정' as AttendanceStatus) };
     })
     .sort((a, b) => attRank(a.status) - attRank(b.status));
-  // 게스트는 그 일정에 추가된 사람만 보여준다 (전체 등록 게스트 목록이 아님).
+  // 게스트는 그 일정에 추가된 사람만 보여준다 (전체 등록 게스트 목록이 아님). 세션은 밴드 게스트 정보에서 가져온다.
+  const guestSessionOf = (guestId: string) =>
+    allGuests.find((g) => g.id === guestId)?.session ?? null;
   const guestRows = (selected?.attendees ?? [])
     .filter((a) => a.guestId != null)
-    .map((a) => ({ guestId: a.guestId as string, nickname: a.nickname, session: a.session }))
+    .map((a) => ({
+      guestId: a.guestId as string,
+      nickname: a.nickname,
+      session: guestSessionOf(a.guestId as string),
+    }))
     .sort((a, b) => a.nickname.localeCompare(b.nickname, 'ko'));
   const addedGuestIds = guestRows.map((g) => g.guestId);
   const goingCount = selected?.counts.attending ?? 0;
@@ -459,7 +465,7 @@ export function SchedulePage() {
           guests={allGuests}
           addedGuestIds={addedGuestIds}
           onAddNew={addGuest}
-          onConfirm={(guestId, session) => setGuestAttendance(selected.id, guestId, session)}
+          onPick={(guestId) => setGuestAttendance(selected.id, guestId)}
           onClose={() => setGuestPickerOpen(false)}
         />
       )}
