@@ -155,7 +155,7 @@ public class SongService {
 		return new VoteResult(votes.countBySongId(songId), false);
 	}
 
-	/** WISHLIST → CONFIRMED (밴드장). */
+	/** WISHLIST → CONFIRMED (관리자). */
 	@Transactional
 	public SongResponse confirm(Long songId, Long userId) {
 		Song song = findSongWithDetails(songId);
@@ -187,7 +187,7 @@ public class SongService {
 		return toResponse(song, actorUserId);
 	}
 
-	/** 곡 삭제 (밴드장). song_parts·votes 는 cascade. */
+	/** 곡 삭제 (관리자). song_parts·votes 는 cascade. */
 	@Transactional
 	public void delete(Long songId, Long userId) {
 		Song song = findSong(songId);

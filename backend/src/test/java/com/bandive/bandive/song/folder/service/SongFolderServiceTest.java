@@ -73,7 +73,7 @@ class SongFolderServiceTest extends RepositoryTest {
 	}
 
 	@Test
-	void 생성은_밴드장만_이고_목록_끝에_붙는다() {
+	void 생성은_관리자만_이고_목록_끝에_붙는다() {
 		assertThatThrownBy(() -> service.create(band.getId(), memberId, req("커버곡", SongStatus.WISHLIST)))
 			.isInstanceOf(ForbiddenException.class);
 

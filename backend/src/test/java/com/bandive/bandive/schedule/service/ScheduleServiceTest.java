@@ -148,7 +148,7 @@ class ScheduleServiceTest extends RepositoryTest {
 	}
 
 	@Test
-	void 밴드장은_일정을_삭제하고_출결도_함께_사라진다() {
+	void 관리자는_일정을_삭제하고_출결도_함께_사라진다() {
 		Long scheduleId = service.create(band.getId(), ownerId, req()).id();
 		service.setAttendance(scheduleId, memberId, AttendanceStatus.ATTENDING);
 		em.flush();

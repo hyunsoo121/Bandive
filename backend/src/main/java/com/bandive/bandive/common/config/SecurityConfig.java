@@ -26,7 +26,7 @@ import com.bandive.bandive.common.security.RestAuthenticationEntryPoint;
 
 /**
  * 인증: 카카오 oauth2Login (세션 대신 쿠키에 authorization request). 인가: 공개 GET / 그 외 인증. API 는
- * STATELESS + Bearer JWT. 밴드장 전용은 메서드 단위 {@code @PreAuthorize}.
+ * STATELESS + Bearer JWT. 관리자 전용은 메서드 단위 {@code @PreAuthorize}.
  */
 @Configuration
 @EnableWebSecurity

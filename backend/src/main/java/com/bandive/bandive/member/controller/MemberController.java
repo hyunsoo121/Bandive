@@ -44,7 +44,7 @@ public class MemberController {
 		return memberService.updateMyParts(bandId, userId, request);
 	}
 
-	/** 밴드장이 특정 멤버의 파트 설정/해제. */
+	/** 관리자가 특정 멤버의 파트 설정/해제. */
 	@PatchMapping("/{userId}")
 	@PreAuthorize("@bandGuard.isOwner(#bandId)")
 	public MemberResponse updateMemberParts(@PathVariable Long bandId, @PathVariable Long userId,
@@ -67,7 +67,7 @@ public class MemberController {
 		memberService.leave(bandId, userId);
 	}
 
-	/** 추방 (밴드장). */
+	/** 추방 (관리자). */
 	@DeleteMapping("/{userId}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	@PreAuthorize("@bandGuard.isOwner(#bandId)")

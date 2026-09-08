@@ -20,7 +20,7 @@ export const createSchedule = (bandId: string, body: ScheduleCreateBody) =>
 export const updateSchedule = (scheduleId: string, body: Partial<ScheduleCreateBody>) =>
   api.patch<ScheduleDto>(`/api/schedules/${scheduleId}`, body);
 
-/** 일정 삭제 (밴드장). attendances cascade. */
+/** 일정 삭제 (관리자). attendances cascade. */
 export const deleteSchedule = (scheduleId: string) => api.del<void>(`/api/schedules/${scheduleId}`);
 
 /** 내 참석 여부 등록/변경 (밴드 멤버) — upsert. */

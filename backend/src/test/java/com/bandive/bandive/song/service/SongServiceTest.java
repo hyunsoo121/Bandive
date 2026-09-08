@@ -161,7 +161,7 @@ class SongServiceTest extends RepositoryTest {
 	// ── confirm ──────────────────────────────────────────
 
 	@Test
-	void 밴드장은_곡을_확정한다() {
+	void 관리자는_곡을_확정한다() {
 		Long songId = service.add(band.getId(), memberId, manual(null)).id();
 		em.flush();
 
@@ -223,7 +223,7 @@ class SongServiceTest extends RepositoryTest {
 	// ── delete ───────────────────────────────────────────
 
 	@Test
-	void 밴드장은_곡을_삭제하고_파트_투표도_함께_사라진다() {
+	void 관리자는_곡을_삭제하고_파트_투표도_함께_사라진다() {
 		Long songId = service.add(band.getId(), memberId, manual(List.of(new SessionSlot("GUITAR", 1)))).id();
 		service.vote(songId, memberId);
 		em.flush();
@@ -272,7 +272,7 @@ class SongServiceTest extends RepositoryTest {
 		assertThatThrownBy(() -> service.moveToFolder(songId, outsiderId, wishFolder.getId()))
 			.isInstanceOf(ForbiddenException.class);
 
-		// 밴드장이 아닌 일반 멤버도 옮길 수 있다
+		// 관리자가 아닌 일반 멤버도 옮길 수 있다
 		assertThat(service.moveToFolder(songId, memberId, wishFolder.getId()).folderId()).isEqualTo(wishFolder.getId());
 
 		// WISHLIST 곡을 CONFIRMED 폴더로는 못 옮긴다

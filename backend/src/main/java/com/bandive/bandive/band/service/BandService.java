@@ -103,7 +103,7 @@ public class BandService {
 		return BandResponse.from(band, bandMembers.countByBandId(bandId), BandRole.OWNER);
 	}
 
-	/** 밴드장 위임 — 대상은 OWNER, 이전 밴드장은 MEMBER 로. 대상 == 본인이면 no-op. */
+	/** 관리자 위임 — 대상은 OWNER, 이전 관리자는 MEMBER 로. 대상 == 본인이면 no-op. */
 	@Transactional
 	public void transferOwnership(Long bandId, Long currentOwnerId, Long targetUserId) {
 		if (currentOwnerId.equals(targetUserId)) {

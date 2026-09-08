@@ -61,7 +61,7 @@ class InviteControllerTest {
 	}
 
 	@Test
-	void 밴드장은_초대코드를_발급받는다() throws Exception {
+	void 관리자는_초대코드를_발급받는다() throws Exception {
 		given(bandGuard.isOwner(1L)).willReturn(true);
 		given(inviteService.issue(1L)).willReturn(CODE);
 
@@ -72,7 +72,7 @@ class InviteControllerTest {
 	}
 
 	@Test
-	void 밴드장이_아니면_발급_403() throws Exception {
+	void 관리자가_아니면_발급_403() throws Exception {
 		given(bandGuard.isOwner(1L)).willReturn(false);
 
 		mvc.perform(post("/api/bands/1/invite-codes").with(asUser(7L)))

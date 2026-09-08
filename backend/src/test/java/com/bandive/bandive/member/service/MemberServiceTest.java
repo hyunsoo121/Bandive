@@ -93,7 +93,7 @@ class MemberServiceTest extends RepositoryTest {
 	}
 
 	@Test
-	void 밴드장이_남의_파트를_설정한다() {
+	void 관리자가_남의_파트를_설정한다() {
 		join("owner", BandRole.OWNER, "2026-09-01T00:00:00Z");
 		BandMember target = join("m", BandRole.MEMBER, "2026-09-02T00:00:00Z");
 		em.flush();
@@ -158,7 +158,7 @@ class MemberServiceTest extends RepositoryTest {
 	}
 
 	@Test
-	void 밴드장은_추방할_수_없다_409() {
+	void 관리자는_추방할_수_없다_409() {
 		BandMember owner = join("owner", BandRole.OWNER, "2026-09-01T00:00:00Z");
 		em.flush();
 
@@ -187,7 +187,7 @@ class MemberServiceTest extends RepositoryTest {
 	}
 
 	@Test
-	void 밴드장은_탈퇴할_수_없다_409() {
+	void 관리자는_탈퇴할_수_없다_409() {
 		BandMember owner = join("owner", BandRole.OWNER, "2026-09-01T00:00:00Z");
 		em.flush();
 

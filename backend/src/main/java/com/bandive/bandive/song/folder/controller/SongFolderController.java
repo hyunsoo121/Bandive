@@ -44,7 +44,7 @@ public class SongFolderController {
 		return folderService.create(bandId, userId, request);
 	}
 
-	/** 한 status 안에서 폴더 순서 재지정 (밴드장). */
+	/** 한 status 안에서 폴더 순서 재지정 (관리자). */
 	@PutMapping("/api/bands/{bandId}/song-folders/order")
 	public List<SongFolderResponse> reorder(@PathVariable Long bandId, @CurrentUser Long userId,
 			@Valid @RequestBody FolderOrderRequest request) {

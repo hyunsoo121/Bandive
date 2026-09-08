@@ -9,13 +9,13 @@ export const listMedia = (bandId: string, scheduleId?: string) =>
 export const addMedia = (bandId: string, body: MediaCreateBody) =>
   api.post<MediaDto>(`/api/bands/${bandId}/media`, body);
 
-/** 부분 수정 (URL·제목·종류·공개범위·연결일정) — 등록자 본인 또는 밴드장. */
+/** 부분 수정 (URL·제목·종류·공개범위·연결일정) — 등록자 본인 또는 관리자. */
 export const updateMedia = (mediaId: string, body: MediaUpdateBody) =>
   api.patch<MediaDto>(`/api/media/${mediaId}`, body);
 
-/** 공개 범위만 변경 — 등록자 본인 또는 밴드장. (updateMedia 로도 가능) */
+/** 공개 범위만 변경 — 등록자 본인 또는 관리자. (updateMedia 로도 가능) */
 export const changeVisibility = (mediaId: string, visibility: MediaVisibilityDto) =>
   api.patch<MediaDto>(`/api/media/${mediaId}/visibility`, { visibility });
 
-/** 영상 삭제 (등록자 본인 또는 밴드장). */
+/** 영상 삭제 (등록자 본인 또는 관리자). */
 export const deleteMedia = (mediaId: string) => api.del<void>(`/api/media/${mediaId}`);

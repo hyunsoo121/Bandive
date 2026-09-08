@@ -64,14 +64,14 @@ class MemberControllerTest {
 	@Test
 	void 멤버_목록은_공개다() throws Exception {
 		given(memberService.list(1L)).willReturn(List.of(
-				new MemberResponse(10L, "밴드장", BandRole.OWNER, true, List.of("GUITAR"),
+				new MemberResponse(10L, "관리자", BandRole.OWNER, true, List.of("GUITAR"),
 						Instant.parse("2026-09-01T00:00:00Z")),
 				new MemberResponse(11L, "멤버", BandRole.MEMBER, false, List.of(),
 						Instant.parse("2026-09-02T00:00:00Z"))));
 
 		mvc.perform(get("/api/bands/1/members"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$[0].nickname").value("밴드장"))
+			.andExpect(jsonPath("$[0].nickname").value("관리자"))
 			.andExpect(jsonPath("$[0].role").value("OWNER"))
 			.andExpect(jsonPath("$[0].parts[0]").value("GUITAR"))
 			.andExpect(jsonPath("$[1].userId").value(11));
@@ -90,7 +90,7 @@ class MemberControllerTest {
 	}
 
 	@Test
-	void 남의_파트_설정은_밴드장이_아니면_403() throws Exception {
+	void 남의_파트_설정은_관리자가_아니면_403() throws Exception {
 		given(bandGuard.isOwner(1L)).willReturn(false);
 
 		mvc.perform(patch("/api/bands/1/members/9").with(asUser(7L))
@@ -99,7 +99,7 @@ class MemberControllerTest {
 	}
 
 	@Test
-	void 리더_지정은_밴드장이면_200_이고_목록을_돌려준다() throws Exception {
+	void 리더_지정은_관리자면_200_이고_목록을_돌려준다() throws Exception {
 		given(bandGuard.isOwner(1L)).willReturn(true);
 		given(memberService.assignLeader(1L, 9L)).willReturn(List.of(new MemberResponse(9L, "리더", BandRole.MEMBER, true,
 				List.of("VOCAL"), Instant.parse("2026-09-01T00:00:00Z"))));
@@ -110,7 +110,7 @@ class MemberControllerTest {
 	}
 
 	@Test
-	void 리더_지정은_밴드장이_아니면_403() throws Exception {
+	void 리더_지정은_관리자가_아니면_403() throws Exception {
 		given(bandGuard.isOwner(1L)).willReturn(false);
 
 		mvc.perform(put("/api/bands/1/members/leader").with(asUser(7L))
@@ -119,7 +119,7 @@ class MemberControllerTest {
 	}
 
 	@Test
-	void 추방은_밴드장이면_204() throws Exception {
+	void 추방은_관리자면_204() throws Exception {
 		given(bandGuard.isOwner(1L)).willReturn(true);
 
 		mvc.perform(delete("/api/bands/1/members/9").with(asUser(7L))).andExpect(status().isNoContent());
@@ -127,7 +127,7 @@ class MemberControllerTest {
 	}
 
 	@Test
-	void 추방은_밴드장이_아니면_403() throws Exception {
+	void 추방은_관리자가_아니면_403() throws Exception {
 		given(bandGuard.isOwner(1L)).willReturn(false);
 
 		mvc.perform(delete("/api/bands/1/members/9").with(asUser(7L)))

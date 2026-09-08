@@ -132,7 +132,7 @@ class MediaServiceTest extends RepositoryTest {
 	}
 
 	@Test
-	void 공개범위_변경은_등록자_본인_또는_밴드장() {
+	void 공개범위_변경은_등록자_본인_또는_관리자() {
 		Long mediaId = service
 			.create(band.getId(), memberId, req("https://a.com/x", MediaVisibility.MEMBERS_ONLY, null))
 			.id();
@@ -142,7 +142,7 @@ class MediaServiceTest extends RepositoryTest {
 		assertThat(service.changeVisibility(mediaId, memberId, MediaVisibility.LINK_PUBLIC).visibility())
 			.isEqualTo(MediaVisibility.LINK_PUBLIC); // 등록자 본인
 		assertThat(service.changeVisibility(mediaId, ownerId, MediaVisibility.MEMBERS_ONLY).visibility())
-			.isEqualTo(MediaVisibility.MEMBERS_ONLY); // 밴드장
+			.isEqualTo(MediaVisibility.MEMBERS_ONLY); // 관리자
 
 		assertThatThrownBy(() -> service.changeVisibility(mediaId, thirdId, MediaVisibility.LINK_PUBLIC))
 			.isInstanceOf(ForbiddenException.class)
@@ -169,21 +169,21 @@ class MediaServiceTest extends RepositoryTest {
 	}
 
 	@Test
-	void 부분수정은_등록자가_아니면_밴드장이어야() {
+	void 부분수정은_등록자가_아니면_관리자여야() {
 		Long mediaId = service.create(band.getId(), memberId, req("https://a.com/x", MediaVisibility.LINK_PUBLIC, null))
 			.id();
 		Long thirdId = joinMember("third", BandRole.MEMBER);
 		em.flush();
 
-		assertThat(service.update(mediaId, ownerId, new MediaUpdateRequest(null, null, null, "밴드장이 고침", null)).title())
-			.isEqualTo("밴드장이 고침");
+		assertThat(service.update(mediaId, ownerId, new MediaUpdateRequest(null, null, null, "관리자가 고침", null)).title())
+			.isEqualTo("관리자가 고침");
 		assertThatThrownBy(
 				() -> service.update(mediaId, thirdId, new MediaUpdateRequest(null, null, null, "남이 고침", null)))
 			.isInstanceOf(ForbiddenException.class);
 	}
 
 	@Test
-	void 삭제는_등록자_본인_또는_밴드장() {
+	void 삭제는_등록자_본인_또는_관리자() {
 		Long mine = service.create(band.getId(), memberId, req("https://a.com/mine", MediaVisibility.LINK_PUBLIC, null))
 			.id();
 		Long ownersUpload = service
@@ -193,7 +193,7 @@ class MediaServiceTest extends RepositoryTest {
 		em.flush();
 
 		service.delete(mine, memberId); // 등록자 본인
-		service.delete(ownersUpload, ownerId); // 밴드장이 자기 것
+		service.delete(ownersUpload, ownerId); // 관리자가 자기 것
 		em.flush();
 		assertThat(media.findById(mine)).isEmpty();
 

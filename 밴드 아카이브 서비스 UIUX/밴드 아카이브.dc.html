@@ -599,7 +599,7 @@
                 <div style="height: 72px; border: 2px dashed var(--color-neutral-500); display: flex; align-items: center; justify-content: center; font-size: 11px; color: var(--color-neutral-600); cursor: pointer">이미지 업로드</div>
               </div>
             </div>
-            <span style="font-size: 11px; color: var(--color-neutral-700); line-height: 1.5">만들면 내가 밴드장이 되고, 초대 코드가 바로 발급됩니다.</span>
+            <span style="font-size: 11px; color: var(--color-neutral-700); line-height: 1.5">만들면 내가 관리자가 되고, 초대 코드가 바로 발급됩니다.</span>
           </div>
           <div style="padding: 16px; border-top: 2px solid var(--color-text); display: flex; gap: 8px">
             <span onClick="{{ createBand }}" style="flex: 1; padding: 12px 14px; font-size: 13px; font-weight: 700; background: {{ createBtnBg }}; color: #fff; cursor: pointer">밴드 만들기</span>
@@ -764,7 +764,7 @@
 
   <div style="width: 100%; max-width: 1240px; font-size: 12px; color: var(--color-neutral-700); display: flex; gap: 18px; flex-wrap: wrap">
     <span>탭바·필터·투표·승격·출결·초대 코드가 모두 동작합니다.</span>
-    <span>역할을 바꾸면 밴드장 전용 액션과 비회원 제한이 반영됩니다.</span>
+    <span>역할을 바꾸면 관리자 전용 액션과 비회원 제한이 반영됩니다.</span>
   </div>
 </div>
 
@@ -872,7 +872,7 @@ class Component extends DCLogic {
     const band = allBands.filter(b => b.id === st.bandId)[0] || allBands[0];
     const isOwner = st.role === 'owner';
     const isGuest = st.role === 'guest';
-    const roleLabel = isOwner ? '밴드장' : isGuest ? '비회원' : '사용자';
+    const roleLabel = isOwner ? '관리자' : isGuest ? '비회원' : '사용자';
 
     const views = [
       { key: 'mobile', label: '모바일' },
@@ -880,7 +880,7 @@ class Component extends DCLogic {
     ].map(v => ({ label: v.label, bg: st.view === v.key ? INK : 'transparent', fg: st.view === v.key ? BG : INK, pick: () => this.setState({ view: v.key }) }));
 
     const roles = [
-      { key: 'owner', label: '밴드장' },
+      { key: 'owner', label: '관리자' },
       { key: 'member', label: '사용자' },
       { key: 'guest', label: '비회원' },
     ].map(r => ({ label: r.label, bg: st.role === r.key ? ACCENT : 'transparent', fg: st.role === r.key ? '#fff' : INK, pick: () => this.setState({ role: r.key, loginOpen: false }) }));
@@ -997,7 +997,7 @@ class Component extends DCLogic {
 
     const members = MEMBERS.filter(m => st.kicked.indexOf(m.name) < 0).map(m => ({
       name: m.name, part: m.part, initial: m.name.slice(-1), avBg: m.avBg,
-      role: m.role === 'owner' ? '밴드장' : '사용자',
+      role: m.role === 'owner' ? '관리자' : '사용자',
       roleBg: m.role === 'owner' ? ACCENT : N200,
       roleFg: m.role === 'owner' ? '#fff' : N800,
       canKick: isOwner && m.role !== 'owner',
@@ -1066,7 +1066,7 @@ class Component extends DCLogic {
 
     const bandList = allBands.map(b => ({
       name: b.name, initial: b.initial, note: b.note,
-      sub: '멤버 ' + b.members + '명 · ' + (b.role === 'owner' ? '밴드장' : '사용자'),
+      sub: '멤버 ' + b.members + '명 · ' + (b.role === 'owner' ? '관리자' : '사용자'),
       bg: b.id === st.bandId ? '#fff2ef' : 'transparent',
       mark: b.id === st.bandId ? '●' : '',
       avBg: b.id === st.bandId ? ACCENT : INK,

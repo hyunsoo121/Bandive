@@ -84,7 +84,7 @@ export interface NewScheduleInput {
   location: string;
 }
 
-/** 현재 밴드의 초대 코드 (밴드장이 발급/재발급한 뒤에만 채워진다 — 조회 전용 API 가 없어서). */
+/** 현재 밴드의 초대 코드 (관리자가 발급/재발급한 뒤에만 채워진다 — 조회 전용 API 가 없어서). */
 export interface InviteInfo {
   code: string;
   url: string;
@@ -146,17 +146,17 @@ interface AppState {
   createBand: (name: string) => Promise<void>;
   /** 초대 코드로 가입 → 가입한 밴드 반환 */
   joinByInvite: (code: string) => Promise<Band>;
-  /** 밴드 이름·소개 수정 (밴드장) */
+  /** 밴드 이름·소개 수정 (관리자) */
   updateBand: (name: string, description: string | null) => Promise<void>;
-  /** 밴드장 위임 (밴드장) */
+  /** 관리자 위임 (관리자) */
   transferOwnership: (userId: string) => Promise<void>;
-  /** 밴드 삭제 (밴드장) → 홈으로 */
+  /** 밴드 삭제 (관리자) → 홈으로 */
   deleteBand: () => Promise<void>;
-  /** 밴드 탈퇴 (일반 멤버) → 홈으로. 밴드장은 불가(위임/삭제 먼저) */
+  /** 밴드 탈퇴 (일반 멤버) → 홈으로. 관리자는 불가(위임/삭제 먼저) */
   leaveBand: () => Promise<void>;
-  /** 밴드 로고 이미지 업로드 (밴드장) */
+  /** 밴드 로고 이미지 업로드 (관리자) */
   uploadBandLogo: (file: File) => Promise<void>;
-  /** 밴드 배너 이미지 업로드 (밴드장) */
+  /** 밴드 배너 이미지 업로드 (관리자) */
   uploadBandBanner: (file: File) => Promise<void>;
 
   /** 투표 토글 (POST/DELETE /api/songs/{id}/vote) */
@@ -167,7 +167,7 @@ interface AppState {
   assignPart: (songId: string, slotKey: string, memberName: string) => Promise<void>;
   /** 곡 추가 (POST /api/bands/{id}/songs) */
   addSong: (input: NewSongInput) => Promise<void>;
-  /** 곡 삭제 (밴드장) */
+  /** 곡 삭제 (관리자) */
   removeSong: (songId: string) => Promise<void>;
   /** 곡을 폴더로 이동 (멤버 누구나). folderId null = 미분류. 대상 그룹 맨 끝으로 */
   moveSongToFolder: (songId: string, folderId: string | null) => Promise<void>;
@@ -177,36 +177,36 @@ interface AppState {
     folderId: string | null,
     songIds: string[],
   ) => Promise<void>;
-  /** 곡 폴더 생성 (밴드장) */
+  /** 곡 폴더 생성 (관리자) */
   createSongFolder: (name: string, status: Song['status']) => Promise<void>;
-  /** 곡 폴더 이름 변경 (밴드장) */
+  /** 곡 폴더 이름 변경 (관리자) */
   renameSongFolder: (folderId: string, name: string) => Promise<void>;
-  /** 곡 폴더 삭제 (밴드장) — 소속 곡은 미분류로 */
+  /** 곡 폴더 삭제 (관리자) — 소속 곡은 미분류로 */
   removeSongFolder: (folderId: string) => Promise<void>;
-  /** 한 status 안에서 폴더 순서 재지정 (밴드장) */
+  /** 한 status 안에서 폴더 순서 재지정 (관리자) */
   reorderSongFolders: (status: Song['status'], folderIds: string[]) => Promise<void>;
 
   /** 일정 등록 (POST /api/bands/{id}/schedules) */
   addSchedule: (input: NewScheduleInput) => Promise<void>;
-  /** 일정 삭제 (밴드장) */
+  /** 일정 삭제 (관리자) */
   removeSchedule: (scheduleId: string) => Promise<void>;
   /** 내 참석 여부 등록/변경 (POST /api/schedules/{id}/attendance) */
   setAttendance: (scheduleId: string, status: AttendanceStatus) => Promise<void>;
 
   /** 영상 URL 첨부 (POST /api/bands/{id}/media) */
   addMedia: (input: NewMediaInput) => Promise<void>;
-  /** 영상 수정 (PATCH /api/media/{id}) — 등록자 본인 또는 밴드장 */
+  /** 영상 수정 (PATCH /api/media/{id}) — 등록자 본인 또는 관리자 */
   editMedia: (mediaId: string, input: EditMediaInput) => Promise<void>;
-  /** 영상 삭제 (등록자 본인 또는 밴드장) */
+  /** 영상 삭제 (등록자 본인 또는 관리자) */
   removeMedia: (mediaId: string) => Promise<void>;
 
-  /** 멤버 추방 (밴드장) — userId */
+  /** 멤버 추방 (관리자) — userId */
   kickMember: (userId: string) => Promise<void>;
   /** 멤버 세션(파트) 전체 교체. 본인 또는 관리자 */
   setMemberParts: (userId: string, parts: string[]) => Promise<void>;
   /** 밴드 리더 지정/해제 (관리자). null = 리더 없음 */
   setBandLeader: (userId: string | null) => Promise<void>;
-  /** 초대 코드 발급/재발급 (밴드장) */
+  /** 초대 코드 발급/재발급 (관리자) */
   issueInviteCode: () => Promise<void>;
 
   openSwitcher: () => void;

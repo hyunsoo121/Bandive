@@ -23,7 +23,7 @@ import com.bandive.bandive.song.folder.dto.FolderOrderRequest;
 import com.bandive.bandive.song.folder.dto.SongFolderResponse;
 
 /**
- * 곡 폴더 관리. 생성·이름변경·삭제·순서변경은 모두 밴드장만. 목록 조회는 공개.
+ * 곡 폴더 관리. 생성·이름변경·삭제·순서변경은 모두 관리자만. 목록 조회는 공개.
  */
 @Service
 @Transactional(readOnly = true)

@@ -82,7 +82,7 @@ public class MediaService {
 	}
 
 	/**
-	 * 부분 수정 — 등록자 본인 또는 밴드장. null 필드는 유지. URL 이 바뀌면 platform 을 다시 판별한다.
+	 * 부분 수정 — 등록자 본인 또는 관리자. null 필드는 유지. URL 이 바뀌면 platform 을 다시 판별한다.
 	 */
 	@Transactional
 	public MediaResponse update(Long mediaId, Long userId, MediaUpdateRequest request) {
@@ -101,7 +101,7 @@ public class MediaService {
 		return MediaResponse.from(found);
 	}
 
-	/** 공개 범위 변경 — 등록자 본인 또는 밴드장. */
+	/** 공개 범위 변경 — 등록자 본인 또는 관리자. */
 	@Transactional
 	public MediaResponse changeVisibility(Long mediaId, Long userId, MediaVisibility visibility) {
 		Media found = findMedia(mediaId);
@@ -110,7 +110,7 @@ public class MediaService {
 		return MediaResponse.from(found);
 	}
 
-	/** 삭제 — 등록자 본인 또는 밴드장. */
+	/** 삭제 — 등록자 본인 또는 관리자. */
 	@Transactional
 	public void delete(Long mediaId, Long userId) {
 		Media found = findMedia(mediaId);

@@ -341,12 +341,12 @@ CGLIB 프록시가 생기는데 부모의 `final` setter 를 못 감싼다는 **
 
 ### 초대 코드가 멤버 화면에 안 보인다
 
-**증상.** 밴드장인데 멤버 탭에 초대 코드가 없음.
+**증상.** 관리자인데 멤버 탭에 초대 코드가 없음.
 
 **원인.** 버그 아님. 초대 코드 **조회** API 가 없다 (`POST` 발급/재발급만 있음). 발급을 눌러야 표시된다.
 `POST` 를 다시 부르면 이전 코드는 폐기되므로 자동 호출하지 않는 것.
 
-### 밴드장인데 밴드 전환 시트에 "사용자" 로 표시된다
+### 관리자인데 밴드 전환 시트에 "사용자" 로 표시된다
 
 **원인.** `GET /api/bands/my` 응답에 아직 role 필드가 없다. 현재 밴드 화면의 권한 판정은
 멤버 목록에서 내 역할을 찾아 정확히 하지만, 내 밴드 **목록**(스위처)에는 역할 정보가 없어 전부 'member' fallback.
@@ -476,6 +476,6 @@ API 는 없어서 생성 DTO 만 손보면 됨. 테스트 `SongControllerTest.�
 - **파일 업로드(로고/배너)**: `LocalStorageService` — MIME 화이트리스트(png/jpg/webp/gif, **SVG 제외**),
   UUID 파일명, path-traversal 가드(`dir.startsWith(root)`), 5MB 제한. `Content-Type` 은 클라 신고값이라
   스푸핑 가능하나 `.png` 확장자로만 서빙 + `X-Content-Type-Options: nosniff`(Security 기본값)라 HTML 실행 불가.
-- **인가**: `@bandGuard` 멤버/밴드장 체크 + media `visibility` 필터(비회원·비멤버는 `LINK_PUBLIC` 만).
+- **인가**: `@bandGuard` 멤버/관리자 체크 + media `visibility` 필터(비회원·비멤버는 `LINK_PUBLIC` 만).
 - **배포 시 숙제**: ① 크로스도메인이면 refresh 쿠키 `SameSite=None; Secure` → CSRF 재검토(현재 `Strict`),
   ② `/api/auth/login` 브루트포스·`/api/songs/search` 남용 rate limiting, ③ 프론트 정적 서빙 측 CSP 헤더.

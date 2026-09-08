@@ -21,7 +21,7 @@ public class InviteController {
 		this.inviteService = inviteService;
 	}
 
-	/** 초대 코드 발급/재발급 (밴드장). */
+	/** 초대 코드 발급/재발급 (관리자). */
 	@PostMapping("/api/bands/{bandId}/invite-codes")
 	@ResponseStatus(HttpStatus.CREATED)
 	@PreAuthorize("@bandGuard.isOwner(#bandId)")

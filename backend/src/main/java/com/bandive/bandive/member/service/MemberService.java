@@ -52,7 +52,7 @@ public class MemberService {
 		return MemberResponse.from(me);
 	}
 
-	/** 밴드장이 특정 멤버의 파트 설정/해제. */
+	/** 관리자가 특정 멤버의 파트 설정/해제. */
 	@Transactional
 	public MemberResponse updateMemberParts(Long bandId, Long targetUserId, MemberPartsRequest request) {
 		BandMember target = requireMember(bandId, targetUserId, "MEMBER_NOT_FOUND", "해당 멤버를 찾을 수 없습니다.");
@@ -74,7 +74,7 @@ public class MemberService {
 		return list(bandId);
 	}
 
-	/** 밴드장이 다른 멤버를 추방. */
+	/** 관리자가 다른 멤버를 추방. */
 	@Transactional
 	public void kick(Long bandId, Long targetUserId) {
 		BandMember target = requireMember(bandId, targetUserId, "MEMBER_NOT_FOUND", "해당 멤버를 찾을 수 없습니다.");

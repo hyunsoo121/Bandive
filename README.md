@@ -40,7 +40,7 @@
 ## 5. 확정된 세부 결정사항
 
 ### 5.1 권한 모델
-- 밴드장(Owner) / 사용자(Member) 2단계 역할 구조 (관리자 역할 제외, 3단계에서 변경)
+- 관리자(Owner) / 사용자(Member) 2단계 역할 구조 (별도 운영자 등급 없이 2단계로 단순화, 3단계 설계에서 변경)
 
 ### 5.2 합주곡 위시리스트 운영 방식
 - 누구나 곡 추가 가능
@@ -49,9 +49,9 @@
   - 직접 입력: 제목/아티스트를 수동으로 입력
 - 곡 등록 시 추가 입력 필드: 비고/메모, 세션 구성(악기별 필요 인원, 예: 드럼1/기타2/건반1/보컬1), 참고 영상
 - 투표(좋아요 방식)는 멤버 1인당 1회만 가능
-- 최종 승격은 자동이 아닌, 득표 수를 참고해 밴드장이 수동 승인
+- 최종 승격은 자동이 아닌, 득표 수를 참고해 관리자가 수동 승인
 - 파트 배정(세션별 담당 멤버 매핑)은 합주곡(CONFIRMED) 상태에서만 가능, 미배정(null) 허용
-- 파트 배정 권한: 로그인한 멤버 누구나 가능 (밴드장 전용 아님, 기존 결정에서 변경)
+- 파트 배정 권한: 로그인한 멤버 누구나 가능 (관리자 전용 아님, 기존 결정에서 변경)
 
 ### 5.3 로고 / 배너
 - 이미지 파일 직접 업로드 지원 (영상과 달리 자체 스토리지 부담이 적어 업로드 방식 채택)
@@ -247,21 +247,21 @@ erDiagram
 | POST | /api/bands | 밴드 생성 | O |
 | GET | /api/bands/{bandId} | 밴드 상세 조회 | X |
 | GET | /api/bands/my | 내가 속한 밴드 목록 | O |
-| PATCH | /api/bands/{bandId} | 밴드 정보 수정 (이름/설명) | O (밴드장) |
-| POST | /api/bands/{bandId}/logo | 로고 이미지 업로드 | O (밴드장) |
-| POST | /api/bands/{bandId}/banner | 배너 이미지 업로드 | O (밴드장) |
+| PATCH | /api/bands/{bandId} | 밴드 정보 수정 (이름/설명) | O (관리자) |
+| POST | /api/bands/{bandId}/logo | 로고 이미지 업로드 | O (관리자) |
+| POST | /api/bands/{bandId}/banner | 배너 이미지 업로드 | O (관리자) |
 
 ### 8.3 초대
 | Method | Endpoint | 설명 | 인증 필요 |
 |---|---|---|---|
-| POST | /api/bands/{bandId}/invite-codes | 초대 코드 발급/재발급 | O (밴드장) |
+| POST | /api/bands/{bandId}/invite-codes | 초대 코드 발급/재발급 | O (관리자) |
 | POST | /api/invite-codes/{code}/join | 초대 코드로 밴드 가입 | O |
 
 ### 8.4 밴드 멤버
 | Method | Endpoint | 설명 | 인증 필요 |
 |---|---|---|---|
 | GET | /api/bands/{bandId}/members | 멤버 목록 조회 | X |
-| DELETE | /api/bands/{bandId}/members/{userId} | 멤버 추방 | O (밴드장) |
+| DELETE | /api/bands/{bandId}/members/{userId} | 멤버 추방 | O (관리자) |
 | DELETE | /api/bands/{bandId}/members/me | 밴드 탈퇴 | O |
 
 ### 8.5 곡 (위시리스트 / 합주곡 리스트)
@@ -272,9 +272,9 @@ erDiagram
 | POST | /api/bands/{bandId}/songs | 곡 추가 (검색 결과 선택 또는 직접 입력, 메모/세션구성/참고영상 포함) | O |
 | POST | /api/songs/{songId}/vote | 투표 (1인 1표) | O |
 | DELETE | /api/songs/{songId}/vote | 투표 취소 | O |
-| PATCH | /api/songs/{songId}/confirm | 합주곡으로 승격 | O (밴드장) |
+| PATCH | /api/songs/{songId}/confirm | 합주곡으로 승격 | O (관리자) |
 | PUT | /api/songs/{songId}/parts/{partId}/assign | 파트 배정/해제 (합주곡 상태에서만, 미배정 가능) | O (로그인 멤버 누구나) |
-| DELETE | /api/songs/{songId} | 곡 삭제 | O (밴드장) |
+| DELETE | /api/songs/{songId} | 곡 삭제 | O (관리자) |
 
 ### 8.6 일정
 | Method | Endpoint | 설명 | 인증 필요 |
@@ -282,7 +282,7 @@ erDiagram
 | GET | /api/bands/{bandId}/schedules | 일정 목록 (캘린더 뷰용, 연결된 영상 포함) | X |
 | POST | /api/bands/{bandId}/schedules | 일정 등록 | O |
 | PATCH | /api/schedules/{scheduleId} | 일정 수정 | O |
-| DELETE | /api/schedules/{scheduleId} | 일정 삭제 | O (밴드장) |
+| DELETE | /api/schedules/{scheduleId} | 일정 삭제 | O (관리자) |
 | POST | /api/schedules/{scheduleId}/attendance | 참석 여부 등록/변경 | O |
 
 ### 8.7 미디어 (영상)
@@ -290,7 +290,7 @@ erDiagram
 |---|---|---|---|
 | GET | /api/bands/{bandId}/media?scheduleId= | 영상 목록 조회 (일정별 필터 가능, 공개범위 적용) | X (공개 설정에 따라 제한) |
 | POST | /api/bands/{bandId}/media | 영상 URL 등록 (scheduleId 선택 입력) | O |
-| PATCH | /api/media/{mediaId}/visibility | 공개 범위 변경 | O (밴드장) |
+| PATCH | /api/media/{mediaId}/visibility | 공개 범위 변경 | O (관리자) |
 | DELETE | /api/media/{mediaId} | 영상 삭제 | O |
 
 ## 9. 기능 플로우
@@ -313,12 +313,12 @@ flowchart TD
 ```mermaid
 flowchart TD
     A[곡 등록<br/>검색 API 또는 직접 입력] --> B[투표<br/>멤버 1인당 1표]
-    B --> C[밴드장 승인<br/>득표 참고해 합주곡 승격]
+    B --> C[관리자 승인<br/>득표 참고해 합주곡 승격]
     C --> D[파트 배정<br/>합주곡 상태에서만, 미배정 가능]
 ```
 1. 곡 등록 (검색 API 또는 직접 입력, 메모/세션구성/참고영상 포함)
 2. 투표 (멤버 1인당 1표)
-3. 밴드장 승인 (득표 참고해 합주곡으로 승격)
+3. 관리자 승인 (득표 참고해 합주곡으로 승격)
 4. 파트 배정 (합주곡 상태에서만 가능, 미배정 허용)
 
 ### 9.3 일정·영상 연결 흐름
@@ -343,9 +343,9 @@ flowchart TD
 
 ### ADR-002. 권한 모델: 3단계 → 2단계로 변경
 - **상태**: 승인됨 (수정됨)
-- **배경**: 최초에는 밴드장/관리자/멤버 3단계로 설계했으나, 이후 밴드장/사용자 2단계로 단순화 요청
+- **배경**: 최초에는 관리자(당시 명칭 "밴드장")/운영진/멤버 3단계로 설계했으나, 이후 관리자/사용자 2단계로 단순화 요청
 - **결정**: BAND_MEMBERS.role은 OWNER/MEMBER 두 값만 가짐
-- **결과**: 권한 체크 로직이 단순해짐. 다만 밴드장 부재 시 위임할 관리자가 없어 병목 가능성 있음 (장기 검토 필요)
+- **결과**: 권한 체크 로직이 단순해짐. 다만 관리자 부재 시 위임할 사람이 없어 병목 가능성 있음 (장기 검토 필요)
 
 ### ADR-003. 백엔드 기술 스택: Spring Boot 채택
 - **상태**: 승인됨
@@ -371,9 +371,9 @@ flowchart TD
 - **결정**: 이번 MVP 범위에서는 UI로 노출하지 않음. 다만 Band.visibility, BandFollow 같은 데이터 구조 확장 여지는 남겨둠
 - **결과**: MVP 개발 범위 축소. 공개 밴드 수가 늘어난 시점에 재논의 필요
 
-### ADR-007. 파트 배정 권한: 밴드장 전용 → 로그인 멤버 누구나로 변경
+### ADR-007. 파트 배정 권한: 관리자 전용 → 로그인 멤버 누구나로 변경
 - **상태**: 승인됨 (수정됨)
-- **배경**: 최초 API 설계(8.5)에는 밴드장만 파트 배정 가능하도록 명시했으나, 프론트엔드 목업 구현 과정에서 "로그인한 멤버 누구나 배정 가능"으로 이미 동작 중이었고, 실제로도 세션 구성은 멤버 간 자율 조율 영역에 가까워 밴드장 승인까지 거칠 필요가 낮다고 판단
+- **배경**: 최초 API 설계(8.5)에는 관리자만 파트 배정 가능하도록 명시했으나, 프론트엔드 목업 구현 과정에서 "로그인한 멤버 누구나 배정 가능"으로 이미 동작 중이었고, 실제로도 세션 구성은 멤버 간 자율 조율 영역에 가까워 관리자 승인까지 거칠 필요가 낮다고 판단
 - **결정**: `PUT /api/songs/{songId}/parts/{partId}/assign`은 로그인한 멤버 누구나 호출 가능하도록 변경 (합주곡 상태에서만 가능하다는 제약은 유지)
 - **결과**: 프론트 목업과 백엔드 정책이 일치. 다만 멤버 간 배정 충돌(동시에 같은 파트에 서로 다른 사람을 배정) 처리 로직은 구현 시 별도로 고려 필요
 
