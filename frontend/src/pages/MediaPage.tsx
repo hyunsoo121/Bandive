@@ -19,12 +19,6 @@ const STRIPE_SHADES = [
 const stripe = (a: string, b: string) =>
   `repeating-linear-gradient(135deg, ${a} 0 12px, ${b} 12px 24px)`;
 
-const PLATFORM_ICON: Record<MediaItem['platform'], string> = {
-  youtube: '▶',
-  drive: '△',
-  other: '🔗',
-};
-
 export function MediaPage() {
   const { currentBand, role, user, media: allMedia, schedules, removeMedia } = useApp();
   const guard = useGuard();
@@ -89,7 +83,7 @@ export function MediaPage() {
                 {m.thumbnailUrl && (
                   <img className="media__thumb-img" src={m.thumbnailUrl} alt="" loading="lazy" />
                 )}
-                <span className="media__play">{PLATFORM_ICON[m.platform]}</span>
+                <span className="media__play" aria-hidden="true" />
                 <span className="media__kind">{m.kind}</span>
                 {m.platform === 'other' && <span className="media__warn">링크 아님</span>}
               </a>

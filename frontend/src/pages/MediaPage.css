@@ -91,8 +91,16 @@
   justify-content: center;
   background: var(--color-bg);
   border: 2px solid var(--color-text);
-  font-size: 14px;
-  line-height: 1;
+}
+/* 재생 삼각형 (플랫폼과 무관하게 항상 ▶ 모양) */
+.media__play::after {
+  content: '';
+  width: 0;
+  height: 0;
+  margin-left: 3px;
+  border-style: solid;
+  border-width: 7px 0 7px 11px;
+  border-color: transparent transparent transparent var(--color-text);
 }
 .media__kind {
   position: absolute;
