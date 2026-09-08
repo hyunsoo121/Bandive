@@ -674,6 +674,25 @@ function SongRow({
         <span className="songrow__no">{String(index + 1).padStart(2, '0')}</span>
       )}
 
+      <div className="songrow__art">
+        {song.artworkUrl ? (
+          <img src={song.artworkUrl} alt="" loading="lazy" />
+        ) : (
+          <svg
+            className="songrow__art-fallback"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.7}
+            aria-hidden="true"
+          >
+            <path d="M9 18V5l12-2v13" />
+            <circle cx="6" cy="18" r="3" />
+            <circle cx="18" cy="16" r="3" />
+          </svg>
+        )}
+      </div>
+
       <div className="songrow__main">
         <button type="button" className="songrow__title-btn" onClick={onToggle}>
           <span className="stack" style={{ gap: 4 }}>
@@ -682,12 +701,7 @@ function SongRow({
               {song.artist} · {song.proposer} 제안
             </span>
           </span>
-          <span className="songrow__title-end">
-            {song.artworkUrl && (
-              <img className="songrow__art" src={song.artworkUrl} alt="" loading="lazy" />
-            )}
-            <span className="songrow__caret">{open ? '닫기 ▲' : '상세 ▼'}</span>
-          </span>
+          <span className="songrow__caret">{open ? '닫기 ▲' : '상세 ▼'}</span>
         </button>
 
         <div className="songrow__chips">
