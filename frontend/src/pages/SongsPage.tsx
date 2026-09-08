@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   DndContext,
   PointerSensor,
   closestCenter,
+  useDroppable,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -24,8 +25,15 @@ import { PromptModal } from '../components/PromptModal';
 import './SongsPage.css';
 
 const ROLE_LABEL: Record<string, string> = { owner: '밴드장', member: '사용자', guest: '비회원' };
-type SortKey = 'votes' | 'recent';
+type SortKey = 'manual' | 'votes' | 'recent';
+const SORT_LABEL: Record<SortKey, string> = { manual: '수동', votes: '득표순', recent: '최신순' };
 const UNFILED = '__unfiled__';
+
+interface Group {
+  key: string;
+  folder: SongFolder | null;
+  songs: Song[];
+}
 
 export function SongsPage() {
   const {
@@ -38,6 +46,7 @@ export function SongsPage() {
     promoteSong,
     assignPart,
     moveSongToFolder,
+    reorderSongs,
     createSongFolder,
     renameSongFolder,
     removeSongFolder,
@@ -48,38 +57,76 @@ export function SongsPage() {
   const isGuest = role === 'guest';
 
   const [tab, setTab] = useState<Song['status']>('WISHLIST');
-  const [sort, setSort] = useState<SortKey>('votes');
+  const [sort, setSort] = useState<SortKey>('manual');
   const [openId, setOpenId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [prompt, setPrompt] = useState<{ mode: 'create' | 'rename'; folder?: SongFolder } | null>(
     null,
   );
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
-  if (!currentBand) return null;
-  const bandId = currentBand.id;
+  const bandId = currentBand?.id ?? null;
+  const collapseKey = bandId ? `bandive.sf.collapsed.${bandId}` : null;
 
-  const memberNames = members.filter((m) => m.bandId === bandId).map((m) => m.name);
-  const bandSongs = songs.filter((s) => s.bandId === bandId);
-  const wishlist = bandSongs.filter((s) => s.status === 'WISHLIST');
-  const confirmed = bandSongs.filter((s) => s.status === 'CONFIRMED');
+  useEffect(() => {
+    if (!collapseKey) return;
+    try {
+      const raw = localStorage.getItem(collapseKey);
+      setCollapsed(new Set(raw ? (JSON.parse(raw) as string[]) : []));
+    } catch {
+      setCollapsed(new Set());
+    }
+  }, [collapseKey]);
+
+  const toggleCollapse = (id: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      try {
+        if (collapseKey) localStorage.setItem(collapseKey, JSON.stringify([...next]));
+      } catch {
+        /* localStorage 불가 — 이번 세션만 유지 */
+      }
+      return next;
+    });
+
   const isWish = tab === 'WISHLIST';
-  const tabSongs = isWish ? wishlist : confirmed;
+
+  const memberNames = useMemo(
+    () => members.filter((m) => m.bandId === bandId).map((m) => m.name),
+    [members, bandId],
+  );
 
   const folders = useMemo(
     () => songFolders.filter((f) => f.status === tab).sort((a, b) => a.position - b.position),
     [songFolders, tab],
   );
 
-  const sortSongs = (list: Song[]) =>
-    [...list].sort((a, b) =>
-      sort === 'votes'
-        ? b.votes - a.votes || b.addedOrder - a.addedOrder
-        : b.addedOrder - a.addedOrder,
-    );
+  const tabSongs = useMemo(
+    () => songs.filter((s) => s.bandId === bandId && s.status === tab),
+    [songs, bandId, tab],
+  );
+  const wishCount = useMemo(
+    () => songs.filter((s) => s.bandId === bandId && s.status === 'WISHLIST').length,
+    [songs, bandId],
+  );
+  const confirmedCount = useMemo(
+    () => songs.filter((s) => s.bandId === bandId && s.status === 'CONFIRMED').length,
+    [songs, bandId],
+  );
 
-  const groups: { key: string; folder: SongFolder | null; songs: Song[] }[] = [
+  const sortSongs = (list: Song[]) => {
+    const arr = [...list];
+    if (sort === 'manual') return arr.sort((a, b) => a.position - b.position);
+    if (sort === 'votes')
+      return arr.sort((a, b) => b.votes - a.votes || b.addedOrder - a.addedOrder);
+    return arr.sort((a, b) => b.addedOrder - a.addedOrder);
+  };
+
+  const groups: Group[] = [
     ...folders.map((f) => ({
       key: f.id,
       folder: f,
@@ -88,14 +135,79 @@ export function SongsPage() {
     { key: UNFILED, folder: null, songs: sortSongs(tabSongs.filter((s) => s.folderId == null)) },
   ];
 
+  const dragEnabled = sort === 'manual' && !isGuest;
+
+  if (!currentBand || !bandId) return null;
+
+  const groupOf = (songId: string) => groups.find((g) => g.songs.some((s) => s.id === songId));
+  const folderIdOf = (g: Group) => (g.folder ? g.folder.id : null);
+
   const onDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
-    if (!over || active.id === over.id) return;
-    const ids = folders.map((f) => f.id);
-    const from = ids.indexOf(String(active.id));
-    const to = ids.indexOf(String(over.id));
-    if (from < 0 || to < 0) return;
-    void reorderSongFolders(tab, arrayMove(ids, from, to));
+    if (!over) return;
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    if (activeId === overId) return;
+
+    // ── 폴더 순서 이동 ──
+    if (activeId.startsWith('F:')) {
+      if (!overId.startsWith('F:')) return;
+      const ids = folders.map((f) => f.id);
+      const from = ids.indexOf(activeId.slice(2));
+      const to = ids.indexOf(overId.slice(2));
+      if (from < 0 || to < 0) return;
+      void reorderSongFolders(tab, arrayMove(ids, from, to));
+      return;
+    }
+
+    // ── 곡 이동/정렬 ──
+    if (!activeId.startsWith('S:')) return;
+    const songId = activeId.slice(2);
+    const src = groupOf(songId);
+    if (!src) return;
+
+    let dest: Group | undefined;
+    let destIndex: number;
+    if (overId.startsWith('S:')) {
+      const overSongId = overId.slice(2);
+      dest = groupOf(overSongId);
+      destIndex = dest ? dest.songs.findIndex((s) => s.id === overSongId) : -1;
+    } else if (overId.startsWith('G:')) {
+      const key = overId.slice(2);
+      dest = groups.find((g) => g.key === key);
+      destIndex = dest ? dest.songs.length : -1;
+    } else if (overId.startsWith('F:')) {
+      const fid = overId.slice(2);
+      dest = groups.find((g) => g.folder?.id === fid);
+      destIndex = dest ? dest.songs.length : -1;
+    } else {
+      return;
+    }
+    if (!dest || destIndex < 0) return;
+
+    const destFolderId = folderIdOf(dest);
+
+    if (src.key === dest.key) {
+      const ids = src.songs.map((s) => s.id);
+      const from = ids.indexOf(songId);
+      if (from === destIndex) return;
+      void reorderSongs(tab, destFolderId, arrayMove(ids, from, destIndex));
+      return;
+    }
+
+    // 다른 그룹으로: 폴더 이동 → 대상/원본 순서 확정
+    const destIds = dest.songs.map((s) => s.id);
+    destIds.splice(destIndex, 0, songId);
+    const srcIds = src.songs.filter((s) => s.id !== songId).map((s) => s.id);
+    void (async () => {
+      try {
+        await moveSongToFolder(songId, destFolderId);
+        await reorderSongs(tab, destFolderId, destIds);
+        if (srcIds.length) await reorderSongs(tab, folderIdOf(src), srcIds);
+      } catch {
+        /* AppContext 가 실패 시 목록 재동기화 */
+      }
+    })();
   };
 
   const submitPrompt = (value: string) => {
@@ -121,7 +233,7 @@ export function SongsPage() {
               setOpenId(null);
             }}
           >
-            위시리스트 {wishlist.length}
+            위시리스트 {wishCount}
           </button>
           <button
             type="button"
@@ -131,23 +243,23 @@ export function SongsPage() {
               setOpenId(null);
             }}
           >
-            합주곡 {confirmed.length}
+            합주곡 {confirmedCount}
           </button>
         </div>
 
         <div className="songs__toolbar">
           <div className="songs__sort">
             <span className="muted" style={{ fontSize: 11 }}>
-              폴더 안 정렬
+              정렬
             </span>
-            {(['votes', 'recent'] as SortKey[]).map((k) => (
+            {(['manual', 'votes', 'recent'] as SortKey[]).map((k) => (
               <button
                 key={k}
                 type="button"
                 className={`songs__sortchip${sort === k ? ' is-on' : ''}`}
                 onClick={() => setSort(k)}
               >
-                {k === 'votes' ? '득표순' : '최신순'}
+                {SORT_LABEL[k]}
               </button>
             ))}
           </div>
@@ -161,22 +273,39 @@ export function SongsPage() {
             </button>
           )}
         </div>
+
+        {sort !== 'manual' && !isGuest && (
+          <span className="muted" style={{ fontSize: 11 }}>
+            {SORT_LABEL[sort]} 보기 중 — 순서를 바꾸려면 ‘수동’을 선택하세요.
+          </span>
+        )}
+        {dragEnabled && (
+          <span className="muted" style={{ fontSize: 11 }}>
+            <span className="songs__draghint">⠿</span> 손잡이를 끌어 순서를 바꾸거나 다른 폴더로
+            옮기세요.
+          </span>
+        )}
       </header>
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
-        <SortableContext items={folders.map((f) => f.id)} strategy={verticalListSortingStrategy}>
+        <SortableContext
+          items={folders.map((f) => `F:${f.id}`)}
+          strategy={verticalListSortingStrategy}
+        >
           <div className="songs__list">
             {groups.map((g) => (
               <FolderGroup
                 key={g.key}
-                folder={g.folder}
-                songs={g.songs}
+                group={g}
                 isOwner={isOwner}
                 isGuest={isGuest}
                 isWish={isWish}
+                dragEnabled={dragEnabled}
+                collapsed={g.folder ? collapsed.has(g.folder.id) : false}
                 folders={folders}
                 openId={openId}
                 memberNames={memberNames}
+                onToggleCollapse={() => g.folder && toggleCollapse(g.folder.id)}
                 onToggle={(id) => setOpenId((cur) => (cur === id ? null : id))}
                 onVote={(id) => guard(() => voteSong(id))()}
                 onPromote={(id) => {
@@ -209,7 +338,7 @@ export function SongsPage() {
           onSubmitted={() => {
             setAddOpen(false);
             setTab('WISHLIST');
-            setSort('recent');
+            setSort('manual');
           }}
         />
       )}
@@ -234,14 +363,16 @@ export function SongsPage() {
 /* ───────────────────────── 폴더 그룹 ───────────────────────── */
 
 interface GroupProps {
-  folder: SongFolder | null;
-  songs: Song[];
+  group: Group;
   isOwner: boolean;
   isGuest: boolean;
   isWish: boolean;
+  dragEnabled: boolean;
+  collapsed: boolean;
   folders: SongFolder[];
   openId: string | null;
   memberNames: string[];
+  onToggleCollapse: () => void;
   onToggle: (id: string) => void;
   onVote: (id: string) => void;
   onPromote: (id: string) => void;
@@ -252,14 +383,16 @@ interface GroupProps {
 }
 
 function FolderGroup({
-  folder,
-  songs,
+  group,
   isOwner,
   isGuest,
   isWish,
+  dragEnabled,
+  collapsed,
   folders,
   openId,
   memberNames,
+  onToggleCollapse,
   onToggle,
   onVote,
   onPromote,
@@ -268,8 +401,13 @@ function FolderGroup({
   onRenameRequest,
   onDelete,
 }: GroupProps) {
+  const { folder, songs, key } = group;
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const sortable = useSortable({ id: folder ? folder.id : UNFILED, disabled: !folder || !isOwner });
+  const sortable = useSortable({
+    id: `F:${folder ? folder.id : UNFILED}`,
+    disabled: !folder || !isOwner,
+  });
+  const droppable = useDroppable({ id: `G:${key}` });
   const style = folder
     ? { transform: CSS.Transform.toString(sortable.transform), transition: sortable.transition }
     : undefined;
@@ -280,80 +418,103 @@ function FolderGroup({
       style={style}
       className={`folder${sortable.isDragging ? ' is-dragging' : ''}`}
     >
-      <div className="folder__head">
-        {folder && isOwner && (
+      <div
+        ref={droppable.setNodeRef}
+        className={`folder__body${droppable.isOver ? ' is-over' : ''}`}
+      >
+        <div className="folder__head">
+          {folder && isOwner && (
+            <button
+              type="button"
+              className="folder__handle"
+              aria-label="폴더 순서 이동"
+              {...sortable.attributes}
+              {...sortable.listeners}
+            >
+              ⠿
+            </button>
+          )}
           <button
             type="button"
-            className="folder__handle"
-            aria-label="폴더 순서 이동"
-            {...sortable.attributes}
-            {...sortable.listeners}
+            className="folder__toggle"
+            onClick={onToggleCollapse}
+            disabled={!folder}
           >
-            ⠿
+            <span className="folder__caret">{folder ? (collapsed ? '▸' : '▾') : ''}</span>
+            <strong className="folder__name">{folder ? folder.name : '미분류'}</strong>
+            <span className="folder__count">{songs.length}</span>
           </button>
-        )}
-        <strong className="folder__name">{folder ? folder.name : '미분류'}</strong>
-        <span className="folder__count">{songs.length}</span>
-        {folder && isOwner && (
-          <span className="folder__actions">
-            <button type="button" className="folder__act" onClick={() => onRenameRequest(folder)}>
-              이름
-            </button>
-            {confirmDelete ? (
-              <>
+          {folder && isOwner && (
+            <span className="folder__actions">
+              <button type="button" className="folder__act" onClick={() => onRenameRequest(folder)}>
+                이름
+              </button>
+              {confirmDelete ? (
+                <>
+                  <button
+                    type="button"
+                    className="folder__act folder__act--danger"
+                    onClick={() => onDelete(folder.id)}
+                  >
+                    정말 삭제
+                  </button>
+                  <button
+                    type="button"
+                    className="folder__act"
+                    onClick={() => setConfirmDelete(false)}
+                  >
+                    취소
+                  </button>
+                </>
+              ) : (
                 <button
                   type="button"
                   className="folder__act folder__act--danger"
-                  onClick={() => onDelete(folder.id)}
+                  onClick={() => setConfirmDelete(true)}
+                  title="곡은 미분류로 이동합니다"
                 >
-                  정말 삭제
+                  삭제
                 </button>
-                <button
-                  type="button"
-                  className="folder__act"
-                  onClick={() => setConfirmDelete(false)}
-                >
-                  취소
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="folder__act folder__act--danger"
-                onClick={() => setConfirmDelete(true)}
-                title="곡은 미분류로 이동합니다"
-              >
-                삭제
-              </button>
-            )}
-          </span>
+              )}
+            </span>
+          )}
+        </div>
+
+        {collapsed ? (
+          <button type="button" className="folder__collapsed" onClick={onToggleCollapse}>
+            곡 {songs.length}개 · 펼치기
+          </button>
+        ) : songs.length === 0 ? (
+          <div className="folder__empty">
+            {folder ? '이 폴더에 곡이 없습니다.' : '분류 안 된 곡이 없습니다.'}
+          </div>
+        ) : (
+          <SortableContext
+            items={songs.map((s) => `S:${s.id}`)}
+            strategy={verticalListSortingStrategy}
+          >
+            {songs.map((song, i) => (
+              <SongRow
+                key={song.id}
+                song={song}
+                index={i}
+                isWish={isWish}
+                isOwner={isOwner}
+                isGuest={isGuest}
+                dragEnabled={dragEnabled}
+                open={openId === song.id}
+                memberNames={memberNames}
+                folders={folders}
+                onToggle={() => onToggle(song.id)}
+                onVote={() => onVote(song.id)}
+                onPromote={() => onPromote(song.id)}
+                onAssign={(slotKey, name) => onAssign(song.id, slotKey, name)}
+                onMove={(folderId) => onMove(song.id, folderId)}
+              />
+            ))}
+          </SortableContext>
         )}
       </div>
-
-      {songs.length === 0 ? (
-        <div className="folder__empty">
-          {folder ? '이 폴더에 곡이 없습니다.' : '분류 안 된 곡이 없습니다.'}
-        </div>
-      ) : (
-        songs.map((song, i) => (
-          <SongRow
-            key={song.id}
-            song={song}
-            index={i}
-            isWish={isWish}
-            isOwner={isOwner}
-            isGuest={isGuest}
-            open={openId === song.id}
-            memberNames={memberNames}
-            folders={folders}
-            onToggle={() => onToggle(song.id)}
-            onVote={() => onVote(song.id)}
-            onPromote={() => onPromote(song.id)}
-            onAssign={(slotKey, name) => onAssign(song.id, slotKey, name)}
-            onMove={(folderId) => onMove(song.id, folderId)}
-          />
-        ))
-      )}
     </section>
   );
 }
@@ -366,6 +527,7 @@ interface RowProps {
   isWish: boolean;
   isOwner: boolean;
   isGuest: boolean;
+  dragEnabled: boolean;
   open: boolean;
   memberNames: string[];
   folders: SongFolder[];
@@ -382,6 +544,7 @@ function SongRow({
   isWish,
   isOwner,
   isGuest,
+  dragEnabled,
   open,
   memberNames,
   folders,
@@ -397,8 +560,30 @@ function SongRow({
   const canAssign = song.status === 'CONFIRMED' && !isGuest;
   const showAssignReadonly = song.status === 'CONFIRMED' && isGuest;
 
+  const sortable = useSortable({ id: `S:${song.id}`, disabled: !dragEnabled });
+  const style = {
+    transform: CSS.Transform.toString(sortable.transform),
+    transition: sortable.transition,
+  };
+
   return (
-    <article className="songrow">
+    <article
+      ref={sortable.setNodeRef}
+      style={style}
+      className={`songrow${sortable.isDragging ? ' is-dragging' : ''}`}
+    >
+      {dragEnabled && (
+        <button
+          type="button"
+          className="songrow__handle"
+          aria-label="곡 순서 이동"
+          {...sortable.attributes}
+          {...sortable.listeners}
+        >
+          ⠿
+        </button>
+      )}
+
       {isWish ? (
         <button
           type="button"
@@ -447,7 +632,7 @@ function SongRow({
           {hasRef && <span className="songrow__chip songrow__chip--ref">참고 영상</span>}
         </div>
 
-        {isOwner && folders.length > 0 && (
+        {!isGuest && folders.length > 0 && (
           <label className="songrow__folder">
             <span className="muted" style={{ fontSize: 11 }}>
               폴더

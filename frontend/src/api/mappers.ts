@@ -80,6 +80,7 @@ export function toSong(dto: SongDto): Song {
     votes: dto.voteCount,
     votedByMe: dto.votedByMe,
     folderId: dto.folderId != null ? String(dto.folderId) : null,
+    position: dto.position ?? 0,
     addedOrder: Date.parse(dto.createdAt) || dto.id,
     assignments,
     parts: dto.parts.map((p) => ({

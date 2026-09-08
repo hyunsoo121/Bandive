@@ -249,8 +249,9 @@ class SongServiceTest extends RepositoryTest {
 	// ── folder ───────────────────────────────────────────
 
 	@Test
-	void 곡을_같은_status_폴더로만_옮길_수_있고_밴드장만() {
+	void 곡을_같은_status_폴더로만_옮길_수_있고_멤버_누구나_가능() {
 		Long songId = service.add(band.getId(), memberId, manual(null)).id();
+		Long outsiderId = users.save(Fixtures.user("outsider")).getId();
 		com.bandive.bandive.song.folder.SongFolder wishFolder = em
 			.persist(com.bandive.bandive.song.folder.SongFolder.builder()
 				.band(band)
@@ -267,17 +268,50 @@ class SongServiceTest extends RepositoryTest {
 				.build());
 		em.flush();
 
-		assertThatThrownBy(() -> service.moveToFolder(songId, memberId, wishFolder.getId()))
+		// 밴드 멤버가 아니면 막힌다
+		assertThatThrownBy(() -> service.moveToFolder(songId, outsiderId, wishFolder.getId()))
 			.isInstanceOf(ForbiddenException.class);
 
-		assertThat(service.moveToFolder(songId, ownerId, wishFolder.getId()).folderId()).isEqualTo(wishFolder.getId());
+		// 밴드장이 아닌 일반 멤버도 옮길 수 있다
+		assertThat(service.moveToFolder(songId, memberId, wishFolder.getId()).folderId()).isEqualTo(wishFolder.getId());
 
 		// WISHLIST 곡을 CONFIRMED 폴더로는 못 옮긴다
-		assertThatThrownBy(() -> service.moveToFolder(songId, ownerId, confFolder.getId()))
+		assertThatThrownBy(() -> service.moveToFolder(songId, memberId, confFolder.getId()))
 			.isInstanceOf(com.bandive.bandive.common.exception.ValidationException.class);
 
 		// null 이면 미분류
-		assertThat(service.moveToFolder(songId, ownerId, null).folderId()).isNull();
+		assertThat(service.moveToFolder(songId, memberId, null).folderId()).isNull();
+	}
+
+	@Test
+	void 그룹_안_곡_순서를_통째로_재지정한다() {
+		Long a = service.add(band.getId(), memberId, manual(null)).id();
+		Long b = service.add(band.getId(), memberId, manual(null)).id();
+		Long c = service.add(band.getId(), memberId, manual(null)).id();
+		em.flush();
+		em.clear();
+
+		// 처음엔 추가순 0,1,2
+		assertThat(positionsById()).containsEntry(a, 0).containsEntry(b, 1).containsEntry(c, 2);
+
+		service.reorder(band.getId(), memberId,
+				new com.bandive.bandive.song.dto.SongOrderRequest(SongStatus.WISHLIST, null, List.of(c, a, b)));
+		em.flush();
+		em.clear();
+
+		assertThat(positionsById()).containsEntry(c, 0).containsEntry(a, 1).containsEntry(b, 2);
+
+		// 그룹의 곡 집합과 다르면 거부
+		assertThatThrownBy(() -> service.reorder(band.getId(), memberId,
+				new com.bandive.bandive.song.dto.SongOrderRequest(SongStatus.WISHLIST, null, List.of(a, b))))
+			.isInstanceOf(com.bandive.bandive.common.exception.ValidationException.class);
+	}
+
+	private java.util.Map<Long, Integer> positionsById() {
+		return songs.findAllByBandId(band.getId())
+			.stream()
+			.collect(java.util.stream.Collectors.toMap(com.bandive.bandive.song.Song::getId,
+					com.bandive.bandive.song.Song::getPosition));
 	}
 
 	@Test

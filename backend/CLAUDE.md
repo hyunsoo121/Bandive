@@ -248,7 +248,8 @@
   - ✅ ① 밴드 로고·배너 업로드 UI 연결 (백엔드는 이미 있었음)
   - ✅ ②③ 영상 제목(`media.title`)·썸네일(`MediaThumbnail`, YouTube/Drive URL→이미지, 미저장)·`PATCH /api/media/{id}`(부분수정, 등록자/밴드장)·OTHER 링크 경고
   - ✅ ⑤ 이메일 로그인: `users`에 `password_hash`·`provider`, `POST /api/auth/{signup,login}`, `SessionIssuer`(카카오 성공핸들러와 공통), 비번 8자+영문숫자, 이메일 인증 없음, 복구 없음 (ADR-010)
-  - ✅ ④ 곡 폴더 + 순서 (`V6` `song_folders` + `songs.folder_id` SET NULL, 드래그 핸들 `@dnd-kit`, 폴더 CRUD·reorder 밴드장, 위시/합주 폴더 별도(status), 항상 폴더 그룹핑+폴더 내부만 정렬, 승격 시 `confirm()` 이 folder 도 null)
+  - ✅ ④ 곡 폴더 + 순서 (`V6` `song_folders` + `songs.folder_id` SET NULL, 드래그 핸들 `@dnd-kit`, 폴더 CRUD·reorder 밴드장, 위시/합주 폴더 별도(status), 항상 폴더 그룹핑, 승격 시 `confirm()` 이 folder 도 null)
+  - ✅ ④-b 곡 수동 정렬 + 폴더 간 드래그 (`V8` `songs.position` — (band,status,folder/미분류) 그룹 안 위치. `PUT /api/bands/{bandId}/songs/order` `{status,folderId,songIds}` = 그룹 전체 재지정, **멤버 누구나**. `moveToFolder` 도 owner→**멤버**, 대상 그룹 맨 끝 position. 프론트: 폴더 접기/펼치기(localStorage), 곡 행 드래그 핸들로 그룹 내 정렬 + 다른 폴더로 이동, 정렬칩 `수동`(드래그 가능)/`득표순`/`최신순`(보기 전용))
   - ✅ ⑥ 세션 직접 입력(자유 악기 — "실로폰" 등, 프론트 `INSTRUMENTS` 하드코딩 제거 → `SessionShape = Record<string, number>`, 백엔드는 이미 String 자유값) + 앨범 아트(`V7` `songs.artwork_url`, iTunes `artworkUrl100`→`600x600bb` 치환, `SongResponse.artworkUrl`, 검색결과·곡 row 썸네일)
   - ⚠️ `MUSIC_COUNTRY` 기본값 `KR`→`US`: KR iTunes 스토어는 Search API `entity=song` 응답이 **항상 빈 배열**(2026-09-03 확인). US 카탈로그는 한글 검색어("아이유 좋은날"→Good Day/IU)도 매칭됨
   - ✅ ⑥-b 제목 현지화: `ItunesMusicSearchService` 2단계 — US 검색 → trackId 를 `lookup?id=…&country=KR`(`MUSIC_LOCALIZE_COUNTRY`, 기본 KR, 빈 값이면 끔) 1회 조회해 "Good Day"→"좋은 날/아이유" 치환. KR 미수록 곡·lookup 실패는 US 값 폴백. 앨범아트 URL 은 두 스토어 동일. `MusicProperties` 4번째 파라미터 `localizeCountry` 추가

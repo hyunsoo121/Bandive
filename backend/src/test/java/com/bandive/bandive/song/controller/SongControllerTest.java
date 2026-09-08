@@ -47,7 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SongControllerTest {
 
 	private static final SongResponse SONG = new SongResponse(5L, 1L, "곡", "아티스트", SongStatus.WISHLIST,
-			SongSourceType.MANUAL, null, null, "메모", null, 7L, "나", 3, true, null, List.of(),
+			SongSourceType.MANUAL, null, null, "메모", null, 7L, "나", 3, true, null, 0, List.of(),
 			Instant.parse("2026-09-02T00:00:00Z"));
 
 	@Autowired
@@ -158,6 +158,26 @@ class SongControllerTest {
 	void 곡_삭제는_204() throws Exception {
 		mvc.perform(delete("/api/songs/5").with(asUser(7L))).andExpect(status().isNoContent());
 		then(songService).should().delete(5L, 7L);
+	}
+
+	@Test
+	void 곡_순서_재지정은_멤버면_204() throws Exception {
+		given(bandGuard.isMember(1L)).willReturn(true);
+
+		mvc.perform(put("/api/bands/1/songs/order").with(asUser(7L))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"status\":\"WISHLIST\",\"folderId\":null,\"songIds\":[3,1,2]}"))
+			.andExpect(status().isNoContent());
+		then(songService).should().reorder(eq(1L), eq(7L), any());
+	}
+
+	@Test
+	void 곡_순서_재지정은_비멤버면_403() throws Exception {
+		given(bandGuard.isMember(1L)).willReturn(false);
+
+		mvc.perform(put("/api/bands/1/songs/order").with(asUser(7L))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"status\":\"WISHLIST\",\"songIds\":[3,1,2]}")).andExpect(status().isForbidden());
 	}
 
 	@TestConfiguration

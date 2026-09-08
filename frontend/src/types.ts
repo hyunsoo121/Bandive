@@ -88,6 +88,8 @@ export interface Song {
   assignments: Record<string, string>;
   /** 속한 폴더 id. null = 미분류 */
   folderId: string | null;
+  /** 그룹(status × 폴더/미분류) 안 수동 정렬 위치. 0 부터 */
+  position: number;
   /** 원본 파트 슬롯 — 배정 API(partId 필요) 호출용 */
   parts: SongPartLite[];
 }

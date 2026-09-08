@@ -29,6 +29,7 @@ import com.bandive.bandive.song.Vote;
 import com.bandive.bandive.song.VoteRepository;
 import com.bandive.bandive.song.dto.SongCreateRequest;
 import com.bandive.bandive.song.dto.SongCreateRequest.SessionSlot;
+import com.bandive.bandive.song.dto.SongOrderRequest;
 import com.bandive.bandive.song.dto.SongResponse;
 import com.bandive.bandive.song.dto.TrackSearchResult;
 import com.bandive.bandive.song.dto.VoteResult;
@@ -130,6 +131,8 @@ public class SongService {
 				}
 			}
 		}
+		// 새 곡은 항상 WISHLIST·미분류 — 그 그룹 맨 끝에 놓는다.
+		song.moveToPosition(songs.countByBandIdAndStatusAndFolderIsNull(bandId, SongStatus.WISHLIST));
 		songs.save(song);
 		return SongResponse.from(song, 0L, false);
 	}
@@ -192,26 +195,50 @@ public class SongService {
 		songs.delete(song);
 	}
 
-	/** 곡을 폴더로 이동 (밴드장). folderId 가 null 이면 미분류. 폴더는 곡과 같은 밴드·같은 status 여야 한다. */
+	/** 곡을 폴더로 이동 (밴드 멤버 누구나). folderId 가 null 이면 미분류. 폴더는 곡과 같은 밴드·같은 status 여야 한다. */
 	@Transactional
 	public SongResponse moveToFolder(Long songId, Long userId, Long folderId) {
 		Song song = findSongWithDetails(songId);
-		requireOwner(song.getBand().getId(), userId);
+		Long bandId = song.getBand().getId();
+		requireMember(bandId, userId);
 		if (folderId == null) {
+			// 이미 미분류가 아니었으면 미분류 그룹 맨 끝으로.
+			int position = songs.countByBandIdAndStatusAndFolderIsNull(bandId, song.getStatus());
 			song.moveToFolder(null);
+			song.moveToPosition(position);
 		}
 		else {
 			SongFolder folder = folders.findById(folderId)
 				.orElseThrow(() -> new NotFoundException("FOLDER_NOT_FOUND", "폴더를 찾을 수 없습니다."));
-			if (!folder.getBand().getId().equals(song.getBand().getId())) {
+			if (!folder.getBand().getId().equals(bandId)) {
 				throw new ValidationException("FOLDER_BAND_MISMATCH", "다른 밴드의 폴더로는 옮길 수 없습니다.");
 			}
 			if (folder.getStatus() != song.getStatus()) {
 				throw new ValidationException("FOLDER_STATUS_MISMATCH", "위시리스트/합주곡 구분이 다른 폴더입니다.");
 			}
+			int position = songs.countByFolderId(folderId);
 			song.moveToFolder(folder);
+			song.moveToPosition(position);
 		}
 		return toResponse(song, userId);
+	}
+
+	/** 한 그룹(status × 폴더/미분류) 안에서 곡 순서를 통째로 다시 지정 (밴드 멤버 누구나). */
+	@Transactional
+	public void reorder(Long bandId, Long userId, SongOrderRequest request) {
+		requireMember(bandId, userId);
+		List<Song> current = (request.folderId() == null)
+				? songs.findByBandIdAndStatusAndFolderIsNullOrderByPositionAsc(bandId, request.status()) : songs
+					.findByBandIdAndStatusAndFolderIdOrderByPositionAsc(bandId, request.status(), request.folderId());
+		Set<Long> currentIds = current.stream().map(Song::getId).collect(HashSet::new, Set::add, Set::addAll);
+		if (currentIds.size() != request.songIds().size() || !currentIds.containsAll(request.songIds())) {
+			throw new ValidationException("SONG_ORDER_MISMATCH", "곡 순서 목록이 현재 그룹의 곡과 일치하지 않습니다.");
+		}
+		for (int i = 0; i < request.songIds().size(); i++) {
+			Long id = request.songIds().get(i);
+			int position = i;
+			current.stream().filter(s -> s.getId().equals(id)).findFirst().orElseThrow().moveToPosition(position);
+		}
 	}
 
 	private Song findSong(Long songId) {

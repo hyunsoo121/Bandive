@@ -81,6 +81,11 @@ public class Song extends BaseTimeEntity {
 	@JoinColumn(name = "folder_id")
 	private SongFolder folder;
 
+	/** (band, status, folder 또는 미분류) 그룹 안에서의 수동 정렬 위치. 0 부터. */
+	@Builder.Default
+	@Column(nullable = false)
+	private int position = 0;
+
 	@Builder.Default
 	@OneToMany(mappedBy = "song", cascade = CascadeType.ALL, orphanRemoval = true)
 	private List<SongPart> parts = new ArrayList<>();
@@ -103,6 +108,11 @@ public class Song extends BaseTimeEntity {
 	/** 폴더로 이동. null 이면 미분류. */
 	public void moveToFolder(SongFolder folder) {
 		this.folder = folder;
+	}
+
+	/** 그룹 안 정렬 위치 지정. */
+	public void moveToPosition(int position) {
+		this.position = position;
 	}
 
 }

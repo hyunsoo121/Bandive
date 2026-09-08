@@ -18,6 +18,18 @@ public interface SongRepository extends JpaRepository<Song, Long> {
 
 	List<Song> findAllByBandIdAndStatus(Long bandId, SongStatus status);
 
+	/** 미분류(folder=null) 그룹의 곡 수 — 새 곡의 position 계산용. */
+	int countByBandIdAndStatusAndFolderIsNull(Long bandId, SongStatus status);
+
+	/** 특정 폴더의 곡 수 — 폴더로 옮길 때 맨 끝 position 계산용. */
+	int countByFolderId(Long folderId);
+
+	/** 한 폴더 안 곡들 (정렬 재지정용). */
+	List<Song> findByBandIdAndStatusAndFolderIdOrderByPositionAsc(Long bandId, SongStatus status, Long folderId);
+
+	/** 미분류 그룹 곡들 (정렬 재지정용). */
+	List<Song> findByBandIdAndStatusAndFolderIsNullOrderByPositionAsc(Long bandId, SongStatus status);
+
 	/** 목록 응답용 — addedBy·parts·배정멤버를 한 번에 fetch. status 가 null 이면 전체. */
 	@Query("""
 			select distinct s from Song s

@@ -59,6 +59,11 @@
 .folder.is-dragging {
   opacity: 0.6;
 }
+.folder__body.is-over {
+  background: var(--color-neutral-100);
+  outline: 2px dashed var(--color-neutral-400);
+  outline-offset: 2px;
+}
 .folder__head {
   display: flex;
   align-items: center;
@@ -75,9 +80,43 @@
   padding: 0 2px;
   touch-action: none;
 }
+.folder__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  flex: 1;
+  min-width: 0;
+}
+.folder__toggle:disabled {
+  cursor: default;
+}
+.folder__caret {
+  font-size: 11px;
+  width: 10px;
+  flex: none;
+  color: var(--color-neutral-600);
+}
 .folder__name {
   font-family: var(--font-heading);
   font-size: 14px;
+}
+.folder__collapsed {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 12px 0;
+  text-align: left;
+  font-size: 12px;
+  color: var(--color-neutral-600);
+  cursor: pointer;
+}
+.folder__collapsed:hover {
+  color: var(--color-text);
 }
 .folder__count {
   font-size: 11px;
@@ -136,6 +175,27 @@
   display: flex;
   gap: 12px;
   align-items: flex-start;
+}
+.songrow.is-dragging {
+  opacity: 0.5;
+}
+.songrow__handle {
+  border: none;
+  background: transparent;
+  cursor: grab;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--color-neutral-500);
+  padding: 4px 0 0;
+  flex: none;
+  touch-action: none;
+}
+.songrow__handle:active {
+  cursor: grabbing;
+}
+.songs__draghint {
+  font-size: 13px;
+  color: var(--color-neutral-500);
 }
 .songrow__main {
   flex: 1;

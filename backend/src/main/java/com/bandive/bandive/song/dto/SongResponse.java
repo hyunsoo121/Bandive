@@ -9,7 +9,7 @@ import com.bandive.bandive.song.SongStatus;
 
 public record SongResponse(Long id, Long bandId, String title, String artist, SongStatus status,
 		SongSourceType sourceType, String externalTrackId, String artworkUrl, String memo, String referenceVideoUrl,
-		Long addedByUserId, String addedByNickname, long voteCount, boolean votedByMe, Long folderId,
+		Long addedByUserId, String addedByNickname, long voteCount, boolean votedByMe, Long folderId, int position,
 		List<SongPartResponse> parts, Instant createdAt) {
 
 	public static SongResponse from(Song song, long voteCount, boolean votedByMe) {
@@ -21,7 +21,7 @@ public record SongResponse(Long id, Long bandId, String title, String artist, So
 		return new SongResponse(song.getId(), song.getBand().getId(), song.getTitle(), song.getArtist(),
 				song.getStatus(), song.getSourceType(), song.getExternalTrackId(), song.getArtworkUrl(), song.getMemo(),
 				song.getReferenceVideoUrl(), song.getAddedBy().getId(), song.getAddedBy().getNickname(), voteCount,
-				votedByMe, folderId, parts, song.getCreatedAt());
+				votedByMe, folderId, song.getPosition(), parts, song.getCreatedAt());
 	}
 
 }

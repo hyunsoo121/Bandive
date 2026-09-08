@@ -156,8 +156,14 @@ interface AppState {
   addSong: (input: NewSongInput) => Promise<void>;
   /** 곡 삭제 (밴드장) */
   removeSong: (songId: string) => Promise<void>;
-  /** 곡을 폴더로 이동 (밴드장). folderId null = 미분류 */
+  /** 곡을 폴더로 이동 (멤버 누구나). folderId null = 미분류. 대상 그룹 맨 끝으로 */
   moveSongToFolder: (songId: string, folderId: string | null) => Promise<void>;
+  /** 한 그룹(status × 폴더/미분류) 안 곡 순서 재지정 (멤버 누구나) */
+  reorderSongs: (
+    status: Song['status'],
+    folderId: string | null,
+    songIds: string[],
+  ) => Promise<void>;
   /** 곡 폴더 생성 (밴드장) */
   createSongFolder: (name: string, status: Song['status']) => Promise<void>;
   /** 곡 폴더 이름 변경 (밴드장) */
@@ -481,6 +487,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setSongs((prev) => prev.map((s) => (s.id === songId ? toSong(dto) : s)));
   }, []);
 
+  const reorderSongs = useCallback(
+    async (status: Song['status'], folderId: string | null, songIds: string[]) => {
+      if (!currentBandId) return;
+      // 낙관적 반영: 해당 그룹 곡들의 position 을 새 순서 인덱스로
+      const order = new Map(songIds.map((id, i) => [id, i]));
+      setSongs((prev) =>
+        prev.map((s) =>
+          s.bandId === currentBandId &&
+          s.status === status &&
+          (s.folderId ?? null) === folderId &&
+          order.has(s.id)
+            ? { ...s, position: order.get(s.id) ?? s.position }
+            : s,
+        ),
+      );
+      try {
+        await songApi.reorderSongs(currentBandId, status, folderId, songIds);
+      } catch (e) {
+        const fresh = await songApi.listSongs(currentBandId);
+        setSongs(fresh.map(toSong));
+        throw e;
+      }
+    },
+    [currentBandId],
+  );
+
   const createSongFolder = useCallback(
     async (name: string, status: Song['status']) => {
       if (!currentBandId) return;
@@ -625,6 +657,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addSong,
     removeSong,
     moveSongToFolder,
+    reorderSongs,
     createSongFolder,
     renameSongFolder,
     removeSongFolder,

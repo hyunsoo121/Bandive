@@ -7,6 +7,19 @@ import type {
   VoteResultDto,
 } from './types';
 
+/** 한 그룹(status × 폴더/미분류) 안 곡 순서 재지정 (밴드 멤버 누구나). songIds 는 그 그룹의 전체 곡. */
+export const reorderSongs = (
+  bandId: string,
+  status: SongStatusDto,
+  folderId: string | null,
+  songIds: string[],
+) =>
+  api.put<void>(`/api/bands/${bandId}/songs/order`, {
+    status,
+    folderId: folderId ? Number(folderId) : null,
+    songIds: songIds.map(Number),
+  });
+
 /** 외부 음원 검색 (공개). 결과의 externalTrackId 를 곡 추가 시 그대로 넘긴다. */
 export const searchTracks = (q: string) =>
   api.get<TrackSearchResultDto[]>(`/api/songs/search?q=${encodeURIComponent(q)}`);
@@ -37,6 +50,6 @@ export const assignPart = (songId: string, partId: string, userId: string | null
 /** 곡 삭제 (밴드장). parts·votes cascade. */
 export const deleteSong = (songId: string) => api.del<void>(`/api/songs/${songId}`);
 
-/** 곡을 폴더로 이동 (밴드장). folderId null 이면 미분류. */
+/** 곡을 폴더로 이동 (밴드 멤버 누구나). folderId null 이면 미분류. 대상 그룹 맨 끝에 놓인다. */
 export const moveSongToFolder = (songId: string, folderId: string | null) =>
   api.put<SongDto>(`/api/songs/${songId}/folder`, { folderId: folderId ? Number(folderId) : null });

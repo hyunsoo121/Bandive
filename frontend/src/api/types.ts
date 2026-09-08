@@ -89,6 +89,7 @@ export interface SongDto {
   voteCount: number;
   votedByMe: boolean;
   folderId: number | null;
+  position: number;
   parts: SongPartDto[];
   createdAt: string;
 }
