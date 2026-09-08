@@ -243,3 +243,20 @@
   font-weight: 700;
   padding: 3px 8px;
 }
+/* 관리자 — 멤버 행에서 바로 출결 지정 */
+.sched__att-set {
+  display: flex;
+  gap: 4px;
+  flex: none;
+}
+.sched__att--sm {
+  flex: none;
+  padding: 4px 8px;
+  font-size: 11px;
+  border-width: 1px;
+  border-color: var(--color-neutral-400);
+  color: var(--color-neutral-700);
+}
+.sched__att--sm.is-on {
+  border-color: var(--color-text);
+}

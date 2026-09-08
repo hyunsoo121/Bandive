@@ -39,7 +39,16 @@ function buildCells(year: number, month: number, events: UiSchedule[]): Cell[] {
 const DOW = ['일', '월', '화', '수', '목', '금', '토'];
 
 export function SchedulePage() {
-  const { currentBand, media: allMedia, members: allMembers, schedules, setAttendance } = useApp();
+  const {
+    currentBand,
+    role,
+    media: allMedia,
+    members: allMembers,
+    schedules,
+    setAttendance,
+    setMemberAttendance,
+  } = useApp();
+  const isOwner = role === 'owner';
   const guard = useGuard();
   const bandId = currentBand?.id ?? '';
 
@@ -316,13 +325,36 @@ export function SchedulePage() {
                   return (
                     <div key={r.id} className="sched__att-row">
                       <Avatar label={r.initial} size={26} color={r.avatarColor} />
-                      <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{r.name}</span>
-                      <span className="muted" style={{ fontSize: 11 }}>
-                        {r.parts.join(', ')}
+                      <span className="stack" style={{ flex: 1, minWidth: 0, gap: 1 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600 }}>{r.name}</span>
+                        {r.parts.length > 0 && (
+                          <span className="muted" style={{ fontSize: 10 }}>
+                            {r.parts.join(', ')}
+                          </span>
+                        )}
                       </span>
-                      <span className="sched__status" style={st}>
-                        {r.status}
-                      </span>
+                      {isOwner ? (
+                        <div className="sched__att-set">
+                          {ATT_OPTIONS.map((opt) => (
+                            <button
+                              key={opt}
+                              type="button"
+                              className={`sched__att sched__att--sm${
+                                r.status === opt ? ' is-on' : ''
+                              }`}
+                              onClick={() => {
+                                void setMemberAttendance(selected.id, r.id, opt);
+                              }}
+                            >
+                              {opt}
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="sched__status" style={st}>
+                          {r.status}
+                        </span>
+                      )}
                     </div>
                   );
                 })}

@@ -65,4 +65,11 @@ public class ScheduleController {
 		return scheduleService.setAttendance(scheduleId, userId, request.status());
 	}
 
+	/** 관리자가 특정 멤버의 참석 여부를 대신 설정. */
+	@PostMapping("/api/schedules/{scheduleId}/attendance/{userId}")
+	public ScheduleResponse setMemberAttendance(@PathVariable Long scheduleId, @PathVariable Long userId,
+			@CurrentUser Long actorUserId, @Valid @RequestBody AttendanceRequest request) {
+		return scheduleService.setMemberAttendance(scheduleId, actorUserId, userId, request.status());
+	}
+
 }

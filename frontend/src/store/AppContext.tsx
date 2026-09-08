@@ -192,6 +192,12 @@ interface AppState {
   removeSchedule: (scheduleId: string) => Promise<void>;
   /** 내 참석 여부 등록/변경 (POST /api/schedules/{id}/attendance) */
   setAttendance: (scheduleId: string, status: AttendanceStatus) => Promise<void>;
+  /** 관리자가 특정 멤버의 참석 여부를 대신 등록/변경 */
+  setMemberAttendance: (
+    scheduleId: string,
+    userId: string,
+    status: AttendanceStatus,
+  ) => Promise<void>;
 
   /** 영상 URL 첨부 (POST /api/bands/{id}/media) */
   addMedia: (input: NewMediaInput) => Promise<void>;
@@ -668,6 +674,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const setMemberAttendance = useCallback(
+    async (scheduleId: string, userId: string, status: AttendanceStatus) => {
+      try {
+        const dto = await scheduleApi.setMemberAttendance(scheduleId, userId, ATT_TO_EN[status]);
+        setSchedules((prev) => prev.map((s) => (s.id === scheduleId ? toSchedule(dto) : s)));
+      } catch (e) {
+        console.error('멤버 출결 저장 실패', e);
+      }
+    },
+    [],
+  );
+
   // 일정에 연결된 영상이 바뀌면 그 일정의 mediaIds 도 다시 받아야 상세에 반영된다.
   const refreshSchedules = useCallback(async (bandId: string) => {
     const list = await scheduleApi.listSchedules(bandId);
@@ -765,6 +783,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addSchedule,
     removeSchedule,
     setAttendance,
+    setMemberAttendance,
     addMedia,
     editMedia,
     removeMedia,

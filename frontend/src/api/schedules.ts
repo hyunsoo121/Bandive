@@ -26,3 +26,10 @@ export const deleteSchedule = (scheduleId: string) => api.del<void>(`/api/schedu
 /** 내 참석 여부 등록/변경 (밴드 멤버) — upsert. */
 export const setAttendance = (scheduleId: string, status: AttendanceStatusDto) =>
   api.post<ScheduleDto>(`/api/schedules/${scheduleId}/attendance`, { status });
+
+/** 관리자가 특정 멤버의 참석 여부를 대신 등록/변경 — upsert. */
+export const setMemberAttendance = (
+  scheduleId: string,
+  userId: string,
+  status: AttendanceStatusDto,
+) => api.post<ScheduleDto>(`/api/schedules/${scheduleId}/attendance/${userId}`, { status });

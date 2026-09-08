@@ -116,17 +116,32 @@ public class ScheduleService {
 	public ScheduleResponse setAttendance(Long scheduleId, Long userId, AttendanceStatus status) {
 		Schedule schedule = findSchedule(scheduleId);
 		requireMember(schedule.getBand().getId(), userId);
-
-		attendances.findByScheduleIdAndUserId(scheduleId, userId).ifPresentOrElse(existing -> {
-			existing.changeStatus(status);
-		}, () -> {
-			attendances.save(Attendance.builder()
-				.schedule(schedule)
-				.user(users.getReferenceById(userId))
-				.status(status)
-				.build());
-		});
+		upsertAttendance(schedule, userId, status);
 		return toResponse(schedule, userId);
+	}
+
+	/** 관리자가 특정 멤버의 참석 여부를 대신 등록/변경 (upsert). */
+	@Transactional
+	public ScheduleResponse setMemberAttendance(Long scheduleId, Long actorUserId, Long targetUserId,
+			AttendanceStatus status) {
+		Schedule schedule = findSchedule(scheduleId);
+		Long bandId = schedule.getBand().getId();
+		requireOwner(bandId, actorUserId);
+		if (!bandMembers.existsByBandIdAndUserId(bandId, targetUserId)) {
+			throw new NotFoundException("MEMBER_NOT_FOUND", "해당 멤버를 찾을 수 없습니다.");
+		}
+		upsertAttendance(schedule, targetUserId, status);
+		return toResponse(schedule, actorUserId);
+	}
+
+	private void upsertAttendance(Schedule schedule, Long userId, AttendanceStatus status) {
+		attendances.findByScheduleIdAndUserId(schedule.getId(), userId)
+			.ifPresentOrElse(existing -> existing.changeStatus(status),
+					() -> attendances.save(Attendance.builder()
+						.schedule(schedule)
+						.user(users.getReferenceById(userId))
+						.status(status)
+						.build()));
 	}
 
 	private Schedule findSchedule(Long scheduleId) {

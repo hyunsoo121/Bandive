@@ -186,6 +186,43 @@ class ScheduleServiceTest extends RepositoryTest {
 	}
 
 	@Test
+	void 관리자는_다른_멤버의_출결을_대신_설정한다() {
+		Long scheduleId = service.create(band.getId(), ownerId, req()).id();
+		service.setAttendance(scheduleId, memberId, AttendanceStatus.UNDECIDED);
+		em.flush();
+		em.clear();
+
+		service.setMemberAttendance(scheduleId, ownerId, memberId, AttendanceStatus.ABSENT);
+		em.flush();
+		em.clear();
+
+		assertThat(attendances.findByScheduleIdAndUserId(scheduleId, memberId).orElseThrow().getStatus())
+			.isEqualTo(AttendanceStatus.ABSENT);
+		assertThat(attendances.findAllByScheduleId(scheduleId)).hasSize(1); // upsert, 중복
+																			// 안 생김
+	}
+
+	@Test
+	void 일반_멤버는_남의_출결을_설정할_수_없다_403() {
+		Long scheduleId = service.create(band.getId(), ownerId, req()).id();
+		em.flush();
+
+		assertThatThrownBy(() -> service.setMemberAttendance(scheduleId, memberId, ownerId, AttendanceStatus.ATTENDING))
+			.isInstanceOf(ForbiddenException.class)
+			.satisfies(ex -> assertThat(((ForbiddenException) ex).getCode()).isEqualTo("NOT_BAND_OWNER"));
+	}
+
+	@Test
+	void 대상이_멤버가_아니면_404() {
+		Long scheduleId = service.create(band.getId(), ownerId, req()).id();
+		em.flush();
+
+		assertThatThrownBy(() -> service.setMemberAttendance(scheduleId, ownerId, 999_999L, AttendanceStatus.ATTENDING))
+			.isInstanceOf(NotFoundException.class)
+			.satisfies(ex -> assertThat(((NotFoundException) ex).getCode()).isEqualTo("MEMBER_NOT_FOUND"));
+	}
+
+	@Test
 	void 일정_목록에_공개범위_필터된_연결_영상이_포함된다() {
 		Long scheduleId = service.create(band.getId(), ownerId, req()).id();
 		Schedule schedule = schedules.findById(scheduleId).orElseThrow();

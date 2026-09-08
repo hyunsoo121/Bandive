@@ -143,7 +143,8 @@
 | POST | /api/bands/{bandId}/schedules | 일정 등록 | O |
 | PATCH | /api/schedules/{scheduleId} | 일정 수정 | O |
 | DELETE | /api/schedules/{scheduleId} | 일정 삭제 | O (관리자) |
-| POST | /api/schedules/{scheduleId}/attendance | 참석 여부 등록/변경 | O |
+| POST | /api/schedules/{scheduleId}/attendance | 내 참석 여부 등록/변경 | O |
+| POST | /api/schedules/{scheduleId}/attendance/{userId} | 멤버 출결 대신 설정 | O (관리자) |
 
 ### 미디어
 | Method | Endpoint | 설명 | 인증 |
@@ -224,6 +225,7 @@
     `PATCH /api/schedules/{id}`(**밴드 멤버 누구나**, 부분 수정 — null 필드 무시) /
     `DELETE /api/schedules/{id}`(관리자, attendances cascade) /
     `POST /api/schedules/{id}/attendance`(밴드 멤버, `{status}` → 내 출결 **upsert**).
+    - ✅ 2026-09-08 추가: `POST /api/schedules/{id}/attendance/{userId}`(관리자만, 특정 멤버 출결 대신 설정 — `requireOwner` + 멤버 검증, upsert). 프론트 일정 상세 "멤버 출결" 목록에서 관리자는 행별로 참석/미정/불참 바로 지정.
     권한 서비스 레벨(scheduleId → schedule.band). 없는 일정 `404 SCHEDULE_NOT_FOUND`.
     **"연결 영상 포함"은 4-6 에서** (Media 도메인 후). 마이그레이션 없음. 142 테스트 그린.
   - **4-6 미디어 ✅ 완료 (2026-09-02) → Phase 4 전체 완료**: `media/{dto,service,controller}`.
