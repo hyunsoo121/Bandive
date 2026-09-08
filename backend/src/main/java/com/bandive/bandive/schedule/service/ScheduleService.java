@@ -151,7 +151,7 @@ public class ScheduleService {
 		BandMember member = bandMembers.findByBandIdAndUserId(bandId, userId)
 			.orElseThrow(() -> new ForbiddenException("NOT_A_MEMBER", "이 밴드의 멤버가 아닙니다."));
 		if (member.getRole() != BandRole.OWNER) {
-			throw new ForbiddenException("NOT_BAND_OWNER", "밴드장만 할 수 있습니다.");
+			throw new ForbiddenException("NOT_BAND_OWNER", "관리자만 할 수 있습니다.");
 		}
 	}
 

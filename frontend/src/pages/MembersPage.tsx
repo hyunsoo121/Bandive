@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { Avatar } from '../components/Avatar';
 import { PartsPickerModal } from '../components/PartsPickerModal';
+import { DangerConfirmModal } from '../components/DangerConfirmModal';
 import type { Member } from '../types';
 import './MembersPage.css';
 
@@ -21,26 +22,13 @@ export function MembersPage() {
   const [copied, setCopied] = useState(false);
   const [issuing, setIssuing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [leaveArmed, setLeaveArmed] = useState(false);
-  const [leaving, setLeaving] = useState(false);
+  const [leaveOpen, setLeaveOpen] = useState(false);
 
   if (!currentBand) return null;
 
   const isOwner = role === 'owner';
   const isMember = role === 'member';
   const bandMembers = members.filter((m) => m.bandId === currentBand.id);
-
-  const runLeave = async () => {
-    setLeaving(true);
-    setError(null);
-    try {
-      await leaveBand();
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : '밴드를 탈퇴하지 못했습니다.');
-      setLeaving(false);
-      setLeaveArmed(false);
-    }
-  };
 
   const runIssue = async () => {
     setIssuing(true);
@@ -51,15 +39,6 @@ export function MembersPage() {
       setError(e instanceof Error ? e.message : '초대 코드를 발급하지 못했습니다.');
     } finally {
       setIssuing(false);
-    }
-  };
-
-  const runKick = async (userId: string) => {
-    setError(null);
-    try {
-      await kickMember(userId);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : '멤버를 추방하지 못했습니다.');
     }
   };
 
@@ -110,7 +89,7 @@ export function MembersPage() {
             canManage={isOwner}
             onSetParts={(parts) => runSetParts(m.id, parts)}
             onSetLeader={(on) => runSetLeader(on ? m.id : null)}
-            onKick={() => runKick(m.id)}
+            onKick={() => kickMember(m.id)}
           />
         ))}
       </div>
@@ -163,29 +142,13 @@ export function MembersPage() {
 
       {isMember && (
         <div className="members__leave">
-          {leaveArmed ? (
-            <>
-              <button
-                type="button"
-                className="btn btn--sm members__leave-btn"
-                disabled={leaving}
-                onClick={runLeave}
-              >
-                {leaving ? '탈퇴 중…' : `정말 "${currentBand.name}" 탈퇴`}
-              </button>
-              <button type="button" className="btn btn--sm" onClick={() => setLeaveArmed(false)}>
-                취소
-              </button>
-            </>
-          ) : (
-            <button
-              type="button"
-              className="btn btn--sm members__leave-btn"
-              onClick={() => setLeaveArmed(true)}
-            >
-              밴드 탈퇴
-            </button>
-          )}
+          <button
+            type="button"
+            className="btn btn--sm members__leave-btn"
+            onClick={() => setLeaveOpen(true)}
+          >
+            밴드 탈퇴
+          </button>
         </div>
       )}
 
@@ -194,6 +157,21 @@ export function MembersPage() {
           관리자는 밴드를 탈퇴할 수 없습니다. 다른 멤버에게 관리자를 위임한 뒤에 탈퇴하거나, 밴드
           설정에서 밴드를 삭제하세요.
         </p>
+      )}
+
+      {leaveOpen && (
+        <DangerConfirmModal
+          title="밴드 탈퇴"
+          message={
+            <>
+              정말 <strong>{currentBand.name}</strong> 에서 탈퇴하시겠습니까? 다시 들어오려면 초대
+              코드가 필요합니다.
+            </>
+          }
+          confirmPhrase="밴드 탈퇴"
+          onConfirm={leaveBand}
+          onClose={() => setLeaveOpen(false)}
+        />
       )}
     </div>
   );
@@ -207,11 +185,12 @@ interface RowProps {
   canManage: boolean;
   onSetParts: (parts: string[]) => void;
   onSetLeader: (on: boolean) => void;
-  onKick: () => void;
+  onKick: () => Promise<void>;
 }
 
 function MemberRow({ member, canEditParts, canManage, onSetParts, onSetLeader, onKick }: RowProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [kickOpen, setKickOpen] = useState(false);
   const parts = member.parts;
 
   return (
@@ -266,7 +245,7 @@ function MemberRow({ member, canEditParts, canManage, onSetParts, onSetLeader, o
           </button>
         )}
         {canManage && member.role !== 'owner' && (
-          <button type="button" className="members__kick" onClick={onKick}>
+          <button type="button" className="members__kick" onClick={() => setKickOpen(true)}>
             추방
           </button>
         )}
@@ -281,6 +260,21 @@ function MemberRow({ member, canEditParts, canManage, onSetParts, onSetLeader, o
             setPickerOpen(false);
           }}
           onClose={() => setPickerOpen(false)}
+        />
+      )}
+
+      {kickOpen && (
+        <DangerConfirmModal
+          title="멤버 추방"
+          message={
+            <>
+              <strong>{member.name}</strong> 님을 밴드에서 추방하시겠습니까? 이 멤버의 세션 설정도
+              함께 사라집니다.
+            </>
+          }
+          confirmPhrase="멤버 추방"
+          onConfirm={onKick}
+          onClose={() => setKickOpen(false)}
         />
       )}
     </div>

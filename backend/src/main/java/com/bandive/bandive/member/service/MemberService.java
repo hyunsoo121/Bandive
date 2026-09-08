@@ -79,7 +79,7 @@ public class MemberService {
 	public void kick(Long bandId, Long targetUserId) {
 		BandMember target = requireMember(bandId, targetUserId, "MEMBER_NOT_FOUND", "해당 멤버를 찾을 수 없습니다.");
 		if (target.getRole() == BandRole.OWNER) {
-			throw new ConflictException("CANNOT_KICK_OWNER", "밴드장은 추방할 수 없습니다.");
+			throw new ConflictException("CANNOT_KICK_OWNER", "관리자는 추방할 수 없습니다.");
 		}
 		bandMembers.delete(target);
 	}
@@ -89,7 +89,7 @@ public class MemberService {
 	public void leave(Long bandId, Long userId) {
 		BandMember me = requireMember(bandId, userId, "NOT_A_MEMBER", "이 밴드의 멤버가 아닙니다.");
 		if (me.getRole() == BandRole.OWNER) {
-			throw new ConflictException("OWNER_CANNOT_LEAVE", "밴드장은 탈퇴할 수 없습니다. 밴드를 삭제하거나 밴드장을 위임하세요.");
+			throw new ConflictException("OWNER_CANNOT_LEAVE", "관리자는 탈퇴할 수 없습니다. 밴드를 삭제하거나 관리자를 위임하세요.");
 		}
 		bandMembers.delete(me);
 	}
