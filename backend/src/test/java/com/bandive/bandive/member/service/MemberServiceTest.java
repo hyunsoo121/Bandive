@@ -105,6 +105,46 @@ class MemberServiceTest extends RepositoryTest {
 	}
 
 	@Test
+	void 리더를_지정하고_재지정하면_이전_리더는_해제된다() {
+		join("owner", BandRole.OWNER, "2026-09-01T00:00:00Z");
+		BandMember a = join("a", BandRole.MEMBER, "2026-09-02T00:00:00Z");
+		BandMember b = join("b", BandRole.MEMBER, "2026-09-03T00:00:00Z");
+		em.flush();
+		em.clear();
+
+		service.assignLeader(band.getId(), a.getUser().getId());
+		em.flush();
+		em.clear();
+		assertThat(leadersOf()).containsExactly(a.getUser().getId());
+
+		// 다른 멤버로 재지정 → 이전 리더 해제, 밴드당 1명 유지
+		service.assignLeader(band.getId(), b.getUser().getId());
+		em.flush();
+		em.clear();
+		assertThat(leadersOf()).containsExactly(b.getUser().getId());
+
+		// null 이면 리더 없음
+		service.assignLeader(band.getId(), null);
+		em.flush();
+		em.clear();
+		assertThat(leadersOf()).isEmpty();
+	}
+
+	@Test
+	void 없는_멤버를_리더로_지정하면_404() {
+		assertThatThrownBy(() -> service.assignLeader(band.getId(), 999L)).isInstanceOf(NotFoundException.class)
+			.satisfies(ex -> assertThat(((NotFoundException) ex).getCode()).isEqualTo("MEMBER_NOT_FOUND"));
+	}
+
+	private List<Long> leadersOf() {
+		return bandMembers.findAllByBandId(band.getId())
+			.stream()
+			.filter(BandMember::isLeader)
+			.map(m -> m.getUser().getId())
+			.toList();
+	}
+
+	@Test
 	void 추방하면_멤버_행이_삭제된다() {
 		join("owner", BandRole.OWNER, "2026-09-01T00:00:00Z");
 		BandMember target = join("m", BandRole.MEMBER, "2026-09-02T00:00:00Z");

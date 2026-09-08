@@ -1,10 +1,23 @@
 import { useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { Avatar } from '../components/Avatar';
+import { PartsPickerModal } from '../components/PartsPickerModal';
+import type { Member } from '../types';
 import './MembersPage.css';
 
 export function MembersPage() {
-  const { currentBand, role, members, kickMember, leaveBand, invite, issueInviteCode } = useApp();
+  const {
+    currentBand,
+    role,
+    user,
+    members,
+    kickMember,
+    setMemberParts,
+    setBandLeader,
+    leaveBand,
+    invite,
+    issueInviteCode,
+  } = useApp();
   const [copied, setCopied] = useState(false);
   const [issuing, setIssuing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -15,6 +28,7 @@ export function MembersPage() {
 
   const isOwner = role === 'owner';
   const isMember = role === 'member';
+  const bandMembers = members.filter((m) => m.bandId === currentBand.id);
 
   const runLeave = async () => {
     setLeaving(true);
@@ -27,7 +41,6 @@ export function MembersPage() {
       setLeaveArmed(false);
     }
   };
-  const bandMembers = members.filter((m) => m.bandId === currentBand.id);
 
   const runIssue = async () => {
     setIssuing(true);
@@ -47,6 +60,24 @@ export function MembersPage() {
       await kickMember(userId);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : '멤버를 추방하지 못했습니다.');
+    }
+  };
+
+  const runSetParts = async (userId: string, parts: string[]) => {
+    setError(null);
+    try {
+      await setMemberParts(userId, parts);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '세션을 저장하지 못했습니다.');
+    }
+  };
+
+  const runSetLeader = async (userId: string | null) => {
+    setError(null);
+    try {
+      await setBandLeader(userId);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '리더를 지정하지 못했습니다.');
     }
   };
 
@@ -71,36 +102,21 @@ export function MembersPage() {
       </header>
 
       <div className="members__list">
-        {bandMembers.map((m) => {
-          const canKick = isOwner && m.role !== 'owner';
-          return (
-            <div key={m.id} className="members__row">
-              <Avatar label={m.initial} size={34} color={m.avatarColor} />
-              <span className="stack" style={{ flex: 1, minWidth: 0 }}>
-                <strong style={{ fontSize: 14 }}>{m.name}</strong>
-              </span>
-              <span
-                className="members__role"
-                style={{
-                  background:
-                    m.role === 'owner' ? 'var(--color-accent)' : 'var(--color-neutral-200)',
-                  color: m.role === 'owner' ? '#fff' : 'var(--color-neutral-800)',
-                }}
-              >
-                {m.role === 'owner' ? '관리자' : '사용자'}
-              </span>
-              {canKick && (
-                <button type="button" className="members__kick" onClick={() => runKick(m.id)}>
-                  추방
-                </button>
-              )}
-            </div>
-          );
-        })}
+        {bandMembers.map((m) => (
+          <MemberRow
+            key={m.id}
+            member={m}
+            canEditParts={isOwner || m.id === user?.id}
+            canManage={isOwner}
+            onSetParts={(parts) => runSetParts(m.id, parts)}
+            onSetLeader={(on) => runSetLeader(on ? m.id : null)}
+            onKick={() => runKick(m.id)}
+          />
+        ))}
       </div>
 
       {error && (
-        <p style={{ fontSize: 12, margin: '10px 0 0', color: 'var(--color-accent)' }}>{error}</p>
+        <p style={{ fontSize: 12, margin: '10px 16px 0', color: 'var(--color-accent)' }}>{error}</p>
       )}
 
       {isOwner && (
@@ -140,7 +156,9 @@ export function MembersPage() {
       )}
 
       {!isOwner && (
-        <p className="members__note muted">멤버 초대와 추방은 관리자만 할 수 있습니다.</p>
+        <p className="members__note muted">
+          멤버 초대·추방과 리더 지정은 관리자만 할 수 있습니다. 내 세션은 직접 설정할 수 있어요.
+        </p>
       )}
 
       {isMember && (
@@ -176,6 +194,94 @@ export function MembersPage() {
           관리자는 밴드를 탈퇴할 수 없습니다. 다른 멤버에게 관리자를 위임한 뒤에 탈퇴하거나, 밴드
           설정에서 밴드를 삭제하세요.
         </p>
+      )}
+    </div>
+  );
+}
+
+/* ───────────────────────── 멤버 행 ───────────────────────── */
+
+interface RowProps {
+  member: Member;
+  canEditParts: boolean;
+  canManage: boolean;
+  onSetParts: (parts: string[]) => void;
+  onSetLeader: (on: boolean) => void;
+  onKick: () => void;
+}
+
+function MemberRow({ member, canEditParts, canManage, onSetParts, onSetLeader, onKick }: RowProps) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const parts = member.parts;
+
+  return (
+    <div className="members__row">
+      <div className="members__row-top">
+        <Avatar label={member.initial} size={34} color={member.avatarColor} />
+        <span className="stack" style={{ flex: 1, minWidth: 0, gap: 4 }}>
+          <strong style={{ fontSize: 14 }}>{member.name}</strong>
+          <span className="members__parts-line">
+            {parts.length ? (
+              parts.map((p) => (
+                <span key={p} className="members__part-chip">
+                  {p}
+                </span>
+              ))
+            ) : (
+              <span className="muted" style={{ fontSize: 11 }}>
+                세션 미지정
+              </span>
+            )}
+            {canEditParts && (
+              <button
+                type="button"
+                className="members__parts-edit"
+                onClick={() => setPickerOpen(true)}
+              >
+                세션 설정
+              </button>
+            )}
+          </span>
+        </span>
+
+        {member.leader && <span className="members__leader">리더</span>}
+        <span
+          className="members__role"
+          style={{
+            background:
+              member.role === 'owner' ? 'var(--color-accent)' : 'var(--color-neutral-200)',
+            color: member.role === 'owner' ? '#fff' : 'var(--color-neutral-800)',
+          }}
+        >
+          {member.role === 'owner' ? '관리자' : '사용자'}
+        </span>
+
+        {canManage && (
+          <button
+            type="button"
+            className={`members__leadbtn${member.leader ? ' is-on' : ''}`}
+            onClick={() => onSetLeader(!member.leader)}
+          >
+            {member.leader ? '리더 해제' : '리더 지정'}
+          </button>
+        )}
+        {canManage && member.role !== 'owner' && (
+          <button type="button" className="members__kick" onClick={onKick}>
+            추방
+          </button>
+        )}
+      </div>
+
+      {pickerOpen && (
+        <PartsPickerModal
+          name={member.name}
+          current={parts}
+          onSave={(next) => {
+            onSetParts(next);
+            setPickerOpen(false);
+          }}
+          onClose={() => setPickerOpen(false)}
+        />
       )}
     </div>
   );

@@ -10,12 +10,14 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.bandive.bandive.auth.CurrentUser;
+import com.bandive.bandive.member.dto.LeaderRequest;
 import com.bandive.bandive.member.dto.MemberPartsRequest;
 import com.bandive.bandive.member.dto.MemberResponse;
 import com.bandive.bandive.member.service.MemberService;
@@ -48,6 +50,14 @@ public class MemberController {
 	public MemberResponse updateMemberParts(@PathVariable Long bandId, @PathVariable Long userId,
 			@Valid @RequestBody MemberPartsRequest request) {
 		return memberService.updateMemberParts(bandId, userId, request);
+	}
+
+	/** 관리자가 밴드 리더를 지정/해제. {@code userId} 가 null 이면 리더 없음. */
+	@PutMapping("/leader")
+	@PreAuthorize("@bandGuard.isOwner(#bandId)")
+	public List<MemberResponse> assignLeader(@PathVariable Long bandId,
+			@RequestBody(required = false) LeaderRequest request) {
+		return memberService.assignLeader(bandId, request == null ? null : request.userId());
 	}
 
 	/** 탈퇴. */

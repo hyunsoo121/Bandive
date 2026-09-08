@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
 public interface BandMemberRepository extends JpaRepository<BandMember, Long> {
@@ -21,5 +22,10 @@ public interface BandMemberRepository extends JpaRepository<BandMember, Long> {
 	/** 멤버 목록용 — user 를 fetch join 해서 N+1 을 피한다. */
 	@Query("select bm from BandMember bm join fetch bm.user where bm.band.id = :bandId")
 	List<BandMember> findAllByBandIdWithUser(Long bandId);
+
+	/** 밴드의 리더 플래그를 모두 해제 (리더 재지정 전에 호출). */
+	@Modifying(clearAutomatically = true, flushAutomatically = true)
+	@Query("update BandMember bm set bm.leader = false where bm.band.id = :bandId and bm.leader = true")
+	void clearLeader(Long bandId);
 
 }

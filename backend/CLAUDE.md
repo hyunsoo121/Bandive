@@ -256,6 +256,8 @@
   - ✅ 보안 점검(배포 전, 2026-09-08): SQL 인젝션 표면 없음(전부 JPQL 바인딩). `SongCreateRequest.referenceVideoUrl`·`artworkUrl` 에 `@Pattern("^(https?://.+)?$")` 추가 — 프론트가 `<a href>`/`<img src>` 로 그대로 렌더하는데 검증이 없어 `javascript:` 저장형 XSS 가능했음(media URL 은 이미 막혀 있었음). 상세는 [`../docs/TROUBLESHOOTING.md`](../docs/TROUBLESHOOTING.md) "보안 점검" 절
   - ✅ 회원정보·밴드 수정 (2026-09-08): `PATCH /api/auth/me`(닉네임) + `PATCH /api/auth/me/password`(LOCAL 계정만, 현재 비번 확인 → `CURRENT_PASSWORD_MISMATCH` 400 / 카카오면 `PASSWORD_CHANGE_UNSUPPORTED` 409). `MeResponse` 에 `email`·`provider` 추가. 밴드 수정 백엔드는 이미 있었음(`PATCH /api/bands/{id}` 이름·소개, 로고/배너, `PUT .../owner` 위임, `DELETE`) — 프론트에 `/bands/:id/settings` 페이지(밴드장 전용: 정보·이미지·위임·삭제) + 사이드바 "내 정보" 모달 신설. `moveToFolder`·위임·삭제는 그대로 밴드장
   - ✅ 밴드 탈퇴 (2026-09-08, 프론트만): `DELETE /api/bands/{id}/members/me`(`OWNER_CANNOT_LEAVE` 409, 이미 Phase 4-3 에 구현됨) 를 `AppContext.leaveBand` + 멤버 페이지 2단계 버튼(일반 멤버만 노출)으로 연결
+  - ✅ "밴드장"→"관리자" 명칭 통일 (2026-09-08, 프론트 사용자노출 텍스트만. api/*.ts JSDoc 은 유지)
+  - ✅ 멤버 세션 설정 + 밴드 리더 (2026-09-08): 세션(파트) 설정은 백엔드에 이미 있었음(`PATCH .../members/me` 본인, `PATCH .../members/{userId}` 관리자, 자유 텍스트 리스트 최대 5개, 중복·다중 허용) — 멤버 페이지에 편집 UI(악기 토글칩 + 직접입력) 추가. **리더**는 신규: `V9` `band_members.is_leader` + 부분 유니크 인덱스(밴드당 1명), `PUT /api/bands/{bandId}/members/leader` `{userId|null}` 관리자 전용(`clearLeader` 후 재지정, 갱신 목록 반환), `MemberResponse.leader` 추가. `MemberDto`/`Member` 에 `parts[]`·`leader` 추가(기존 `part: ''` 스텁 제거)
 - **Phase 7 — 배포**: Dockerfile, prod compose, CI/CD (push → AWS 자동 배포).
   **+ S3 `StorageService` 구현체** (Phase 5 에서 이동 — `app.storage.type=s3`, AWS SDK v2, 버킷·IAM).
   ⚠️ 로컬에서 비켜쓴 포트를 **기본값으로 복구**: Postgres 5432, Redis 6379, 앱 8080

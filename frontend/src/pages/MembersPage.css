@@ -22,15 +22,28 @@
 }
 .members__row {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
   padding: 13px 0;
   border-bottom: 1px solid var(--color-divider);
+}
+.members__row-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 .members__role {
   font-size: 10px;
   font-weight: 700;
   padding: 3px 7px;
+}
+.members__leader {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 7px;
+  background: var(--color-text);
+  color: var(--color-bg);
 }
 .members__kick {
   font-size: 11px;
@@ -43,6 +56,48 @@
 }
 .members__kick:hover {
   background: var(--color-accent-100);
+}
+.members__leadbtn {
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid var(--color-neutral-400);
+  background: var(--color-bg);
+  color: var(--color-neutral-800);
+  padding: 5px 9px;
+  cursor: pointer;
+}
+.members__leadbtn.is-on {
+  border-color: var(--color-text);
+  background: var(--color-text);
+  color: var(--color-bg);
+}
+
+/* 세션(파트) — 행에서는 현재 값만 보여주고 편집은 모달 */
+.members__parts-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+.members__part-chip {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 7px;
+  background: var(--color-neutral-200);
+  color: var(--color-neutral-800);
+}
+.members__parts-edit {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border: 1px solid var(--color-neutral-400);
+  background: var(--color-bg);
+  color: var(--color-neutral-700);
+  cursor: pointer;
+}
+.members__parts-edit:hover {
+  border-color: var(--color-text);
+  color: var(--color-text);
 }
 
 .members__invite {

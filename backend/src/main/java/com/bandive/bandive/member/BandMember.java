@@ -58,6 +58,11 @@ public class BandMember extends BaseTimeEntity {
 	@Column(name = "joined_at", nullable = false)
 	private Instant joinedAt;
 
+	/** 밴드 리더(합주 진행·대표). 관리자(OWNER)와 별개. 밴드당 최대 1명. */
+	@Builder.Default
+	@Column(name = "is_leader", nullable = false)
+	private boolean leader = false;
+
 	/** 이 밴드에서 맡은 파트(악기). Instrument 이름이 기본이나 자유 문자열도 허용. */
 	@Builder.Default
 	@ElementCollection(fetch = FetchType.LAZY)
@@ -67,6 +72,10 @@ public class BandMember extends BaseTimeEntity {
 
 	public void changeRole(BandRole role) {
 		this.role = role;
+	}
+
+	public void setLeader(boolean leader) {
+		this.leader = leader;
 	}
 
 	/** 파트 전체 교체 (공백 제거·중복 제거). */

@@ -57,7 +57,8 @@ export function toMember(dto: MemberDto, bandId: string): Member {
     bandId,
     name: dto.nickname,
     initial: initialOf(dto.nickname),
-    part: '',
+    parts: dto.parts ?? [],
+    leader: dto.leader ?? false,
     role: toRole(dto.role),
     avatarColor: avatarColor(dto.userId),
   };

@@ -39,6 +39,8 @@ export interface MemberDto {
   userId: number;
   nickname: string;
   role: BandRoleDto;
+  leader: boolean;
+  parts: string[];
   joinedAt: string;
 }
 

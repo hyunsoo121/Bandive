@@ -52,7 +52,10 @@ export interface Member {
   bandId: string;
   name: string;
   initial: string;
-  part: string;
+  /** 이 밴드에서 맡은 세션(악기). 자유 문자열, 멤버당 최대 5개, 중복·다중 허용 */
+  parts: string[];
+  /** 밴드 리더 여부 (관리자와 별개, 밴드당 1명) */
+  leader: boolean;
   role: 'owner' | 'member';
   avatarColor: string;
 }

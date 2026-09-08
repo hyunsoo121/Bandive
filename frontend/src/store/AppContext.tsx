@@ -202,6 +202,10 @@ interface AppState {
 
   /** 멤버 추방 (밴드장) — userId */
   kickMember: (userId: string) => Promise<void>;
+  /** 멤버 세션(파트) 전체 교체. 본인 또는 관리자 */
+  setMemberParts: (userId: string, parts: string[]) => Promise<void>;
+  /** 밴드 리더 지정/해제 (관리자). null = 리더 없음 */
+  setBandLeader: (userId: string | null) => Promise<void>;
   /** 초대 코드 발급/재발급 (밴드장) */
   issueInviteCode: () => Promise<void>;
 
@@ -468,6 +472,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
           b.id === currentBandId ? { ...b, memberCount: Math.max(1, b.memberCount - 1) } : b,
         ),
       );
+    },
+    [currentBandId],
+  );
+
+  const setMemberParts = useCallback(
+    async (userId: string, parts: string[]) => {
+      if (!currentBandId) return;
+      const dto =
+        user && userId === user.id
+          ? await memberApi.updateMyParts(currentBandId, parts)
+          : await memberApi.updateMemberParts(currentBandId, userId, parts);
+      const fresh = toMember(dto, currentBandId);
+      setMembers((prev) => prev.map((m) => (m.id === userId ? fresh : m)));
+    },
+    [currentBandId, user],
+  );
+
+  const setBandLeader = useCallback(
+    async (userId: string | null) => {
+      if (!currentBandId) return;
+      const dtos = await memberApi.setLeader(currentBandId, userId);
+      setMembers(dtos.map((m) => toMember(m, currentBandId)));
     },
     [currentBandId],
   );
@@ -743,6 +769,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     editMedia,
     removeMedia,
     kickMember,
+    setMemberParts,
+    setBandLeader,
     issueInviteCode,
     openSwitcher: () => setSwitcherOpen(true),
     closeSwitcher: () => setSwitcherOpen(false),

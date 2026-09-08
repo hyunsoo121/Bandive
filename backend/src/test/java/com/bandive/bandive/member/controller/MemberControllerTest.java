@@ -37,6 +37,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -63,9 +64,10 @@ class MemberControllerTest {
 	@Test
 	void 멤버_목록은_공개다() throws Exception {
 		given(memberService.list(1L)).willReturn(List.of(
-				new MemberResponse(10L, "밴드장", BandRole.OWNER, List.of("GUITAR"),
+				new MemberResponse(10L, "밴드장", BandRole.OWNER, true, List.of("GUITAR"),
 						Instant.parse("2026-09-01T00:00:00Z")),
-				new MemberResponse(11L, "멤버", BandRole.MEMBER, List.of(), Instant.parse("2026-09-02T00:00:00Z"))));
+				new MemberResponse(11L, "멤버", BandRole.MEMBER, false, List.of(),
+						Instant.parse("2026-09-02T00:00:00Z"))));
 
 		mvc.perform(get("/api/bands/1/members"))
 			.andExpect(status().isOk())
@@ -77,8 +79,8 @@ class MemberControllerTest {
 
 	@Test
 	void 내_파트_설정은_200() throws Exception {
-		given(memberService.updateMyParts(eq(1L), eq(7L), any())).willReturn(
-				new MemberResponse(7L, "나", BandRole.MEMBER, List.of("BASS"), Instant.parse("2026-09-01T00:00:00Z")));
+		given(memberService.updateMyParts(eq(1L), eq(7L), any())).willReturn(new MemberResponse(7L, "나",
+				BandRole.MEMBER, false, List.of("BASS"), Instant.parse("2026-09-01T00:00:00Z")));
 
 		mvc.perform(patch("/api/bands/1/members/me").with(asUser(7L))
 			.contentType(MediaType.APPLICATION_JSON)
@@ -94,6 +96,26 @@ class MemberControllerTest {
 		mvc.perform(patch("/api/bands/1/members/9").with(asUser(7L))
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("{\"parts\":[\"DRUM\"]}")).andExpect(status().isForbidden());
+	}
+
+	@Test
+	void 리더_지정은_밴드장이면_200_이고_목록을_돌려준다() throws Exception {
+		given(bandGuard.isOwner(1L)).willReturn(true);
+		given(memberService.assignLeader(1L, 9L)).willReturn(List.of(new MemberResponse(9L, "리더", BandRole.MEMBER, true,
+				List.of("VOCAL"), Instant.parse("2026-09-01T00:00:00Z"))));
+
+		mvc.perform(put("/api/bands/1/members/leader").with(asUser(7L))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"userId\":9}")).andExpect(status().isOk()).andExpect(jsonPath("$[0].leader").value(true));
+	}
+
+	@Test
+	void 리더_지정은_밴드장이_아니면_403() throws Exception {
+		given(bandGuard.isOwner(1L)).willReturn(false);
+
+		mvc.perform(put("/api/bands/1/members/leader").with(asUser(7L))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"userId\":9}")).andExpect(status().isForbidden());
 	}
 
 	@Test

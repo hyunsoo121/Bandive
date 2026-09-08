@@ -60,6 +60,20 @@ public class MemberService {
 		return MemberResponse.from(target);
 	}
 
+	/** 관리자가 밴드 리더를 지정/해제. targetUserId 가 null 이면 리더 없음. 밴드당 최대 1명. */
+	@Transactional
+	public List<MemberResponse> assignLeader(Long bandId, Long targetUserId) {
+		if (!bands.existsById(bandId)) {
+			throw new NotFoundException("BAND_NOT_FOUND", "밴드를 찾을 수 없습니다.");
+		}
+		bandMembers.clearLeader(bandId);
+		if (targetUserId != null) {
+			BandMember target = requireMember(bandId, targetUserId, "MEMBER_NOT_FOUND", "해당 멤버를 찾을 수 없습니다.");
+			target.setLeader(true);
+		}
+		return list(bandId);
+	}
+
 	/** 밴드장이 다른 멤버를 추방. */
 	@Transactional
 	public void kick(Long bandId, Long targetUserId) {

@@ -318,7 +318,7 @@ export function SchedulePage() {
                       <Avatar label={r.initial} size={26} color={r.avatarColor} />
                       <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{r.name}</span>
                       <span className="muted" style={{ fontSize: 11 }}>
-                        {r.part}
+                        {r.parts.join(', ')}
                       </span>
                       <span className="sched__status" style={st}>
                         {r.status}
