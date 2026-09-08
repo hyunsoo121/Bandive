@@ -7,6 +7,7 @@ import { SongsPage } from './pages/SongsPage';
 import { SchedulePage } from './pages/SchedulePage';
 import { MediaPage } from './pages/MediaPage';
 import { MembersPage } from './pages/MembersPage';
+import { BandSettingsPage } from './pages/BandSettingsPage';
 import { HomeRedirect, InviteJoin, OAuthFailure, OAuthSuccess } from './pages/SystemPages';
 
 /** 라우트와 무관하게 떠야 하는 모달 (랜딩·초대 페이지에서도 로그인 모달이 필요). */
@@ -30,6 +31,7 @@ export default function App() {
             <Route path="schedule" element={<SchedulePage />} />
             <Route path="media" element={<MediaPage />} />
             <Route path="members" element={<MembersPage />} />
+            <Route path="settings" element={<BandSettingsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

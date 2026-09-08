@@ -20,6 +20,9 @@ export interface User {
   id: string;
   name: string;
   initial: string;
+  /** 이메일 로그인 계정만. 카카오는 null */
+  email: string | null;
+  loginProvider: 'kakao' | 'local';
 }
 
 export interface SongFolder {

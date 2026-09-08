@@ -29,7 +29,13 @@ const toRole = (role: BandRoleDto | undefined): 'owner' | 'member' =>
   role === 'OWNER' ? 'owner' : 'member';
 
 export function toUser(dto: MeDto): User {
-  return { id: String(dto.id), name: dto.nickname, initial: initialOf(dto.nickname) };
+  return {
+    id: String(dto.id),
+    name: dto.nickname,
+    initial: initialOf(dto.nickname),
+    email: dto.email,
+    loginProvider: dto.provider === 'LOCAL' ? 'local' : 'kakao',
+  };
 }
 
 export function toBand(dto: BandDto): Band {

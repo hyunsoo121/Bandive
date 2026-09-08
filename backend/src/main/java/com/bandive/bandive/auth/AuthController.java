@@ -10,8 +10,10 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -21,12 +23,15 @@ import org.springframework.web.bind.annotation.RestController;
 import com.bandive.bandive.auth.dto.AccessTokenResponse;
 import com.bandive.bandive.auth.dto.LoginRequest;
 import com.bandive.bandive.auth.dto.MeResponse;
+import com.bandive.bandive.auth.dto.PasswordChangeRequest;
+import com.bandive.bandive.auth.dto.ProfileUpdateRequest;
 import com.bandive.bandive.auth.dto.SignupRequest;
 import com.bandive.bandive.auth.jwt.JwtProvider;
 import com.bandive.bandive.auth.jwt.RefreshToken;
 import com.bandive.bandive.common.exception.BandiveException;
 import com.bandive.bandive.common.exception.ConflictException;
 import com.bandive.bandive.common.exception.NotFoundException;
+import com.bandive.bandive.common.exception.ValidationException;
 import com.bandive.bandive.user.User;
 import com.bandive.bandive.user.UserRepository;
 
@@ -136,9 +141,35 @@ public class AuthController {
 	/** 현재 로그인 사용자. 미인증이면 SecurityConfig 규칙에 따라 401. */
 	@GetMapping("/me")
 	public MeResponse me(@CurrentUser Long userId) {
-		User user = users.findById(userId)
-			.orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "사용자를 찾을 수 없습니다."));
+		return MeResponse.from(findUser(userId));
+	}
+
+	/** 내 정보 수정 — 현재는 닉네임만. */
+	@PatchMapping("/me")
+	@Transactional
+	public MeResponse updateMe(@CurrentUser Long userId, @Valid @RequestBody ProfileUpdateRequest request) {
+		User user = findUser(userId);
+		user.updateNickname(request.nickname().trim());
 		return MeResponse.from(user);
+	}
+
+	/** 비밀번호 변경 (이메일 로그인 계정만). 현재 비밀번호가 맞아야 한다. */
+	@PatchMapping("/me/password")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	@Transactional
+	public void changePassword(@CurrentUser Long userId, @Valid @RequestBody PasswordChangeRequest request) {
+		User user = findUser(userId);
+		if (!user.isLocal()) {
+			throw new ConflictException("PASSWORD_CHANGE_UNSUPPORTED", "이메일 로그인 계정만 비밀번호를 바꿀 수 있습니다.");
+		}
+		if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+			throw new ValidationException("CURRENT_PASSWORD_MISMATCH", "현재 비밀번호가 올바르지 않습니다.");
+		}
+		user.changePassword(passwordEncoder.encode(request.newPassword()));
+	}
+
+	private User findUser(Long userId) {
+		return users.findById(userId).orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "사용자를 찾을 수 없습니다."));
 	}
 
 }

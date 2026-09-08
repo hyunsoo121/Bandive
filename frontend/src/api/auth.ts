@@ -31,6 +31,16 @@ export function fetchMe(): Promise<MeDto> {
   return api.get<MeDto>('/api/auth/me');
 }
 
+/** 내 정보 수정 (현재는 닉네임만). */
+export function updateMe(nickname: string): Promise<MeDto> {
+  return api.patch<MeDto>('/api/auth/me', { nickname });
+}
+
+/** 비밀번호 변경 (이메일 로그인 계정만). 현재 비밀번호가 맞아야 함. */
+export function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  return api.patch<void>('/api/auth/me/password', { currentPassword, newPassword });
+}
+
 export async function logout(): Promise<void> {
   try {
     await api.post<void>('/api/auth/logout');

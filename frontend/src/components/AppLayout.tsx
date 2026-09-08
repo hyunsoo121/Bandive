@@ -9,10 +9,11 @@ import { GuestBanner } from './GuestBanner';
 import { DevRoleBar } from './DevRoleBar';
 import { BandSwitcher } from './BandSwitcher';
 import { CreateBandModal } from './CreateBandModal';
+import { ProfileModal } from './ProfileModal';
 import { FullscreenLoader } from '../pages/SystemPages';
 import './AppLayout.css';
 
-const ROLE_LABEL: Record<string, string> = { owner: '밴드장', member: '사용자', guest: '비회원' };
+const ROLE_LABEL: Record<string, string> = { owner: '관리자', member: '사용자', guest: '비회원' };
 
 export function AppLayout() {
   const { bandId } = useParams();
@@ -25,9 +26,12 @@ export function AppLayout() {
     role,
     switcherOpen,
     createOpen,
+    profileOpen,
     setCurrentBandId,
     openSwitcher,
     openLogin,
+    openProfile,
+    closeProfile,
     logout,
   } = useApp();
 
@@ -103,20 +107,37 @@ export function AppLayout() {
           <span className="sidebar__chev">▼</span>
         </button>
 
-        <nav className="sidenav">{navList('side')}</nav>
+        <nav className="sidenav">
+          {navList('side')}
+          {role === 'owner' && (
+            <NavLink
+              to={`/bands/${currentBandId}/settings`}
+              className={({ isActive }) => `sidenav__item${isActive ? ' is-active' : ''}`}
+            >
+              <NavIcon
+                d1="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6"
+                d2="M19.4 13a7.9 7.9 0 0 0 0-2l2-1.5-2-3.5-2.4 1a8 8 0 0 0-1.7-1l-.4-2.5h-4l-.4 2.5a8 8 0 0 0-1.7 1l-2.4-1-2 3.5L4.6 11a7.9 7.9 0 0 0 0 2l-2 1.5 2 3.5 2.4-1a8 8 0 0 0 1.7 1l.4 2.5h4l.4-2.5a8 8 0 0 0 1.7-1l2.4 1 2-3.5z"
+              />
+              <span>설정</span>
+            </NavLink>
+          )}
+        </nav>
 
         <div className="sidebar__me">
-          <Avatar
-            label={meInitial}
-            size={30}
-            color={user ? 'var(--color-text)' : 'var(--color-neutral-500)'}
-          />
-          <span className="stack" style={{ flex: 1 }}>
-            <strong style={{ fontSize: 13 }}>{meName}</strong>
-            <span className="muted" style={{ fontSize: 11 }}>
-              {ROLE_LABEL[role]}
+          <button type="button" className="sidebar__me-open" onClick={openProfile} disabled={!user}>
+            <Avatar
+              label={meInitial}
+              size={30}
+              color={user ? 'var(--color-text)' : 'var(--color-neutral-500)'}
+            />
+            <span className="stack" style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
+              <strong style={{ fontSize: 13 }}>{meName}</strong>
+              <span className="muted" style={{ fontSize: 11 }}>
+                {ROLE_LABEL[role]}
+                {user ? ' · 내 정보' : ''}
+              </span>
             </span>
-          </span>
+          </button>
           {user ? (
             <button type="button" className="sidebar__me-btn" onClick={logout}>
               로그아웃
@@ -164,6 +185,7 @@ export function AppLayout() {
 
       {switcherOpen && <BandSwitcher onNavigate={(id) => navigate(`/bands/${id}`)} />}
       {createOpen && <CreateBandModal />}
+      {profileOpen && <ProfileModal onClose={closeProfile} />}
     </div>
   );
 }

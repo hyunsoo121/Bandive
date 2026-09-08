@@ -24,7 +24,7 @@ import { AddSongModal } from '../components/AddSongModal';
 import { PromptModal } from '../components/PromptModal';
 import './SongsPage.css';
 
-const ROLE_LABEL: Record<string, string> = { owner: '밴드장', member: '사용자', guest: '비회원' };
+const ROLE_LABEL: Record<string, string> = { owner: '관리자', member: '사용자', guest: '비회원' };
 type SortKey = 'manual' | 'votes' | 'recent';
 const SORT_LABEL: Record<SortKey, string> = { manual: '수동', votes: '득표순', recent: '최신순' };
 const UNFILED = '__unfiled__';

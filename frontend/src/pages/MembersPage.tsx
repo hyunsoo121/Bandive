@@ -4,14 +4,29 @@ import { Avatar } from '../components/Avatar';
 import './MembersPage.css';
 
 export function MembersPage() {
-  const { currentBand, role, members, kickMember, invite, issueInviteCode } = useApp();
+  const { currentBand, role, members, kickMember, leaveBand, invite, issueInviteCode } = useApp();
   const [copied, setCopied] = useState(false);
   const [issuing, setIssuing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [leaveArmed, setLeaveArmed] = useState(false);
+  const [leaving, setLeaving] = useState(false);
 
   if (!currentBand) return null;
 
   const isOwner = role === 'owner';
+  const isMember = role === 'member';
+
+  const runLeave = async () => {
+    setLeaving(true);
+    setError(null);
+    try {
+      await leaveBand();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '밴드를 탈퇴하지 못했습니다.');
+      setLeaving(false);
+      setLeaveArmed(false);
+    }
+  };
   const bandMembers = members.filter((m) => m.bandId === currentBand.id);
 
   const runIssue = async () => {
@@ -72,7 +87,7 @@ export function MembersPage() {
                   color: m.role === 'owner' ? '#fff' : 'var(--color-neutral-800)',
                 }}
               >
-                {m.role === 'owner' ? '밴드장' : '사용자'}
+                {m.role === 'owner' ? '관리자' : '사용자'}
               </span>
               {canKick && (
                 <button type="button" className="members__kick" onClick={() => runKick(m.id)}>
@@ -125,7 +140,42 @@ export function MembersPage() {
       )}
 
       {!isOwner && (
-        <p className="members__note muted">멤버 초대와 추방은 밴드장만 할 수 있습니다.</p>
+        <p className="members__note muted">멤버 초대와 추방은 관리자만 할 수 있습니다.</p>
+      )}
+
+      {isMember && (
+        <div className="members__leave">
+          {leaveArmed ? (
+            <>
+              <button
+                type="button"
+                className="btn btn--sm members__leave-btn"
+                disabled={leaving}
+                onClick={runLeave}
+              >
+                {leaving ? '탈퇴 중…' : `정말 "${currentBand.name}" 탈퇴`}
+              </button>
+              <button type="button" className="btn btn--sm" onClick={() => setLeaveArmed(false)}>
+                취소
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="btn btn--sm members__leave-btn"
+              onClick={() => setLeaveArmed(true)}
+            >
+              밴드 탈퇴
+            </button>
+          )}
+        </div>
+      )}
+
+      {isOwner && (
+        <p className="members__leave members__leave--note muted">
+          관리자는 밴드를 탈퇴할 수 없습니다. 다른 멤버에게 관리자를 위임한 뒤에 탈퇴하거나, 밴드
+          설정에서 밴드를 삭제하세요.
+        </p>
       )}
     </div>
   );

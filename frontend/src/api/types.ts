@@ -53,6 +53,9 @@ export interface InviteCodeDto {
 export interface MeDto {
   id: number;
   nickname: string;
+  /** LOCAL 가입자만 값이 있음. 카카오 가입자는 null */
+  email: string | null;
+  provider: 'KAKAO' | 'LOCAL';
 }
 
 export interface AccessTokenDto {

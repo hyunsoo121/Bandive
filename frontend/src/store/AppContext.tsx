@@ -114,6 +114,7 @@ interface AppState {
   switcherOpen: boolean;
   loginOpen: boolean;
   createOpen: boolean;
+  profileOpen: boolean;
 
   /** 현재 밴드 곡 (GET /api/bands/{id}/songs) */
   songs: Song[];
@@ -137,10 +138,22 @@ interface AppState {
   /** 이메일 회원가입 — 성공 시 바로 로그인 상태 */
   signup: (email: string, password: string, nickname: string) => Promise<void>;
   logout: () => void;
+  /** 내 닉네임 수정 (PATCH /api/auth/me) */
+  updateProfile: (nickname: string) => Promise<void>;
+  /** 비밀번호 변경 (이메일 로그인 계정만) */
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   /** 밴드 생성 → 내 밴드에 추가하고 해당 밴드로 이동 */
   createBand: (name: string) => Promise<void>;
   /** 초대 코드로 가입 → 가입한 밴드 반환 */
   joinByInvite: (code: string) => Promise<Band>;
+  /** 밴드 이름·소개 수정 (밴드장) */
+  updateBand: (name: string, description: string | null) => Promise<void>;
+  /** 밴드장 위임 (밴드장) */
+  transferOwnership: (userId: string) => Promise<void>;
+  /** 밴드 삭제 (밴드장) → 홈으로 */
+  deleteBand: () => Promise<void>;
+  /** 밴드 탈퇴 (일반 멤버) → 홈으로. 밴드장은 불가(위임/삭제 먼저) */
+  leaveBand: () => Promise<void>;
   /** 밴드 로고 이미지 업로드 (밴드장) */
   uploadBandLogo: (file: File) => Promise<void>;
   /** 밴드 배너 이미지 업로드 (밴드장) */
@@ -198,6 +211,8 @@ interface AppState {
   closeLogin: () => void;
   openCreate: () => void;
   closeCreate: () => void;
+  openProfile: () => void;
+  closeProfile: () => void;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -225,6 +240,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   // 세션 복구: refresh 쿠키로 access 재발급 → 내 정보 + 내 밴드
   useEffect(() => {
@@ -386,6 +402,57 @@ export function AppProvider({ children }: { children: ReactNode }) {
       applyBandUpdate(toBand(await bandApi.uploadBanner(currentBandId, file)));
     },
     [currentBandId, applyBandUpdate],
+  );
+
+  const updateBand = useCallback(
+    async (name: string, description: string | null) => {
+      if (!currentBandId) return;
+      applyBandUpdate(toBand(await bandApi.updateBand(currentBandId, name.trim(), description)));
+    },
+    [currentBandId, applyBandUpdate],
+  );
+
+  const transferOwnership = useCallback(
+    async (userId: string) => {
+      if (!currentBandId) return;
+      await memberApi.transferOwnership(currentBandId, userId);
+      // 역할이 바뀌었으니 밴드/멤버를 다시 받아 반영
+      const [bandDto, memberDtos] = await Promise.all([
+        bandApi.getBand(currentBandId),
+        memberApi.listMembers(currentBandId),
+      ]);
+      applyBandUpdate(toBand(bandDto));
+      setMembers(memberDtos.map((m) => toMember(m, currentBandId)));
+    },
+    [currentBandId, applyBandUpdate],
+  );
+
+  const deleteBand = useCallback(async () => {
+    if (!currentBandId) return;
+    const gone = currentBandId;
+    await memberApi.deleteBand(gone);
+    setBands((prev) => prev.filter((b) => b.id !== gone));
+    setCurrentBandIdState(null);
+    navigate('/');
+  }, [currentBandId, navigate]);
+
+  const leaveBand = useCallback(async () => {
+    if (!currentBandId) return;
+    const gone = currentBandId;
+    await memberApi.leaveBand(gone);
+    setBands((prev) => prev.filter((b) => b.id !== gone));
+    setCurrentBandIdState(null);
+    navigate('/');
+  }, [currentBandId, navigate]);
+
+  const updateProfile = useCallback(async (nickname: string) => {
+    setUser(toUser(await authApi.updateMe(nickname.trim())));
+  }, []);
+
+  const changePassword = useCallback(
+    (currentPassword: string, newPassword: string) =>
+      authApi.changePassword(currentPassword, newPassword),
+    [],
   );
 
   const kickMember = useCallback(
@@ -641,14 +708,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     switcherOpen,
     loginOpen,
     createOpen,
+    profileOpen,
     setCurrentBandId,
     setDevRole,
     login,
     emailLogin,
     signup,
     logout,
+    updateProfile,
+    changePassword,
     createBand,
     joinByInvite,
+    updateBand,
+    transferOwnership,
+    deleteBand,
+    leaveBand,
     uploadBandLogo,
     uploadBandBanner,
     voteSong,
@@ -679,6 +753,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSwitcherOpen(false);
     },
     closeCreate: () => setCreateOpen(false),
+    openProfile: () => {
+      setProfileOpen(true);
+      setSwitcherOpen(false);
+    },
+    closeProfile: () => setProfileOpen(false),
   };
 
   return <AppContext value={value}>{children}</AppContext>;

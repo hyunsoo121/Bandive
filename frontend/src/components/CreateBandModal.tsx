@@ -68,7 +68,7 @@ export function CreateBandModal() {
       </div>
 
       <p className="muted" style={{ fontSize: 11, margin: 0, lineHeight: 1.5 }}>
-        만들면 내가 밴드장이 됩니다. 로고·배너는 밴드 생성 후 설정할 수 있습니다.
+        만들면 내가 관리자가 됩니다. 로고·배너는 밴드 생성 후 설정할 수 있습니다.
       </p>
       {error && <p style={{ fontSize: 12, margin: 0, color: 'var(--color-accent)' }}>{error}</p>}
     </Modal>

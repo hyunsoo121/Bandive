@@ -21,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -109,7 +110,79 @@ class AuthControllerTest extends IntegrationTest {
 		mvc.perform(get("/api/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + access))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.id").value(userId))
-			.andExpect(jsonPath("$.nickname").value("테스터"));
+			.andExpect(jsonPath("$.nickname").value("테스터"))
+			.andExpect(jsonPath("$.provider").value("KAKAO"));
+	}
+
+	@Test
+	void 닉네임을_수정한다() throws Exception {
+		String access = jwtProvider.createAccessToken(userId);
+
+		mvc.perform(patch("/api/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + access)
+			.contentType("application/json")
+			.content("{\"nickname\":\"  새이름  \"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.nickname").value("새이름"));
+
+		assertThat(users.findById(userId).orElseThrow().getNickname()).isEqualTo("새이름");
+	}
+
+	@Test
+	void 빈_닉네임은_400() throws Exception {
+		String access = jwtProvider.createAccessToken(userId);
+
+		mvc.perform(patch("/api/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + access)
+			.contentType("application/json")
+			.content("{\"nickname\":\"   \"}")).andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void 카카오_계정은_비밀번호를_바꿀_수_없다() throws Exception {
+		String access = jwtProvider.createAccessToken(userId);
+
+		mvc.perform(patch("/api/auth/me/password").header(HttpHeaders.AUTHORIZATION, "Bearer " + access)
+			.contentType("application/json")
+			.content("{\"currentPassword\":\"x\",\"newPassword\":\"newpass12\"}"))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("PASSWORD_CHANGE_UNSUPPORTED"));
+	}
+
+	@Test
+	void 이메일_계정_비밀번호_변경_흐름() throws Exception {
+		String email = "pw-" + UUID.randomUUID() + "@example.com";
+		String access = mvcSignup(email, "pass1234", "비번유저");
+		Long id = users.findByEmail(email).orElseThrow().getId();
+
+		// 현재 비밀번호가 틀리면 400
+		mvc.perform(patch("/api/auth/me/password").header(HttpHeaders.AUTHORIZATION, "Bearer " + access)
+			.contentType("application/json")
+			.content("{\"currentPassword\":\"wrongpass1\",\"newPassword\":\"newpass12\"}"))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("CURRENT_PASSWORD_MISMATCH"));
+
+		// 맞으면 204, 새 비밀번호로 로그인 가능
+		mvc.perform(patch("/api/auth/me/password").header(HttpHeaders.AUTHORIZATION, "Bearer " + access)
+			.contentType("application/json")
+			.content("{\"currentPassword\":\"pass1234\",\"newPassword\":\"newpass12\"}"))
+			.andExpect(status().isNoContent());
+
+		mvc.perform(post("/api/auth/login").contentType("application/json")
+			.content("{\"email\":\"" + email + "\",\"password\":\"newpass12\"}")).andExpect(status().isOk());
+
+		refreshTokenStore.delete(id);
+		users.deleteById(id);
+	}
+
+	private String mvcSignup(String email, String password, String nickname) throws Exception {
+		String json = mvc
+			.perform(post("/api/auth/signup").contentType("application/json")
+				.content("{\"email\":\"" + email + "\",\"password\":\"" + password + "\",\"nickname\":\"" + nickname
+						+ "\"}"))
+			.andExpect(status().isCreated())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+		return json.replaceAll(".*\"accessToken\"\\s*:\\s*\"([^\"]+)\".*", "$1");
 	}
 
 	@Test

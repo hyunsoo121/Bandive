@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import { Avatar } from './Avatar';
 import { Modal } from './Modal';
@@ -12,12 +13,15 @@ export function BandSwitcher({ onNavigate }: Props) {
     bands,
     currentBand,
     user,
+    role,
     setCurrentBandId,
     closeSwitcher,
     openCreate,
     openLogin,
+    openProfile,
     logout,
   } = useApp();
+  const navigate = useNavigate();
 
   const pick = (id: string) => {
     setCurrentBandId(id);
@@ -46,7 +50,7 @@ export function BandSwitcher({ onNavigate }: Props) {
               <span className="switcher__row-text">
                 <strong>{b.name}</strong>
                 <span className="muted">
-                  멤버 {b.memberCount}명 · {b.myRole === 'owner' ? '밴드장' : '사용자'}
+                  멤버 {b.memberCount}명 · {b.myRole === 'owner' ? '관리자' : '사용자'}
                 </span>
               </span>
               {active && <span className="switcher__mark">●</span>}
@@ -62,6 +66,33 @@ export function BandSwitcher({ onNavigate }: Props) {
           <span className="muted">이름·로고·배너를 설정하고 초대 코드를 발급합니다</span>
         </span>
       </button>
+
+      {user && (
+        <div className="switcher__links">
+          <button
+            type="button"
+            className="switcher__link"
+            onClick={() => {
+              closeSwitcher();
+              openProfile();
+            }}
+          >
+            내 정보
+          </button>
+          {role === 'owner' && currentBand && (
+            <button
+              type="button"
+              className="switcher__link"
+              onClick={() => {
+                closeSwitcher();
+                navigate(`/bands/${currentBand.id}/settings`);
+              }}
+            >
+              밴드 설정
+            </button>
+          )}
+        </div>
+      )}
 
       <button
         type="button"

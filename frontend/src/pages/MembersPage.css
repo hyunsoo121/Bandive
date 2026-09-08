@@ -79,3 +79,24 @@
   margin: 20px 16px 0;
   font-size: 12px;
 }
+
+.members__leave {
+  margin: 40px 16px 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--color-divider);
+  display: flex;
+  gap: 8px;
+}
+.members__leave--note {
+  display: block;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.members__leave-btn {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.members__leave-btn:hover:not(:disabled) {
+  background: var(--color-accent);
+  color: #fff;
+}

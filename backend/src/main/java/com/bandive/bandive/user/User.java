@@ -61,4 +61,18 @@ public class User extends BaseTimeEntity {
 			.build();
 	}
 
+	/** 닉네임 변경. 호출부에서 trim·검증한 값을 넘긴다. */
+	public void updateNickname(String nickname) {
+		this.nickname = nickname;
+	}
+
+	/** 비밀번호 해시 교체 (LOCAL 계정만). */
+	public void changePassword(String passwordHash) {
+		this.passwordHash = passwordHash;
+	}
+
+	public boolean isLocal() {
+		return this.provider == AuthProvider.LOCAL && this.passwordHash != null;
+	}
+
 }
