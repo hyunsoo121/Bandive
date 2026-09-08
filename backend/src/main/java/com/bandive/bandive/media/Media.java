@@ -15,6 +15,7 @@ import jakarta.persistence.Table;
 import com.bandive.bandive.band.Band;
 import com.bandive.bandive.common.entity.BaseTimeEntity;
 import com.bandive.bandive.schedule.Schedule;
+import com.bandive.bandive.song.Song;
 import com.bandive.bandive.user.User;
 
 import lombok.AccessLevel;
@@ -47,6 +48,11 @@ public class Media extends BaseTimeEntity {
 	@JoinColumn(name = "schedule_id")
 	private Schedule schedule;
 
+	/** 특정 합주곡(CONFIRMED)과의 선택적 연결. 곡 삭제 시 null 로 끊긴다. */
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "song_id")
+	private Song song;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
 	private MediaType type;
@@ -76,13 +82,14 @@ public class Media extends BaseTimeEntity {
 
 	/** 부분 수정 후 서비스가 계산한 최종값으로 한 번에 갱신. */
 	public void edit(String externalUrl, MediaPlatform platform, MediaType type, MediaVisibility visibility,
-			String title, Schedule schedule) {
+			String title, Schedule schedule, Song song) {
 		this.externalUrl = externalUrl;
 		this.platform = platform;
 		this.type = type;
 		this.visibility = visibility;
 		this.title = title;
 		this.schedule = schedule;
+		this.song = song;
 	}
 
 }

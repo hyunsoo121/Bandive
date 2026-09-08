@@ -3,6 +3,7 @@ package com.bandive.bandive.support;
 import java.time.Instant;
 
 import com.bandive.bandive.band.Band;
+import com.bandive.bandive.guest.Guest;
 import com.bandive.bandive.member.BandMember;
 import com.bandive.bandive.member.BandRole;
 import com.bandive.bandive.schedule.Schedule;
@@ -37,6 +38,10 @@ public final class Fixtures {
 
 	public static BandMember member(Band band, User user, BandRole role) {
 		return BandMember.builder().band(band).user(user).role(role).joinedAt(Instant.now()).build();
+	}
+
+	public static Guest guest(Band band, String name) {
+		return Guest.builder().band(band).name(name).build();
 	}
 
 	public static Song song(Band band, User addedBy, SongStatus status) {

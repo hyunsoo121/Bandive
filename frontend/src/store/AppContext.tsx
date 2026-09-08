@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import type {
   AttendanceStatus,
   Band,
+  Guest,
   MediaItem,
   MediaKind,
   Member,
@@ -28,12 +29,14 @@ import * as authApi from '../api/auth';
 import * as bandApi from '../api/bands';
 import * as inviteApi from '../api/invites';
 import * as memberApi from '../api/members';
+import * as guestApi from '../api/guests';
 import * as songApi from '../api/songs';
 import * as songFolderApi from '../api/songFolders';
 import * as scheduleApi from '../api/schedules';
 import * as mediaApi from '../api/media';
 import {
   toBand,
+  toGuest,
   toMedia,
   toMember,
   toSchedule,
@@ -66,6 +69,8 @@ export interface NewMediaInput {
   visibility: Visibility;
   /** 연결할 일정 id. 없으면 null */
   scheduleId: string | null;
+  /** 연결할 합주곡 id. 없으면 null */
+  songId: string | null;
 }
 
 export interface EditMediaInput {
@@ -74,6 +79,7 @@ export interface EditMediaInput {
   kind: MediaKind;
   visibility: Visibility;
   scheduleId: string | null;
+  songId: string | null;
 }
 
 export interface NewScheduleInput {
@@ -126,6 +132,8 @@ interface AppState {
   media: MediaItem[];
   /** 현재 밴드 멤버 (GET /api/bands/{id}/members) */
   members: Member[];
+  /** 현재 밴드 게스트 멤버 (GET /api/bands/{id}/guests), 이름순 */
+  guests: Guest[];
   /** 현재 밴드 초대 코드 (발급 후에만) */
   invite: InviteInfo | null;
 
@@ -163,8 +171,15 @@ interface AppState {
   voteSong: (songId: string) => Promise<void>;
   /** 위시리스트 → 합주곡 승격 (PATCH /api/songs/{id}/confirm) */
   promoteSong: (songId: string) => Promise<void>;
-  /** 파트 슬롯 배정/해제 (PUT /api/songs/{id}/parts/{partId}/assign) */
-  assignPart: (songId: string, slotKey: string, memberName: string) => Promise<void>;
+  /**
+   * 파트 슬롯 배정/해제 (PUT /api/songs/{id}/parts/{partId}/assign).
+   * 실멤버는 `{ userId }`, 게스트는 `{ guestId }`, 해제는 null.
+   */
+  assignPart: (
+    songId: string,
+    slotKey: string,
+    assignee: { userId: string } | { guestId: string } | null,
+  ) => Promise<void>;
   /** 곡 추가 (POST /api/bands/{id}/songs) */
   addSong: (input: NewSongInput) => Promise<void>;
   /** 곡 삭제 (관리자) */
@@ -198,6 +213,14 @@ interface AppState {
     userId: string,
     status: AttendanceStatus,
   ) => Promise<void>;
+  /** 관리자가 게스트를 일정에 추가/수정 (세션 지정, upsert). null = 세션 미지정 */
+  setGuestAttendance: (
+    scheduleId: string,
+    guestId: string,
+    session: string | null,
+  ) => Promise<void>;
+  /** 관리자가 게스트를 일정에서 제외 */
+  clearGuestAttendance: (scheduleId: string, guestId: string) => Promise<void>;
 
   /** 영상 URL 첨부 (POST /api/bands/{id}/media) */
   addMedia: (input: NewMediaInput) => Promise<void>;
@@ -210,6 +233,12 @@ interface AppState {
   kickMember: (userId: string) => Promise<void>;
   /** 멤버 세션(파트) 전체 교체. 본인 또는 관리자 */
   setMemberParts: (userId: string, parts: string[]) => Promise<void>;
+  /** 게스트 등록 (관리자). 생성된 게스트 반환 */
+  addGuest: (name: string) => Promise<Guest>;
+  /** 게스트 이름 수정 (관리자) */
+  renameGuest: (guestId: string, name: string) => Promise<void>;
+  /** 게스트 삭제 (관리자) — 세션 배정·출결에서도 빠진다 */
+  removeGuest: (guestId: string) => Promise<void>;
   /** 밴드 리더 지정/해제 (관리자). null = 리더 없음 */
   setBandLeader: (userId: string | null) => Promise<void>;
   /** 초대 코드 발급/재발급 (관리자) */
@@ -237,6 +266,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentBandId, setCurrentBandIdState] = useState<string | null>(null);
   const [currentBand, setCurrentBand] = useState<Band | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
+  const [guests, setGuests] = useState<Guest[]>([]);
   const [invite, setInvite] = useState<InviteInfo | null>(null);
   const [bootLoading, setBootLoading] = useState(true);
   const [bandLoading, setBandLoading] = useState(false);
@@ -290,17 +320,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setInvite(null);
     (async () => {
       try {
-        const [band, mem, songList, folderList, schedList, mediaList] = await Promise.all([
-          bandApi.getBand(currentBandId),
-          memberApi.listMembers(currentBandId),
-          songApi.listSongs(currentBandId),
-          songFolderApi.listFolders(currentBandId),
-          scheduleApi.listSchedules(currentBandId),
-          mediaApi.listMedia(currentBandId),
-        ]);
+        const [band, mem, guestList, songList, folderList, schedList, mediaList] =
+          await Promise.all([
+            bandApi.getBand(currentBandId),
+            memberApi.listMembers(currentBandId),
+            guestApi.listGuests(currentBandId),
+            songApi.listSongs(currentBandId),
+            songFolderApi.listFolders(currentBandId),
+            scheduleApi.listSchedules(currentBandId),
+            mediaApi.listMedia(currentBandId),
+          ]);
         if (!alive) return;
         setCurrentBand(toBand(band));
         setMembers(mem.map((m) => toMember(m, currentBandId)));
+        setGuests(guestList.map(toGuest));
         setSongs(songList.map(toSong));
         setSongFolders(folderList.map(toSongFolder));
         setSchedules(sortSchedules(schedList.map(toSchedule)));
@@ -309,6 +342,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (alive) {
           setCurrentBand(null);
           setMembers([]);
+          setGuests([]);
           setSongs([]);
           setSongFolders([]);
           setSchedules([]);
@@ -504,6 +538,54 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [currentBandId],
   );
 
+  const addGuest = useCallback(
+    async (name: string): Promise<Guest> => {
+      if (!currentBandId) throw new Error('밴드가 선택되지 않았습니다.');
+      const guest = toGuest(await guestApi.createGuest(currentBandId, name.trim()));
+      setGuests((prev) => [...prev, guest].sort((a, b) => a.name.localeCompare(b.name, 'ko')));
+      return guest;
+    },
+    [currentBandId],
+  );
+
+  const renameGuest = useCallback(
+    async (guestId: string, name: string) => {
+      if (!currentBandId) return;
+      const guest = toGuest(await guestApi.renameGuest(currentBandId, guestId, name.trim()));
+      setGuests((prev) =>
+        prev
+          .map((g) => (g.id === guestId ? guest : g))
+          .sort((a, b) => a.name.localeCompare(b.name, 'ko')),
+      );
+      // 배정·출결에 표시되는 이름도 갱신 필요
+      if (currentBandId) {
+        const [songList, schedList] = await Promise.all([
+          songApi.listSongs(currentBandId),
+          scheduleApi.listSchedules(currentBandId),
+        ]);
+        setSongs(songList.map(toSong));
+        setSchedules(sortSchedules(schedList.map(toSchedule)));
+      }
+    },
+    [currentBandId],
+  );
+
+  const removeGuest = useCallback(
+    async (guestId: string) => {
+      if (!currentBandId) return;
+      await guestApi.deleteGuest(currentBandId, guestId);
+      setGuests((prev) => prev.filter((g) => g.id !== guestId));
+      // 세션 배정 자동 해제 / 출결 행 삭제분을 반영
+      const [songList, schedList] = await Promise.all([
+        songApi.listSongs(currentBandId),
+        scheduleApi.listSchedules(currentBandId),
+      ]);
+      setSongs(songList.map(toSong));
+      setSchedules(sortSchedules(schedList.map(toSchedule)));
+    },
+    [currentBandId],
+  );
+
   const issueInviteCode = useCallback(async () => {
     if (!currentBandId) return;
     const dto = await inviteApi.issueInviteCode(currentBandId);
@@ -540,7 +622,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const assignPart = useCallback(
-    async (songId: string, slotKey: string, memberName: string) => {
+    async (
+      songId: string,
+      slotKey: string,
+      assignee: { userId: string } | { guestId: string } | null,
+    ) => {
       const song = songs.find((s) => s.id === songId);
       if (!song) return;
       const hashAt = slotKey.lastIndexOf('#');
@@ -548,15 +634,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const partIndex = Number(slotKey.slice(hashAt + 1));
       const part = song.parts.find((p) => p.instrument === instrument && p.partIndex === partIndex);
       if (!part) return;
-      const userId = memberName ? (members.find((m) => m.name === memberName)?.id ?? null) : null;
       try {
-        const dto = await songApi.assignPart(songId, part.id, userId);
+        const dto = await songApi.assignPart(songId, part.id, assignee);
         setSongs((prev) => prev.map((s) => (s.id === songId ? toSong(dto) : s)));
       } catch (e) {
         console.error('파트 배정 실패', e);
       }
     },
-    [songs, members],
+    [songs],
   );
 
   const addSong = useCallback(async (input: NewSongInput) => {
@@ -686,6 +771,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const setGuestAttendance = useCallback(
+    async (scheduleId: string, guestId: string, session: string | null) => {
+      try {
+        const dto = await scheduleApi.setGuestAttendance(scheduleId, guestId, session);
+        setSchedules((prev) => prev.map((s) => (s.id === scheduleId ? toSchedule(dto) : s)));
+      } catch (e) {
+        console.error('게스트 추가 실패', e);
+      }
+    },
+    [],
+  );
+
+  const clearGuestAttendance = useCallback(async (scheduleId: string, guestId: string) => {
+    try {
+      const dto = await scheduleApi.clearGuestAttendance(scheduleId, guestId);
+      setSchedules((prev) => prev.map((s) => (s.id === scheduleId ? toSchedule(dto) : s)));
+    } catch (e) {
+      console.error('게스트 제외 실패', e);
+    }
+  }, []);
+
   // 일정에 연결된 영상이 바뀌면 그 일정의 mediaIds 도 다시 받아야 상세에 반영된다.
   const refreshSchedules = useCallback(async (bandId: string) => {
     const list = await scheduleApi.listSchedules(bandId);
@@ -700,6 +806,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         type: input.kind === '공연' ? 'PERFORMANCE' : 'REHEARSAL',
         visibility: input.visibility === '링크 공개' ? 'LINK_PUBLIC' : 'MEMBERS_ONLY',
         scheduleId: input.scheduleId ? Number(input.scheduleId) : null,
+        songId: input.songId ? Number(input.songId) : null,
       });
       setMedia((prev) => [toMedia(dto), ...prev]);
       if (input.scheduleId) await refreshSchedules(input.bandId);
@@ -716,6 +823,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         type: input.kind === '공연' ? 'PERFORMANCE' : 'REHEARSAL',
         visibility: input.visibility === '링크 공개' ? 'LINK_PUBLIC' : 'MEMBERS_ONLY',
         scheduleId: input.scheduleId ? Number(input.scheduleId) : null,
+        songId: input.songId ? Number(input.songId) : null,
       });
       const next = toMedia(dto);
       setMedia((prev) => prev.map((m) => (m.id === mediaId ? next : m)));
@@ -748,6 +856,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     schedules,
     media,
     members,
+    guests,
     invite,
     switcherOpen,
     loginOpen,
@@ -784,12 +893,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     removeSchedule,
     setAttendance,
     setMemberAttendance,
+    setGuestAttendance,
+    clearGuestAttendance,
     addMedia,
     editMedia,
     removeMedia,
     kickMember,
     setMemberParts,
     setBandLeader,
+    addGuest,
+    renameGuest,
+    removeGuest,
     issueInviteCode,
     openSwitcher: () => setSwitcherOpen(true),
     closeSwitcher: () => setSwitcherOpen(false),

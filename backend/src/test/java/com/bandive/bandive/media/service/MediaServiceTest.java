@@ -37,6 +37,9 @@ class MediaServiceTest extends RepositoryTest {
 	private ScheduleRepository schedules;
 
 	@Autowired
+	private com.bandive.bandive.song.SongRepository songs;
+
+	@Autowired
 	private BandRepository bands;
 
 	@Autowired
@@ -58,7 +61,7 @@ class MediaServiceTest extends RepositoryTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new MediaService(media, schedules, bands, bandMembers, users);
+		service = new MediaService(media, schedules, songs, bands, bandMembers, users);
 		band = em.persist(Fixtures.band("A"));
 		ownerId = joinMember("owner", BandRole.OWNER);
 		memberId = joinMember("member", BandRole.MEMBER);
@@ -71,7 +74,7 @@ class MediaServiceTest extends RepositoryTest {
 	}
 
 	private MediaCreateRequest req(String url, MediaVisibility visibility, Long scheduleId) {
-		return new MediaCreateRequest(url, MediaType.REHEARSAL, visibility, null, scheduleId);
+		return new MediaCreateRequest(url, MediaType.REHEARSAL, visibility, null, scheduleId, null);
 	}
 
 	@Test
@@ -102,6 +105,38 @@ class MediaServiceTest extends RepositoryTest {
 				() -> service.create(band.getId(), memberId, req("https://youtu.be/x", null, otherSchedule.getId())))
 			.isInstanceOf(ValidationException.class)
 			.satisfies(ex -> assertThat(((ValidationException) ex).getCode()).isEqualTo("SCHEDULE_BAND_MISMATCH"));
+	}
+
+	@Test
+	void 합주곡에는_연결되고_위시리스트_곡은_거부된다() {
+		User owner = users.findById(ownerId).orElseThrow();
+		var confirmed = em.persist(Fixtures.song(band, owner, com.bandive.bandive.song.SongStatus.CONFIRMED));
+		var wishlist = em.persist(Fixtures.song(band, owner, com.bandive.bandive.song.SongStatus.WISHLIST));
+		em.flush();
+
+		var req = new MediaCreateRequest("https://youtu.be/s", MediaType.REHEARSAL, MediaVisibility.MEMBERS_ONLY, null,
+				null, confirmed.getId());
+		MediaResponse created = service.create(band.getId(), memberId, req);
+		assertThat(created.songId()).isEqualTo(confirmed.getId());
+		assertThat(created.songTitle()).isEqualTo("song-title");
+
+		var bad = new MediaCreateRequest("https://youtu.be/w", MediaType.REHEARSAL, MediaVisibility.MEMBERS_ONLY, null,
+				null, wishlist.getId());
+		assertThatThrownBy(() -> service.create(band.getId(), memberId, bad)).isInstanceOf(ValidationException.class)
+			.satisfies(ex -> assertThat(((ValidationException) ex).getCode()).isEqualTo("SONG_NOT_CONFIRMED"));
+	}
+
+	@Test
+	void 다른_밴드의_곡에는_연결할_수_없다() {
+		Band otherBand = em.persist(Fixtures.band("B"));
+		User otherUser = em.persist(Fixtures.user("b-o"));
+		var otherSong = em.persist(Fixtures.song(otherBand, otherUser, com.bandive.bandive.song.SongStatus.CONFIRMED));
+		em.flush();
+
+		var req = new MediaCreateRequest("https://youtu.be/x", MediaType.REHEARSAL, MediaVisibility.MEMBERS_ONLY, null,
+				null, otherSong.getId());
+		assertThatThrownBy(() -> service.create(band.getId(), memberId, req)).isInstanceOf(ValidationException.class)
+			.satisfies(ex -> assertThat(((ValidationException) ex).getCode()).isEqualTo("SONG_BAND_MISMATCH"));
 	}
 
 	@Test
@@ -154,12 +189,12 @@ class MediaServiceTest extends RepositoryTest {
 		Long mediaId = service
 			.create(band.getId(), memberId,
 					new MediaCreateRequest("https://youtu.be/abc", MediaType.REHEARSAL, MediaVisibility.MEMBERS_ONLY,
-							"원래 제목", null))
+							"원래 제목", null, null))
 			.id();
 		em.flush();
 
 		MediaResponse r = service.update(mediaId, memberId,
-				new MediaUpdateRequest("https://drive.google.com/file/d/xyz/view", null, null, null, null));
+				new MediaUpdateRequest("https://drive.google.com/file/d/xyz/view", null, null, null, null, null));
 
 		assertThat(r.externalUrl()).isEqualTo("https://drive.google.com/file/d/xyz/view");
 		assertThat(r.platform()).isEqualTo(MediaPlatform.GOOGLE_DRIVE); // URL 바뀌어 재판별
@@ -175,10 +210,10 @@ class MediaServiceTest extends RepositoryTest {
 		Long thirdId = joinMember("third", BandRole.MEMBER);
 		em.flush();
 
-		assertThat(service.update(mediaId, ownerId, new MediaUpdateRequest(null, null, null, "관리자가 고침", null)).title())
-			.isEqualTo("관리자가 고침");
+		assertThat(service.update(mediaId, ownerId, new MediaUpdateRequest(null, null, null, "관리자가 고침", null, null))
+			.title()).isEqualTo("관리자가 고침");
 		assertThatThrownBy(
-				() -> service.update(mediaId, thirdId, new MediaUpdateRequest(null, null, null, "남이 고침", null)))
+				() -> service.update(mediaId, thirdId, new MediaUpdateRequest(null, null, null, "남이 고침", null, null)))
 			.isInstanceOf(ForbiddenException.class);
 	}
 

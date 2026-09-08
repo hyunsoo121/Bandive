@@ -16,6 +16,8 @@ import com.bandive.bandive.common.exception.ConflictException;
 import com.bandive.bandive.common.exception.ForbiddenException;
 import com.bandive.bandive.common.exception.NotFoundException;
 import com.bandive.bandive.common.exception.ValidationException;
+import com.bandive.bandive.guest.Guest;
+import com.bandive.bandive.guest.GuestRepository;
 import com.bandive.bandive.member.BandMember;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
@@ -52,6 +54,8 @@ public class SongService {
 
 	private final BandMemberRepository bandMembers;
 
+	private final GuestRepository guests;
+
 	private final UserRepository users;
 
 	private final SongFolderRepository folders;
@@ -59,13 +63,14 @@ public class SongService {
 	private final MusicSearchService musicSearch;
 
 	public SongService(SongRepository songs, SongPartRepository parts, VoteRepository votes, BandRepository bands,
-			BandMemberRepository bandMembers, UserRepository users, SongFolderRepository folders,
-			MusicSearchService musicSearch) {
+			BandMemberRepository bandMembers, GuestRepository guests, UserRepository users,
+			SongFolderRepository folders, MusicSearchService musicSearch) {
 		this.songs = songs;
 		this.parts = parts;
 		this.votes = votes;
 		this.bands = bands;
 		this.bandMembers = bandMembers;
+		this.guests = guests;
 		this.users = users;
 		this.folders = folders;
 		this.musicSearch = musicSearch;
@@ -164,25 +169,37 @@ public class SongService {
 		return toResponse(song, userId);
 	}
 
-	/** 파트 배정/해제 (밴드 멤버 누구나). 곡이 CONFIRMED 여야 한다. */
+	/**
+	 * 파트 배정/해제 (밴드 멤버 누구나). 곡이 CONFIRMED 여야 한다. 실멤버(targetUserId)와 게스트(targetGuestId)는 최대
+	 * 하나.
+	 */
 	@Transactional
-	public SongResponse assignPart(Long songId, Long partId, Long actorUserId, Long targetUserId) {
+	public SongResponse assignPart(Long songId, Long partId, Long actorUserId, Long targetUserId, Long targetGuestId) {
 		Song song = findSongWithDetails(songId);
-		requireMember(song.getBand().getId(), actorUserId);
+		Long bandId = song.getBand().getId();
+		requireMember(bandId, actorUserId);
 		if (!song.isConfirmed()) {
 			throw new ConflictException("SONG_NOT_CONFIRMED", "확정된 합주곡만 파트를 배정할 수 있습니다.");
+		}
+		if (targetUserId != null && targetGuestId != null) {
+			throw new ValidationException("PART_ASSIGN_AMBIGUOUS", "멤버와 게스트를 동시에 배정할 수 없습니다.");
 		}
 
 		SongPart part = parts.findByIdAndSongId(partId, songId)
 			.orElseThrow(() -> new NotFoundException("PART_NOT_FOUND", "해당 파트를 찾을 수 없습니다."));
 
-		if (targetUserId == null) {
-			part.unassign();
-		}
-		else {
-			BandMember target = bandMembers.findByBandIdAndUserId(song.getBand().getId(), targetUserId)
+		if (targetUserId != null) {
+			BandMember target = bandMembers.findByBandIdAndUserId(bandId, targetUserId)
 				.orElseThrow(() -> new NotFoundException("MEMBER_NOT_FOUND", "배정 대상이 이 밴드의 멤버가 아닙니다."));
 			part.assignTo(target);
+		}
+		else if (targetGuestId != null) {
+			Guest target = guests.findByIdAndBandId(targetGuestId, bandId)
+				.orElseThrow(() -> new NotFoundException("GUEST_NOT_FOUND", "배정 대상 게스트를 찾을 수 없습니다."));
+			part.assignTo(target);
+		}
+		else {
+			part.unassign();
 		}
 		return toResponse(song, actorUserId);
 	}

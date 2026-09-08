@@ -63,13 +63,23 @@ export interface Member {
 /** 악기 이름 → 필요 인원. 기본 악기 + 자유 문자열 악기(실로폰 등). */
 export type SessionShape = Record<string, number>;
 
+/** 게스트 멤버 — 계정 없이 이름만. 곡 세션 배정·일정 출결에만 쓰인다. 관리자만 관리. */
+export interface Guest {
+  id: string;
+  bandId: string;
+  name: string;
+}
+
 /** 곡의 파트 슬롯 하나. 백엔드 SongPart 를 화면에서 쓰기 좋게 줄인 것. */
 export interface SongPartLite {
   id: string;
   instrument: string;
   partIndex: number;
-  /** 배정된 멤버의 userId. 없으면 null */
+  /** 배정된 실멤버의 userId. 게스트 배정이거나 미배정이면 null */
   assigneeId: string | null;
+  /** 배정된 게스트 id. 실멤버 배정이거나 미배정이면 null */
+  assigneeGuestId: string | null;
+  /** 배정된 쪽의 표시 이름 */
   assigneeName: string | null;
 }
 
@@ -101,9 +111,14 @@ export interface Song {
 }
 
 export interface ScheduleAttendee {
-  userId: string;
+  /** 실멤버 출결이면 userId, 게스트면 null */
+  userId: string | null;
+  /** 게스트 참석이면 guestId, 실멤버면 null */
+  guestId: string | null;
   nickname: string;
   status: AttendanceStatus;
+  /** 게스트가 그 일정에서 맡는 세션(악기 또는 '관객'). 실멤버면 null */
+  session: string | null;
 }
 
 export interface ScheduleEvent {
@@ -143,4 +158,8 @@ export interface MediaItem {
   uploadedByUserId: string;
   /** 연결된 일정 id. 없으면 null */
   scheduleId: string | null;
+  /** 연결된 합주곡 id. 없으면 null */
+  songId: string | null;
+  /** 연결된 곡 제목 (표시용). 없으면 null */
+  songTitle: string | null;
 }

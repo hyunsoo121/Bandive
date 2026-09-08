@@ -147,6 +147,29 @@ class ScheduleControllerTest {
 			.content("{\"status\":\"ABSENT\"}")).andExpect(status().isOk());
 	}
 
+	@Test
+	void 관리자가_게스트를_일정에_추가() throws Exception {
+		given(scheduleService.setGuestAttendance(3L, 7L, 4L, "드럼")).willReturn(SCHEDULE);
+
+		mvc.perform(post("/api/schedules/3/attendance/guests/4").with(asUser(7L))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"session\":\"드럼\"}")).andExpect(status().isOk());
+	}
+
+	@Test
+	void 게스트_추가는_바디_없이도_동작() throws Exception {
+		given(scheduleService.setGuestAttendance(3L, 7L, 4L, null)).willReturn(SCHEDULE);
+
+		mvc.perform(post("/api/schedules/3/attendance/guests/4").with(asUser(7L))).andExpect(status().isOk());
+	}
+
+	@Test
+	void 관리자가_게스트를_일정에서_제외() throws Exception {
+		given(scheduleService.removeGuestAttendance(3L, 7L, 4L)).willReturn(SCHEDULE);
+
+		mvc.perform(delete("/api/schedules/3/attendance/guests/4").with(asUser(7L))).andExpect(status().isOk());
+	}
+
 	@TestConfiguration
 	@EnableMethodSecurity
 	static class TestSecurityConfig {

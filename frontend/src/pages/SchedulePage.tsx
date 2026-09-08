@@ -6,9 +6,14 @@ import type { AttendanceStatus } from '../types';
 import { Avatar } from '../components/Avatar';
 import { Fab } from '../components/Fab';
 import { AddScheduleModal } from '../components/AddScheduleModal';
+import { GuestPickerModal } from '../components/GuestPickerModal';
 import './SchedulePage.css';
 
 const ATT_OPTIONS: AttendanceStatus[] = ['참석', '미정', '불참'];
+
+/** 출결 목록 기본 정렬: 참석 → 불참 → 미정(미응답 포함) */
+const ATT_RANK: Record<AttendanceStatus, number> = { 참석: 0, 불참: 1, 미정: 2 };
+const attRank = (s: AttendanceStatus | null) => (s == null ? 3 : ATT_RANK[s]);
 
 function statusStyle(s: AttendanceStatus): { background: string; color: string } {
   if (s === '참석')
@@ -44,9 +49,13 @@ export function SchedulePage() {
     role,
     media: allMedia,
     members: allMembers,
+    guests: allGuests,
     schedules,
     setAttendance,
     setMemberAttendance,
+    setGuestAttendance,
+    clearGuestAttendance,
+    addGuest,
   } = useApp();
   const isOwner = role === 'owner';
   const guard = useGuard();
@@ -63,6 +72,7 @@ export function SchedulePage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [pending, setPending] = useState(false);
+  const [guestPickerOpen, setGuestPickerOpen] = useState(false);
 
   // 밴드가 바뀌면 이전 밴드의 선택을 버린다 → 아래 초점 effect 가 새 밴드 기준으로 다시 돈다.
   useEffect(() => {
@@ -92,10 +102,18 @@ export function SchedulePage() {
     });
   };
 
-  const attendanceRows = members.map((m) => {
-    const found = selected?.attendees.find((a) => a.userId === m.id);
-    return { ...m, status: found?.status ?? ('미정' as AttendanceStatus) };
-  });
+  const attendanceRows = members
+    .map((m) => {
+      const found = selected?.attendees.find((a) => a.userId === m.id);
+      return { ...m, status: found?.status ?? ('미정' as AttendanceStatus) };
+    })
+    .sort((a, b) => attRank(a.status) - attRank(b.status));
+  // 게스트는 그 일정에 추가된 사람만 보여준다 (전체 등록 게스트 목록이 아님).
+  const guestRows = (selected?.attendees ?? [])
+    .filter((a) => a.guestId != null)
+    .map((a) => ({ guestId: a.guestId as string, nickname: a.nickname, session: a.session }))
+    .sort((a, b) => a.nickname.localeCompare(b.nickname, 'ko'));
+  const addedGuestIds = guestRows.map((g) => g.guestId);
   const goingCount = selected?.counts.attending ?? 0;
   const myStatus = selected?.myStatus ?? undefined;
 
@@ -293,6 +311,14 @@ export function SchedulePage() {
                         rel="noreferrer"
                       >
                         <span className="sched__vid-thumb">
+                          {m.thumbnailUrl && (
+                            <img
+                              className="sched__vid-thumb-img"
+                              src={m.thumbnailUrl}
+                              alt=""
+                              loading="lazy"
+                            />
+                          )}
                           <span className="sched__vid-play" />
                         </span>
                         <span className="stack" style={{ minWidth: 0, flex: 1 }}>
@@ -359,6 +385,54 @@ export function SchedulePage() {
                   );
                 })}
               </div>
+
+              {(guestRows.length > 0 || isOwner) && (
+                <div className="sched__section">
+                  <div className="spread">
+                    <span className="sched__section-label">참석 게스트</span>
+                    {isOwner && (
+                      <button
+                        type="button"
+                        className="sched__guest-add"
+                        onClick={() => setGuestPickerOpen(true)}
+                      >
+                        ＋ 게스트
+                      </button>
+                    )}
+                  </div>
+                  {guestRows.length === 0 && (
+                    <span className="muted" style={{ fontSize: 11 }}>
+                      아직 이 일정에 추가된 게스트가 없습니다.
+                    </span>
+                  )}
+                  {guestRows.map((r) => (
+                    <div key={r.guestId} className="sched__att-row">
+                      <Avatar
+                        label={[...r.nickname][0] ?? '게'}
+                        size={26}
+                        color="var(--color-neutral-500)"
+                      />
+                      <span className="stack" style={{ flex: 1, minWidth: 0, gap: 1 }}>
+                        <span style={{ fontSize: 13, fontWeight: 600 }}>{r.nickname}</span>
+                        <span className="muted" style={{ fontSize: 10 }}>
+                          게스트{r.session ? ` · ${r.session}` : ''}
+                        </span>
+                      </span>
+                      {isOwner && (
+                        <button
+                          type="button"
+                          className="sched__att sched__att--sm"
+                          onClick={() => {
+                            void clearGuestAttendance(selected.id, r.guestId);
+                          }}
+                        >
+                          빼기
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div className="panel sched__empty">
@@ -377,6 +451,16 @@ export function SchedulePage() {
           bandId={bandId}
           onClose={() => setAddOpen(false)}
           onSubmitted={() => setAddOpen(false)}
+        />
+      )}
+
+      {guestPickerOpen && selected && (
+        <GuestPickerModal
+          guests={allGuests}
+          addedGuestIds={addedGuestIds}
+          onAddNew={addGuest}
+          onConfirm={(guestId, session) => setGuestAttendance(selected.id, guestId, session)}
+          onClose={() => setGuestPickerOpen(false)}
         />
       )}
     </div>

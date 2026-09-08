@@ -29,6 +29,26 @@ type SortKey = 'manual' | 'votes' | 'recent';
 const SORT_LABEL: Record<SortKey, string> = { manual: '수동', votes: '득표순', recent: '최신순' };
 const UNFILED = '__unfiled__';
 
+interface AssignOption {
+  value: string;
+  label: string;
+}
+
+/** "u:3" → { userId:'3' }, "g:7" → { guestId:'7' }, "" → null (배정 해제) */
+function parseAssignee(value: string): { userId: string } | { guestId: string } | null {
+  if (value.startsWith('u:')) return { userId: value.slice(2) };
+  if (value.startsWith('g:')) return { guestId: value.slice(2) };
+  return null;
+}
+
+/** 곡의 슬롯에 지금 배정된 대상을 select value("u:.." / "g:.." / "")로. */
+function currentAssignValue(song: Song, slotKey: string): string {
+  const part = song.parts.find((p) => `${p.instrument}#${p.partIndex}` === slotKey);
+  if (part?.assigneeId) return `u:${part.assigneeId}`;
+  if (part?.assigneeGuestId) return `g:${part.assigneeGuestId}`;
+  return '';
+}
+
 interface Group {
   key: string;
   folder: SongFolder | null;
@@ -42,9 +62,11 @@ export function SongsPage() {
     songs,
     songFolders,
     members,
+    guests,
     voteSong,
     promoteSong,
     assignPart,
+    addGuest,
     moveSongToFolder,
     reorderSongs,
     createSongFolder,
@@ -95,9 +117,15 @@ export function SongsPage() {
 
   const isWish = tab === 'WISHLIST';
 
-  const memberNames = useMemo(
-    () => members.filter((m) => m.bandId === bandId).map((m) => m.name),
-    [members, bandId],
+  /** 파트 배정 선택지 — 실멤버 + 게스트. value 는 "u:<id>" / "g:<id>". */
+  const assignOptions = useMemo<AssignOption[]>(
+    () => [
+      ...members
+        .filter((m) => m.bandId === bandId)
+        .map((m) => ({ value: `u:${m.id}`, label: m.name })),
+      ...guests.map((g) => ({ value: `g:${g.id}`, label: `${g.name} · 게스트` })),
+    ],
+    [members, guests, bandId],
   );
 
   const folders = useMemo(
@@ -304,7 +332,8 @@ export function SongsPage() {
                 collapsed={g.folder ? collapsed.has(g.folder.id) : false}
                 folders={folders}
                 openId={openId}
-                memberNames={memberNames}
+                assignOptions={assignOptions}
+                canAddGuest={isOwner}
                 onToggleCollapse={() => g.folder && toggleCollapse(g.folder.id)}
                 onToggle={(id) => setOpenId((cur) => (cur === id ? null : id))}
                 onVote={(id) => guard(() => voteSong(id))()}
@@ -313,7 +342,10 @@ export function SongsPage() {
                   setTab('CONFIRMED');
                   setOpenId(id);
                 }}
-                onAssign={assignPart}
+                onAssign={(songId, slotKey, value) =>
+                  void assignPart(songId, slotKey, parseAssignee(value))
+                }
+                onAddGuest={(name) => addGuest(name)}
                 onMove={moveSongToFolder}
                 onRenameRequest={(f) => setPrompt({ mode: 'rename', folder: f })}
                 onDelete={removeSongFolder}
@@ -371,12 +403,14 @@ interface GroupProps {
   collapsed: boolean;
   folders: SongFolder[];
   openId: string | null;
-  memberNames: string[];
+  assignOptions: AssignOption[];
+  canAddGuest: boolean;
   onToggleCollapse: () => void;
   onToggle: (id: string) => void;
   onVote: (id: string) => void;
   onPromote: (id: string) => void;
-  onAssign: (songId: string, slotKey: string, memberName: string) => void;
+  onAssign: (songId: string, slotKey: string, value: string) => void;
+  onAddGuest: (name: string) => Promise<unknown>;
   onMove: (songId: string, folderId: string | null) => void;
   onRenameRequest: (folder: SongFolder) => void;
   onDelete: (folderId: string) => void;
@@ -391,12 +425,14 @@ function FolderGroup({
   collapsed,
   folders,
   openId,
-  memberNames,
+  assignOptions,
+  canAddGuest,
   onToggleCollapse,
   onToggle,
   onVote,
   onPromote,
   onAssign,
+  onAddGuest,
   onMove,
   onRenameRequest,
   onDelete,
@@ -503,12 +539,14 @@ function FolderGroup({
                 isGuest={isGuest}
                 dragEnabled={dragEnabled}
                 open={openId === song.id}
-                memberNames={memberNames}
+                assignOptions={assignOptions}
+                canAddGuest={canAddGuest}
                 folders={folders}
                 onToggle={() => onToggle(song.id)}
                 onVote={() => onVote(song.id)}
                 onPromote={() => onPromote(song.id)}
-                onAssign={(slotKey, name) => onAssign(song.id, slotKey, name)}
+                onAssign={(slotKey, value) => onAssign(song.id, slotKey, value)}
+                onAddGuest={onAddGuest}
                 onMove={(folderId) => onMove(song.id, folderId)}
               />
             ))}
@@ -529,12 +567,14 @@ interface RowProps {
   isGuest: boolean;
   dragEnabled: boolean;
   open: boolean;
-  memberNames: string[];
+  assignOptions: AssignOption[];
+  canAddGuest: boolean;
   folders: SongFolder[];
   onToggle: () => void;
   onVote: () => void;
   onPromote: () => void;
-  onAssign: (slotKey: string, memberName: string) => void;
+  onAssign: (slotKey: string, value: string) => void;
+  onAddGuest: (name: string) => Promise<unknown>;
   onMove: (folderId: string | null) => void;
 }
 
@@ -546,12 +586,14 @@ function SongRow({
   isGuest,
   dragEnabled,
   open,
-  memberNames,
+  assignOptions,
+  canAddGuest,
   folders,
   onToggle,
   onVote,
   onPromote,
   onAssign,
+  onAddGuest,
   onMove,
 }: RowProps) {
   const chips = sessionChips(song);
@@ -559,6 +601,7 @@ function SongRow({
   const slots = slotsOf(song);
   const canAssign = song.status === 'CONFIRMED' && !isGuest;
   const showAssignReadonly = song.status === 'CONFIRMED' && isGuest;
+  const [guestPromptOpen, setGuestPromptOpen] = useState(false);
 
   const sortable = useSortable({ id: `S:${song.id}`, disabled: !dragEnabled });
   const style = {
@@ -656,20 +699,31 @@ function SongRow({
           <div className="songrow__detail panel">
             {canAssign && (
               <div className="stack" style={{ gap: 7 }}>
-                <span className="kicker">파트 배정 · 미지정 가능</span>
+                <div className="spread">
+                  <span className="kicker">파트 배정 · 미지정 가능</span>
+                  {canAddGuest && (
+                    <button
+                      type="button"
+                      className="songrow__guest-add"
+                      onClick={() => setGuestPromptOpen(true)}
+                    >
+                      ＋ 게스트
+                    </button>
+                  )}
+                </div>
                 <div className="songrow__slots">
                   {slots.map((slot) => (
                     <label key={slot.key} className="songrow__slot">
                       <span className="muted">{slot.label}</span>
                       <select
                         className="songrow__select"
-                        value={song.assignments[slot.key] ?? ''}
+                        value={currentAssignValue(song, slot.key)}
                         onChange={(e) => onAssign(slot.key, e.target.value)}
                       >
                         <option value="">미지정</option>
-                        {memberNames.map((n) => (
-                          <option key={n} value={n}>
-                            {n}
+                        {assignOptions.map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
                           </option>
                         ))}
                       </select>
@@ -677,6 +731,21 @@ function SongRow({
                   ))}
                 </div>
               </div>
+            )}
+
+            {guestPromptOpen && (
+              <PromptModal
+                title="게스트 추가"
+                label="게스트 이름"
+                placeholder="예: 세션 드러머"
+                submitLabel="추가"
+                maxLength={50}
+                onSubmit={(name) => {
+                  void onAddGuest(name);
+                  setGuestPromptOpen(false);
+                }}
+                onClose={() => setGuestPromptOpen(false)}
+              />
             )}
 
             {showAssignReadonly && (

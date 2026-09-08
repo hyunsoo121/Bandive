@@ -226,16 +226,28 @@
   flex-direction: column;
 }
 .home__video-thumb {
+  position: relative;
   height: 92px;
   border-bottom: 2px solid var(--color-text);
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
+}
+.home__video-thumb-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 .home__play {
+  position: relative;
+  z-index: 1;
   width: 0;
   height: 0;
   border-left: 15px solid var(--color-bg);
   border-top: 10px solid transparent;
   border-bottom: 10px solid transparent;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.55));
 }

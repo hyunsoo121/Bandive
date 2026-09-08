@@ -45,7 +45,7 @@ class MediaControllerTest {
 
 	private static final String JSON = "application/json";
 
-	private static final MediaResponse MEDIA = new MediaResponse(5L, 1L, null, MediaType.PERFORMANCE,
+	private static final MediaResponse MEDIA = new MediaResponse(5L, 1L, null, null, null, MediaType.PERFORMANCE,
 			"https://youtu.be/x", "공연 영상", MediaPlatform.YOUTUBE, "https://img.youtube.com/vi/x/hqdefault.jpg",
 			MediaVisibility.MEMBERS_ONLY, 7L, "나", Instant.parse("2026-09-02T00:00:00Z"));
 

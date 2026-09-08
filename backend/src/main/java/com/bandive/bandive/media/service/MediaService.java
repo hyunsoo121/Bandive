@@ -23,6 +23,9 @@ import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
 import com.bandive.bandive.schedule.Schedule;
 import com.bandive.bandive.schedule.ScheduleRepository;
+import com.bandive.bandive.song.Song;
+import com.bandive.bandive.song.SongRepository;
+import com.bandive.bandive.song.SongStatus;
 import com.bandive.bandive.user.User;
 import com.bandive.bandive.user.UserRepository;
 
@@ -34,16 +37,19 @@ public class MediaService {
 
 	private final ScheduleRepository schedules;
 
+	private final SongRepository songs;
+
 	private final BandRepository bands;
 
 	private final BandMemberRepository bandMembers;
 
 	private final UserRepository users;
 
-	public MediaService(MediaRepository media, ScheduleRepository schedules, BandRepository bands,
+	public MediaService(MediaRepository media, ScheduleRepository schedules, SongRepository songs, BandRepository bands,
 			BandMemberRepository bandMembers, UserRepository users) {
 		this.media = media;
 		this.schedules = schedules;
+		this.songs = songs;
 		this.bands = bands;
 		this.bandMembers = bandMembers;
 		this.users = users;
@@ -66,11 +72,13 @@ public class MediaService {
 			.orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "사용자를 찾을 수 없습니다."));
 
 		Schedule schedule = resolveSchedule(request.scheduleId(), bandId);
+		Song song = resolveSong(request.songId(), bandId);
 		MediaVisibility visibility = request.visibility() != null ? request.visibility() : MediaVisibility.MEMBERS_ONLY;
 
 		Media saved = media.save(Media.builder()
 			.band(band)
 			.schedule(schedule)
+			.song(song)
 			.uploadedBy(uploader)
 			.type(request.type())
 			.externalUrl(request.externalUrl().trim())
@@ -96,8 +104,9 @@ public class MediaService {
 		String title = request.title() != null ? trimToNull(request.title()) : found.getTitle();
 		Schedule schedule = request.scheduleId() != null
 				? resolveSchedule(request.scheduleId(), found.getBand().getId()) : found.getSchedule();
+		Song song = request.songId() != null ? resolveSong(request.songId(), found.getBand().getId()) : found.getSong();
 
-		found.edit(url, platform, type, visibility, title, schedule);
+		found.edit(url, platform, type, visibility, title, schedule, song);
 		return MediaResponse.from(found);
 	}
 
@@ -142,6 +151,21 @@ public class MediaService {
 			throw new ValidationException("SCHEDULE_BAND_MISMATCH", "다른 밴드의 일정에는 연결할 수 없습니다.");
 		}
 		return schedule;
+	}
+
+	private Song resolveSong(Long songId, Long bandId) {
+		if (songId == null) {
+			return null;
+		}
+		Song song = songs.findById(songId)
+			.orElseThrow(() -> new NotFoundException("SONG_NOT_FOUND", "연결할 곡을 찾을 수 없습니다."));
+		if (!song.getBand().getId().equals(bandId)) {
+			throw new ValidationException("SONG_BAND_MISMATCH", "다른 밴드의 곡에는 연결할 수 없습니다.");
+		}
+		if (song.getStatus() != SongStatus.CONFIRMED) {
+			throw new ValidationException("SONG_NOT_CONFIRMED", "합주곡(확정된 곡)만 영상에 연결할 수 있습니다.");
+		}
+		return song;
 	}
 
 	private Media findMedia(Long mediaId) {

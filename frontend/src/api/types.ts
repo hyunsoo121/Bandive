@@ -74,8 +74,18 @@ export interface SongPartDto {
   id: number;
   instrument: string;
   partIndex: number;
+  /** 배정된 실멤버 userId. 게스트 배정이면 null */
   assignedUserId: number | null;
-  assignedNickname: string | null;
+  /** 배정된 게스트 id. 실멤버 배정이면 null */
+  assignedGuestId: number | null;
+  /** 배정된 쪽(멤버 or 게스트)의 표시 이름 */
+  assignedName: string | null;
+}
+
+/** 파트 배정 바디 — userId / guestId 중 최대 하나. 둘 다 null 이면 해제. */
+export interface PartAssignBody {
+  userId: number | null;
+  guestId: number | null;
 }
 
 export interface SongDto {
@@ -131,9 +141,22 @@ export type ScheduleTypeDto = 'REHEARSAL' | 'PERFORMANCE';
 export type AttendanceStatusDto = 'ATTENDING' | 'UNDECIDED' | 'ABSENT';
 
 export interface AttendeeDto {
-  userId: number;
+  /** 실멤버 출결이면 userId, 게스트 출결이면 null */
+  userId: number | null;
+  /** 게스트 참석이면 guestId, 실멤버 출결이면 null */
+  guestId: number | null;
   nickname: string;
   status: AttendanceStatusDto;
+  /** 게스트가 그 일정에서 맡는 세션(악기 또는 "관객"). 실멤버는 null */
+  session: string | null;
+}
+
+/* ── 게스트 멤버 (Guest) ─────────────────────────────────────── */
+
+export interface GuestDto {
+  id: number;
+  bandId: number;
+  name: string;
 }
 
 export interface ScheduleDto {
@@ -163,6 +186,10 @@ export interface MediaDto {
   id: number;
   bandId: number;
   scheduleId: number | null;
+  /** 연결된 합주곡 id. 없으면 null */
+  songId: number | null;
+  /** 연결된 곡 제목 (표시용). 없으면 null */
+  songTitle: string | null;
   type: MediaTypeDto;
   externalUrl: string;
   /** 사용자가 붙인 제목. 없으면 null */
@@ -182,6 +209,7 @@ export interface MediaCreateBody {
   title?: string;
   visibility?: MediaVisibilityDto;
   scheduleId?: number | null;
+  songId?: number | null;
 }
 
 /** 부분 수정 — 보낸 필드만 반영. */
@@ -191,4 +219,5 @@ export interface MediaUpdateBody {
   title?: string;
   visibility?: MediaVisibilityDto;
   scheduleId?: number | null;
+  songId?: number | null;
 }

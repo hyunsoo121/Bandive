@@ -302,6 +302,19 @@
   gap: 12px;
   margin-top: 2px;
 }
+.songrow__guest-add {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border: 1px solid var(--color-neutral-400);
+  background: var(--color-bg);
+  color: var(--color-neutral-800);
+  cursor: pointer;
+}
+.songrow__guest-add:hover {
+  border-color: var(--color-text);
+}
+
 .songrow__slots {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));

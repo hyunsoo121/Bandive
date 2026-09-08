@@ -38,6 +38,7 @@ public interface SongRepository extends JpaRepository<Song, Long> {
 			  left join fetch s.parts p
 			  left join fetch p.assignedMember m
 			  left join fetch m.user
+			  left join fetch p.assignedGuest
 			where s.band.id = :bandId
 			  and (:status is null or s.status = :status)
 			""")
@@ -49,6 +50,7 @@ public interface SongRepository extends JpaRepository<Song, Long> {
 			  left join fetch s.parts p
 			  left join fetch p.assignedMember m
 			  left join fetch m.user
+			  left join fetch p.assignedGuest
 			where s.id = :id
 			""")
 	Optional<Song> findByIdWithDetails(Long id);

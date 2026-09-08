@@ -3,8 +3,11 @@ import { useApp } from '../store/AppContext';
 import { Avatar } from '../components/Avatar';
 import { PartsPickerModal } from '../components/PartsPickerModal';
 import { DangerConfirmModal } from '../components/DangerConfirmModal';
-import type { Member } from '../types';
+import { PromptModal } from '../components/PromptModal';
+import type { Guest, Member } from '../types';
 import './MembersPage.css';
+
+const GUESTS_OPEN_KEY = 'bandive:members:guestsOpen';
 
 export function MembersPage() {
   const {
@@ -12,9 +15,13 @@ export function MembersPage() {
     role,
     user,
     members,
+    guests,
     kickMember,
     setMemberParts,
     setBandLeader,
+    addGuest,
+    renameGuest,
+    removeGuest,
     leaveBand,
     invite,
     issueInviteCode,
@@ -60,6 +67,15 @@ export function MembersPage() {
     }
   };
 
+  const runGuest = async (fn: () => Promise<unknown>, fail: string) => {
+    setError(null);
+    try {
+      await fn();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : fail);
+    }
+  };
+
   const copyLink = async () => {
     if (!invite) return;
     try {
@@ -93,6 +109,14 @@ export function MembersPage() {
           />
         ))}
       </div>
+
+      <GuestSection
+        guests={guests}
+        canManage={isOwner}
+        onAdd={(name) => runGuest(() => addGuest(name), '게스트를 추가하지 못했습니다.')}
+        onRename={(id, name) => runGuest(() => renameGuest(id, name), '이름을 바꾸지 못했습니다.')}
+        onRemove={(id) => runGuest(() => removeGuest(id), '게스트를 삭제하지 못했습니다.')}
+      />
 
       {error && (
         <p style={{ fontSize: 12, margin: '10px 16px 0', color: 'var(--color-accent)' }}>{error}</p>
@@ -275,6 +299,119 @@ function MemberRow({ member, canEditParts, canManage, onSetParts, onSetLeader, o
           confirmPhrase="멤버 추방"
           onConfirm={onKick}
           onClose={() => setKickOpen(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ─────────────────────── 게스트 멤버 ─────────────────────── */
+
+interface GuestSectionProps {
+  guests: Guest[];
+  canManage: boolean;
+  onAdd: (name: string) => void;
+  onRename: (id: string, name: string) => void;
+  onRemove: (id: string) => void;
+}
+
+function GuestSection({ guests, canManage, onAdd, onRename, onRemove }: GuestSectionProps) {
+  const [open, setOpen] = useState(() => {
+    try {
+      return localStorage.getItem(GUESTS_OPEN_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  const [prompt, setPrompt] = useState<{ mode: 'add' } | { mode: 'rename'; guest: Guest } | null>(
+    null,
+  );
+
+  const toggle = () => {
+    setOpen((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem(GUESTS_OPEN_KEY, next ? '1' : '0');
+      } catch {
+        /* 저장 불가 — 무시 */
+      }
+      return next;
+    });
+  };
+
+  // 관리자도 아니고 게스트도 없으면 섹션 자체를 숨긴다
+  if (!canManage && guests.length === 0) return null;
+
+  return (
+    <div className="members__guests">
+      <button type="button" className="members__guests-head" onClick={toggle}>
+        <span>게스트 {guests.length}명</span>
+        <span className="members__guests-chev">{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div className="members__guests-body">
+          {guests.length === 0 && (
+            <span className="muted" style={{ fontSize: 12 }}>
+              아직 등록된 게스트가 없습니다. 곡 세션 배정·일정 출결에 쓸 이름을 추가하세요.
+            </span>
+          )}
+          {guests.map((g) => (
+            <div key={g.id} className="members__guest-row">
+              <Avatar label={[...g.name][0] ?? '게'} size={24} color="var(--color-neutral-500)" />
+              <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600 }}>{g.name}</span>
+              {canManage && (
+                <>
+                  <button
+                    type="button"
+                    className="members__guest-btn"
+                    onClick={() => setPrompt({ mode: 'rename', guest: g })}
+                  >
+                    이름
+                  </button>
+                  <button
+                    type="button"
+                    className="members__guest-btn members__guest-btn--danger"
+                    onClick={() => {
+                      if (
+                        confirm(`게스트 "${g.name}" 를 삭제할까요? 세션 배정·출결에서도 빠집니다.`)
+                      )
+                        onRemove(g.id);
+                    }}
+                  >
+                    삭제
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
+
+          {canManage && (
+            <button
+              type="button"
+              className="btn btn--sm members__guest-add"
+              onClick={() => setPrompt({ mode: 'add' })}
+            >
+              ＋ 게스트 추가
+            </button>
+          )}
+        </div>
+      )}
+
+      {prompt && (
+        <PromptModal
+          title={prompt.mode === 'add' ? '게스트 추가' : '게스트 이름 수정'}
+          label="게스트 이름"
+          placeholder="예: 세션 드러머"
+          initial={prompt.mode === 'rename' ? prompt.guest.name : ''}
+          submitLabel={prompt.mode === 'add' ? '추가' : '변경'}
+          maxLength={50}
+          onSubmit={(name) => {
+            if (prompt.mode === 'add') onAdd(name);
+            else onRename(prompt.guest.id, name);
+            setPrompt(null);
+          }}
+          onClose={() => setPrompt(null)}
         />
       )}
     </div>

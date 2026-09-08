@@ -249,6 +249,14 @@ export function HomePage() {
               return (
                 <div key={v.id} className="home__video">
                   <div className="home__video-thumb" style={{ background: stripe(a, b) }}>
+                    {v.thumbnailUrl && (
+                      <img
+                        className="home__video-thumb-img"
+                        src={v.thumbnailUrl}
+                        alt=""
+                        loading="lazy"
+                      />
+                    )}
                     <span className="home__play" />
                   </div>
                   <div className="stack" style={{ padding: 9, gap: 4 }}>

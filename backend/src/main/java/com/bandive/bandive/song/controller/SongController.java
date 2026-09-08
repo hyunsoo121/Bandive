@@ -80,7 +80,8 @@ public class SongController {
 	public SongResponse assignPart(@PathVariable Long songId, @PathVariable Long partId, @CurrentUser Long userId,
 			@RequestBody(required = false) PartAssignRequest request) {
 		Long targetUserId = request == null ? null : request.userId();
-		return songService.assignPart(songId, partId, userId, targetUserId);
+		Long targetGuestId = request == null ? null : request.guestId();
+		return songService.assignPart(songId, partId, userId, targetUserId, targetGuestId);
 	}
 
 	/** 곡을 폴더로 이동 (밴드 멤버 누구나). {@code folderId} null 이면 미분류. */

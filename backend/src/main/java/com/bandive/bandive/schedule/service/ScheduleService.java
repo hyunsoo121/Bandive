@@ -12,6 +12,8 @@ import com.bandive.bandive.band.Band;
 import com.bandive.bandive.band.BandRepository;
 import com.bandive.bandive.common.exception.ForbiddenException;
 import com.bandive.bandive.common.exception.NotFoundException;
+import com.bandive.bandive.guest.Guest;
+import com.bandive.bandive.guest.GuestRepository;
 import com.bandive.bandive.media.Media;
 import com.bandive.bandive.media.MediaRepository;
 import com.bandive.bandive.member.BandMember;
@@ -42,15 +44,18 @@ public class ScheduleService {
 
 	private final BandMemberRepository bandMembers;
 
+	private final GuestRepository guests;
+
 	private final UserRepository users;
 
 	public ScheduleService(ScheduleRepository schedules, AttendanceRepository attendances, MediaRepository media,
-			BandRepository bands, BandMemberRepository bandMembers, UserRepository users) {
+			BandRepository bands, BandMemberRepository bandMembers, GuestRepository guests, UserRepository users) {
 		this.schedules = schedules;
 		this.attendances = attendances;
 		this.media = media;
 		this.bands = bands;
 		this.bandMembers = bandMembers;
+		this.guests = guests;
 		this.users = users;
 	}
 
@@ -142,6 +147,39 @@ public class ScheduleService {
 						.user(users.getReferenceById(userId))
 						.status(status)
 						.build()));
+	}
+
+	/**
+	 * 관리자가 게스트를 일정에 추가/수정 (upsert). 게스트는 항상 참석(ATTENDING)이며, 그 일정에서 맡는 {@code session}(악기
+	 * 또는 "관객", null 허용)을 함께 기록한다.
+	 */
+	@Transactional
+	public ScheduleResponse setGuestAttendance(Long scheduleId, Long actorUserId, Long guestId, String session) {
+		Schedule schedule = findSchedule(scheduleId);
+		Long bandId = schedule.getBand().getId();
+		requireOwner(bandId, actorUserId);
+		Guest guest = guests.findByIdAndBandId(guestId, bandId)
+			.orElseThrow(() -> new NotFoundException("GUEST_NOT_FOUND", "게스트를 찾을 수 없습니다."));
+		String cleanSession = trimToNull(session);
+		attendances.findByScheduleIdAndGuestId(scheduleId, guestId).ifPresentOrElse(existing -> {
+			existing.changeStatus(AttendanceStatus.ATTENDING);
+			existing.changeSession(cleanSession);
+		}, () -> attendances.save(Attendance.builder()
+			.schedule(schedule)
+			.guest(guest)
+			.status(AttendanceStatus.ATTENDING)
+			.session(cleanSession)
+			.build()));
+		return toResponse(schedule, actorUserId);
+	}
+
+	/** 관리자가 게스트를 일정에서 제외 (참석 행 삭제). */
+	@Transactional
+	public ScheduleResponse removeGuestAttendance(Long scheduleId, Long actorUserId, Long guestId) {
+		Schedule schedule = findSchedule(scheduleId);
+		requireOwner(schedule.getBand().getId(), actorUserId);
+		attendances.findByScheduleIdAndGuestId(scheduleId, guestId).ifPresent(attendances::delete);
+		return toResponse(schedule, actorUserId);
 	}
 
 	private Schedule findSchedule(Long scheduleId) {

@@ -2,10 +2,20 @@
 
 import { fileUrl } from './client';
 import { ATT_TO_KO } from '../lib/schedule';
-import type { Band, MediaItem, Member, ScheduleEvent, SessionShape, Song, User } from '../types';
+import type {
+  Band,
+  Guest,
+  MediaItem,
+  Member,
+  ScheduleEvent,
+  SessionShape,
+  Song,
+  User,
+} from '../types';
 import type {
   BandDto,
   BandRoleDto,
+  GuestDto,
   MediaDto,
   MediaPlatformDto,
   MemberDto,
@@ -51,6 +61,10 @@ export function toBand(dto: BandDto): Band {
   };
 }
 
+export function toGuest(dto: GuestDto): Guest {
+  return { id: String(dto.id), bandId: String(dto.bandId), name: dto.name };
+}
+
 export function toMember(dto: MemberDto, bandId: string): Member {
   return {
     id: String(dto.userId),
@@ -70,7 +84,7 @@ export function toSong(dto: SongDto): Song {
   for (const p of dto.parts) {
     const inst = p.instrument;
     sessions[inst] = (sessions[inst] ?? 0) + 1;
-    if (p.assignedNickname) assignments[`${p.instrument}#${p.partIndex}`] = p.assignedNickname;
+    if (p.assignedName) assignments[`${p.instrument}#${p.partIndex}`] = p.assignedName;
   }
   return {
     id: String(dto.id),
@@ -95,7 +109,8 @@ export function toSong(dto: SongDto): Song {
       instrument: p.instrument,
       partIndex: p.partIndex,
       assigneeId: p.assignedUserId != null ? String(p.assignedUserId) : null,
-      assigneeName: p.assignedNickname,
+      assigneeGuestId: p.assignedGuestId != null ? String(p.assignedGuestId) : null,
+      assigneeName: p.assignedName,
     })),
   };
 }
@@ -110,9 +125,11 @@ export function toSchedule(dto: ScheduleDto): ScheduleEvent {
     counts: dto.counts,
     myStatus: dto.myStatus ? ATT_TO_KO[dto.myStatus] : null,
     attendees: dto.attendees.map((a) => ({
-      userId: String(a.userId),
+      userId: a.userId != null ? String(a.userId) : null,
+      guestId: a.guestId != null ? String(a.guestId) : null,
       nickname: a.nickname,
       status: ATT_TO_KO[a.status],
+      session: a.session ?? null,
     })),
     mediaIds: dto.media.map((m) => String(m.id)),
   };
@@ -165,5 +182,7 @@ export function toMedia(dto: MediaDto): MediaItem {
     visibility: dto.visibility === 'LINK_PUBLIC' ? '링크 공개' : '멤버만',
     uploadedByUserId: String(dto.uploadedByUserId),
     scheduleId: dto.scheduleId != null ? String(dto.scheduleId) : null,
+    songId: dto.songId != null ? String(dto.songId) : null,
+    songTitle: dto.songTitle,
   };
 }

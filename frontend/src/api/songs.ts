@@ -41,10 +41,18 @@ export const unvoteSong = (songId: string) => api.del<VoteResultDto>(`/api/songs
 /** WISHLIST → CONFIRMED 승격 (관리자). */
 export const confirmSong = (songId: string) => api.patch<SongDto>(`/api/songs/${songId}/confirm`);
 
-/** 파트 배정/해제 (밴드 멤버 누구나). userId 가 null 이면 해제. 곡이 CONFIRMED 여야 한다. */
-export const assignPart = (songId: string, partId: string, userId: string | null) =>
+/**
+ * 파트 배정/해제 (밴드 멤버 누구나). 곡이 CONFIRMED 여야 한다.
+ * target 이 null 이면 해제. 실멤버는 `{ userId }`, 게스트는 `{ guestId }` — 최대 하나.
+ */
+export const assignPart = (
+  songId: string,
+  partId: string,
+  target: { userId?: string | null; guestId?: string | null } | null,
+) =>
   api.put<SongDto>(`/api/songs/${songId}/parts/${partId}/assign`, {
-    userId: userId ? Number(userId) : null,
+    userId: target?.userId ? Number(target.userId) : null,
+    guestId: target?.guestId ? Number(target.guestId) : null,
   });
 
 /** 곡 삭제 (관리자). parts·votes cascade. */

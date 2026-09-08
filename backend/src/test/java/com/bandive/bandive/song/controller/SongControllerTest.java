@@ -169,11 +169,20 @@ class SongControllerTest {
 
 	@Test
 	void 파트_배정() throws Exception {
-		given(songService.assignPart(5L, 9L, 7L, 12L)).willReturn(SONG);
+		given(songService.assignPart(5L, 9L, 7L, 12L, null)).willReturn(SONG);
 
 		mvc.perform(put("/api/songs/5/parts/9/assign").with(asUser(7L))
 			.contentType(MediaType.APPLICATION_JSON)
 			.content("{\"userId\":12}")).andExpect(status().isOk());
+	}
+
+	@Test
+	void 파트_게스트_배정() throws Exception {
+		given(songService.assignPart(5L, 9L, 7L, null, 4L)).willReturn(SONG);
+
+		mvc.perform(put("/api/songs/5/parts/9/assign").with(asUser(7L))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"guestId\":4}")).andExpect(status().isOk());
 	}
 
 	@Test

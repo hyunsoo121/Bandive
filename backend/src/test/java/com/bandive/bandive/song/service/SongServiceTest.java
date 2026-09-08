@@ -11,6 +11,8 @@ import com.bandive.bandive.common.exception.ConflictException;
 import com.bandive.bandive.common.exception.ForbiddenException;
 import com.bandive.bandive.common.exception.NotFoundException;
 import com.bandive.bandive.common.exception.ValidationException;
+import com.bandive.bandive.guest.Guest;
+import com.bandive.bandive.guest.GuestRepository;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
 import com.bandive.bandive.song.SongPartRepository;
@@ -52,6 +54,9 @@ class SongServiceTest extends RepositoryTest {
 	private BandMemberRepository bandMembers;
 
 	@Autowired
+	private GuestRepository guests;
+
+	@Autowired
 	private UserRepository users;
 
 	@Autowired
@@ -70,7 +75,7 @@ class SongServiceTest extends RepositoryTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new SongService(songs, parts, votes, bands, bandMembers, users, folders,
+		service = new SongService(songs, parts, votes, bands, bandMembers, guests, users, folders,
 				new StubMusicSearchService());
 		band = em.persist(Fixtures.band("A"));
 		ownerId = joinMember("owner", BandRole.OWNER);
@@ -187,7 +192,7 @@ class SongServiceTest extends RepositoryTest {
 		em.flush();
 		Long partId = parts.findAllBySongId(songId).getFirst().getId();
 
-		assertThatThrownBy(() -> service.assignPart(songId, partId, memberId, memberId))
+		assertThatThrownBy(() -> service.assignPart(songId, partId, memberId, memberId, null))
 			.isInstanceOf(ConflictException.class)
 			.satisfies(ex -> assertThat(((ConflictException) ex).getCode()).isEqualTo("SONG_NOT_CONFIRMED"));
 	}
@@ -200,11 +205,42 @@ class SongServiceTest extends RepositoryTest {
 		service.confirm(songId, ownerId);
 		em.flush();
 
-		SongResponse assigned = service.assignPart(songId, partId, memberId, memberId);
+		SongResponse assigned = service.assignPart(songId, partId, memberId, memberId, null);
 		assertThat(assigned.parts().getFirst().assignedUserId()).isEqualTo(memberId);
 
-		SongResponse cleared = service.assignPart(songId, partId, memberId, null);
+		SongResponse cleared = service.assignPart(songId, partId, memberId, null, null);
 		assertThat(cleared.parts().getFirst().assignedUserId()).isNull();
+	}
+
+	@Test
+	void 게스트를_파트에_배정하면_멤버_배정은_비워진다() {
+		Long songId = service.add(band.getId(), memberId, manual(List.of(new SessionSlot("GUITAR", 1)))).id();
+		em.flush();
+		Long partId = parts.findAllBySongId(songId).getFirst().getId();
+		service.confirm(songId, ownerId);
+		Guest guest = em.persist(Fixtures.guest(band, "세션 기타"));
+		em.flush();
+
+		SongResponse assigned = service.assignPart(songId, partId, memberId, null, guest.getId());
+		assertThat(assigned.parts().getFirst().assignedGuestId()).isEqualTo(guest.getId());
+		assertThat(assigned.parts().getFirst().assignedName()).isEqualTo("세션 기타");
+
+		SongResponse toMember = service.assignPart(songId, partId, memberId, memberId, null);
+		assertThat(toMember.parts().getFirst().assignedGuestId()).isNull();
+		assertThat(toMember.parts().getFirst().assignedUserId()).isEqualTo(memberId);
+	}
+
+	@Test
+	void 멤버와_게스트를_동시에_배정하면_400() {
+		Long songId = service.add(band.getId(), memberId, manual(List.of(new SessionSlot("GUITAR", 1)))).id();
+		service.confirm(songId, ownerId);
+		Guest guest = em.persist(Fixtures.guest(band, "세션"));
+		em.flush();
+		Long partId = parts.findAllBySongId(songId).getFirst().getId();
+
+		assertThatThrownBy(() -> service.assignPart(songId, partId, memberId, memberId, guest.getId()))
+			.isInstanceOf(ValidationException.class)
+			.satisfies(ex -> assertThat(((ValidationException) ex).getCode()).isEqualTo("PART_ASSIGN_AMBIGUOUS"));
 	}
 
 	@Test
@@ -215,7 +251,7 @@ class SongServiceTest extends RepositoryTest {
 		Long partId = parts.findAllBySongId(songId).getFirst().getId();
 		Long outsiderId = em.persist(Fixtures.user("out2")).getId();
 
-		assertThatThrownBy(() -> service.assignPart(songId, partId, memberId, outsiderId))
+		assertThatThrownBy(() -> service.assignPart(songId, partId, memberId, outsiderId, null))
 			.isInstanceOf(NotFoundException.class)
 			.satisfies(ex -> assertThat(((NotFoundException) ex).getCode()).isEqualTo("MEMBER_NOT_FOUND"));
 	}

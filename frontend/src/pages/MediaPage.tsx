@@ -108,6 +108,11 @@ export function MediaPage() {
                     ? `일정 · ${evUi.month + 1}/${evUi.day} ${KIND_LABEL[evUi.type]}`
                     : '연결된 일정 없음'}
                 </span>
+                {m.songTitle && (
+                  <span className="media__link" style={{ color: 'var(--color-accent-700)' }}>
+                    곡 · {m.songTitle}
+                  </span>
+                )}
                 <div className="media__card-foot">
                   <span
                     className="media__scope"

@@ -1,0 +1,56 @@
+package com.bandive.bandive.guest.controller;
+
+import java.util.List;
+
+import jakarta.validation.Valid;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.bandive.bandive.auth.CurrentUser;
+import com.bandive.bandive.guest.dto.GuestRequest;
+import com.bandive.bandive.guest.dto.GuestResponse;
+import com.bandive.bandive.guest.service.GuestService;
+
+@RestController
+public class GuestController {
+
+	private final GuestService guestService;
+
+	public GuestController(GuestService guestService) {
+		this.guestService = guestService;
+	}
+
+	/** 게스트 목록 — 공개. 이름순. */
+	@GetMapping("/api/bands/{bandId}/guests")
+	public List<GuestResponse> list(@PathVariable Long bandId) {
+		return guestService.list(bandId);
+	}
+
+	@PostMapping("/api/bands/{bandId}/guests")
+	@ResponseStatus(HttpStatus.CREATED)
+	public GuestResponse create(@PathVariable Long bandId, @CurrentUser Long userId,
+			@Valid @RequestBody GuestRequest request) {
+		return guestService.create(bandId, userId, request.name());
+	}
+
+	@PatchMapping("/api/bands/{bandId}/guests/{guestId}")
+	public GuestResponse rename(@PathVariable Long bandId, @PathVariable Long guestId, @CurrentUser Long userId,
+			@Valid @RequestBody GuestRequest request) {
+		return guestService.rename(bandId, guestId, userId, request.name());
+	}
+
+	@DeleteMapping("/api/bands/{bandId}/guests/{guestId}")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void delete(@PathVariable Long bandId, @PathVariable Long guestId, @CurrentUser Long userId) {
+		guestService.delete(bandId, guestId, userId);
+	}
+
+}

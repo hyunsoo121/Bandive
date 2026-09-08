@@ -12,5 +12,5 @@ public record MediaCreateRequest(
 		@NotBlank(message = "영상 URL 은 필수입니다") @Size(max = 500) @Pattern(regexp = "^https?://.+",
 				message = "http(s):// 로 시작하는 URL 이어야 합니다") String externalUrl,
 		@NotNull(message = "영상 종류(REHEARSAL/PERFORMANCE)는 필수입니다") MediaType type, MediaVisibility visibility,
-		@Size(max = 200) String title, Long scheduleId) {
+		@Size(max = 200) String title, Long scheduleId, Long songId) {
 }

@@ -18,13 +18,15 @@ const SCOPES: Visibility[] = ['멤버만', '링크 공개'];
 const YT_OR_DRIVE = /(youtube\.com|youtu\.be|drive\.google\.com|docs\.google\.com)/i;
 
 export function AddMediaModal({ bandId, schedules, editing, onClose, onSubmitted }: Props) {
-  const { addMedia, editMedia } = useApp();
+  const { addMedia, editMedia, songs } = useApp();
+  const confirmedSongs = songs.filter((s) => s.bandId === bandId && s.status === 'CONFIRMED');
 
   const [url, setUrl] = useState(editing?.url ?? '');
   const [title, setTitle] = useState(editing?.rawTitle ?? '');
   const [kind, setKind] = useState<MediaKind>(editing?.kind ?? '합주');
   const [visibility, setVisibility] = useState<Visibility>(editing?.visibility ?? '멤버만');
   const [scheduleId, setScheduleId] = useState(editing?.scheduleId ?? '');
+  const [songId, setSongId] = useState(editing?.songId ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,7 +40,14 @@ export function AddMediaModal({ bandId, schedules, editing, onClose, onSubmitted
     setSubmitting(true);
     setError(null);
     try {
-      const payload = { url, title, kind, visibility, scheduleId: scheduleId || null };
+      const payload = {
+        url,
+        title,
+        kind,
+        visibility,
+        scheduleId: scheduleId || null,
+        songId: songId || null,
+      };
       if (editing) await editMedia(editing.id, payload);
       else await addMedia({ bandId, ...payload });
       onSubmitted();
@@ -158,6 +167,28 @@ export function AddMediaModal({ bandId, schedules, editing, onClose, onSubmitted
         </select>
         <span className="muted" style={{ fontSize: 11 }}>
           연결하면 캘린더의 해당 일정 상세에 이 영상이 함께 표시됩니다.
+        </span>
+      </div>
+
+      <div className="field">
+        <label htmlFor="media-song">연결할 곡 · 선택</label>
+        <select
+          id="media-song"
+          className="input"
+          value={songId}
+          onChange={(e) => setSongId(e.target.value)}
+        >
+          <option value="">연결 안 함</option>
+          {confirmedSongs.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.title}
+              {s.artist ? ` · ${s.artist}` : ''}
+            </option>
+          ))}
+        </select>
+        <span className="muted" style={{ fontSize: 11 }}>
+          합주곡 리스트에 있는 곡만 연결할 수 있습니다.
+          {confirmedSongs.length === 0 && ' (아직 합주곡이 없습니다)'}
         </span>
       </div>
 
