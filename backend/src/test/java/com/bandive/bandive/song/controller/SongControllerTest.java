@@ -120,6 +120,28 @@ class SongControllerTest {
 	}
 
 	@Test
+	void 참고영상_URL_이_http가_아니면_400() throws Exception {
+		given(bandGuard.isMember(1L)).willReturn(true);
+
+		mvc.perform(post("/api/bands/1/songs").with(asUser(7L))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"title\":\"곡\",\"sourceType\":\"MANUAL\",\"referenceVideoUrl\":\"javascript:alert(1)\"}"))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+	}
+
+	@Test
+	void 참고영상_URL_이_비어있으면_통과한다() throws Exception {
+		given(bandGuard.isMember(1L)).willReturn(true);
+		given(songService.add(eq(1L), eq(7L), any())).willReturn(SONG);
+
+		mvc.perform(post("/api/bands/1/songs").with(asUser(7L))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"title\":\"곡\",\"sourceType\":\"MANUAL\",\"referenceVideoUrl\":\"\",\"artworkUrl\":\"\"}"))
+			.andExpect(status().isCreated());
+	}
+
+	@Test
 	void 투표는_카운트를_돌려준다() throws Exception {
 		given(songService.vote(5L, 7L)).willReturn(new VoteResult(4, true));
 

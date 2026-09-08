@@ -440,3 +440,42 @@ UI 는 `CONFIRMED` 곡에서만 select 를 보여주므로 보통은 안 나지�
 **해결 (2026-09-03, feature/8).** `addMedia`(`scheduleId` 있을 때) / `removeMedia`(지우는 영상이 일정에 연결돼
 있었을 때) 후 `scheduleApi.listSchedules` 로 `schedules` 를 다시 받는다 (`refreshSchedules` 헬퍼).
 백엔드는 처음부터 `ScheduleResponse.media` 를 정상으로 내려주고 있었음 — 순수 클라 상태 동기화 버그였다.
+
+## 보안 점검 (배포 전, 2026-09-08)
+
+배포 전 URL 첨부·쿼리 관련 보안 훑기. 결과 요약과 고친 것.
+
+### SQL 인젝션 — 없음
+
+전 저장소가 Spring Data JPA. `@Query` 는 전부 JPQL + 네임드 파라미터(`:bandId`),
+문자열 결합 쿼리·`nativeQuery` 0건. 파생 쿼리(`findByBandIdAndStatus…`)도 바인딩.
+raw SQL 은 Flyway 마이그레이션(개발자 작성 정적 스크립트)뿐.
+
+### `javascript:` URL 저장형 XSS — 곡 `referenceVideoUrl` / `artworkUrl` (고침)
+
+**문제.** `MediaCreateRequest`/`MediaUpdateRequest.externalUrl` 은 `@Pattern("^https?://.+")` 로
+막혀 있었으나, `SongCreateRequest.referenceVideoUrl`·`artworkUrl` 은 `@Size` 만 있었다.
+프론트는 이 값을 `<a href={song.referenceVideoUrl}>` / `<img src={song.artworkUrl}>` 로
+그대로 렌더하는데, **React 는 `href`/`src` 속성값을 sanitize 하지 않는다.** 따라서
+`referenceVideoUrl` 에 `javascript:alert(1)` 을 저장해 두면 그 링크를 클릭한 사람 브라우저에서
+스크립트가 실행된다 (곡은 비회원도 GET 으로 봄 → 영향 범위 넓음).
+
+**고침 (2026-09-08, feature/10).** `SongCreateRequest` 의 두 필드에 `@Pattern(regexp = "^(https?://.+)?$")`
+추가 — `http(s)://` 로 시작하는 값 또는 빈 문자열만 허용, `javascript:`·`data:`·`file:` 등은 400.
+빈 문자열을 허용해야 하는 이유: 프론트가 "참고 영상 없음" 일 때 `""` 를 보냄(`AddSongModal`). 곡 수정
+API 는 없어서 생성 DTO 만 손보면 됨. 테스트 `SongControllerTest.참고영상_URL_이_http가_아니면_400`,
+`…비어있으면_통과한다` 추가.
+
+### 나머지 (문제 아님 / 배포 시 처리)
+
+- **XSS 전반**: `dangerouslySetInnerHTML`·`innerHTML`·`eval` 미사용, React 자동 이스케이프.
+  외부 링크는 전부 `target="_blank" rel="noreferrer"` (reverse tabnabbing 안전).
+- **SSRF**: 백엔드가 요청하는 외부 호스트는 `itunes.apple.com` 고정 하나. media/reference URL 을
+  서버가 fetch 하는 코드 없음. `MediaThumbnail` 은 정규식으로 `[A-Za-z0-9_-]` id 만 캡처해
+  `img.youtube.com`/`drive.google.com` 고정 도메인 문자열을 조립(요청은 브라우저 `<img>`).
+- **파일 업로드(로고/배너)**: `LocalStorageService` — MIME 화이트리스트(png/jpg/webp/gif, **SVG 제외**),
+  UUID 파일명, path-traversal 가드(`dir.startsWith(root)`), 5MB 제한. `Content-Type` 은 클라 신고값이라
+  스푸핑 가능하나 `.png` 확장자로만 서빙 + `X-Content-Type-Options: nosniff`(Security 기본값)라 HTML 실행 불가.
+- **인가**: `@bandGuard` 멤버/밴드장 체크 + media `visibility` 필터(비회원·비멤버는 `LINK_PUBLIC` 만).
+- **배포 시 숙제**: ① 크로스도메인이면 refresh 쿠키 `SameSite=None; Secure` → CSRF 재검토(현재 `Strict`),
+  ② `/api/auth/login` 브루트포스·`/api/songs/search` 남용 rate limiting, ③ 프론트 정적 서빙 측 CSP 헤더.
