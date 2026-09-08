@@ -52,7 +52,6 @@ export function MediaPage() {
     <div className="media">
       <header className="media__head">
         <h2>영상</h2>
-        <span className="media__badge">URL 첨부</span>
       </header>
 
       <div className="media__filters">

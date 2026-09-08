@@ -120,185 +120,193 @@ export function BandSettingsPage() {
         <h2>밴드 설정</h2>
       </header>
 
-      <section className="bandset__sec">
-        <span className="kicker">밴드 정보</span>
-        <div className="field">
-          <label htmlFor="bs-name">이름</label>
-          <input
-            id="bs-name"
-            className="input"
-            value={name}
-            maxLength={100}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="bs-note">소개</label>
-          <textarea
-            id="bs-note"
-            className="input"
-            value={note}
-            maxLength={500}
-            rows={3}
-            onChange={(e) => setNote(e.target.value)}
-            placeholder="밴드 소개 (선택)"
-          />
-        </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <button
-            type="button"
-            className="btn btn--primary btn--sm"
-            disabled={!infoDirty || savingInfo}
-            onClick={saveInfo}
-          >
-            {savingInfo ? '저장 중…' : '저장'}
-          </button>
-          {infoMsg && (
-            <span className="muted" style={{ fontSize: 11 }}>
-              {infoMsg}
-            </span>
-          )}
-        </div>
-      </section>
-
-      <section className="bandset__sec">
-        <span className="kicker">로고 / 배너</span>
-        <div className="bandset__imgs">
-          <div className="bandset__img">
-            <span className="muted" style={{ fontSize: 11 }}>
-              로고
-            </span>
-            {currentBand.logoUrl ? (
-              <img src={currentBand.logoUrl} alt="로고" className="bandset__logo" />
-            ) : (
-              <span className="bandset__logo bandset__logo--empty">{currentBand.initial}</span>
-            )}
-            <input ref={logoInput} type="file" accept="image/*" hidden onChange={onPick('logo')} />
-            <button
-              type="button"
-              className="btn btn--sm"
-              onClick={() => logoInput.current?.click()}
-            >
-              변경
-            </button>
-          </div>
-          <div className="bandset__img">
-            <span className="muted" style={{ fontSize: 11 }}>
-              배너
-            </span>
-            <div
-              className="bandset__banner"
-              style={
-                currentBand.bannerUrl
-                  ? { backgroundImage: `url(${currentBand.bannerUrl})` }
-                  : undefined
-              }
-            />
+      <div className="bandset__body">
+        <section className="bandset__sec">
+          <span className="kicker">밴드 정보</span>
+          <div className="field">
+            <label htmlFor="bs-name">이름</label>
             <input
-              ref={bannerInput}
-              type="file"
-              accept="image/*"
-              hidden
-              onChange={onPick('banner')}
+              id="bs-name"
+              className="input"
+              value={name}
+              maxLength={100}
+              onChange={(e) => setName(e.target.value)}
             />
+          </div>
+          <div className="field">
+            <label htmlFor="bs-note">소개</label>
+            <textarea
+              id="bs-note"
+              className="input"
+              value={note}
+              maxLength={500}
+              rows={3}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder="밴드 소개 (선택)"
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
               type="button"
-              className="btn btn--sm"
-              onClick={() => bannerInput.current?.click()}
+              className="btn btn--primary btn--sm"
+              disabled={!infoDirty || savingInfo}
+              onClick={saveInfo}
             >
-              변경
+              {savingInfo ? '저장 중…' : '저장'}
             </button>
+            {infoMsg && (
+              <span className="muted" style={{ fontSize: 11 }}>
+                {infoMsg}
+              </span>
+            )}
           </div>
-        </div>
-      </section>
+        </section>
 
-      <section className="bandset__sec">
-        <span className="kicker">관리자 위임</span>
-        {otherMembers.length === 0 ? (
-          <span className="muted" style={{ fontSize: 12 }}>
-            위임할 다른 멤버가 없습니다.
-          </span>
-        ) : (
-          <>
-            <select
-              className="input"
-              value={transferTo}
-              onChange={(e) => {
-                setTransferTo(e.target.value);
-                setTransferArmed(false);
-              }}
-            >
-              <option value="">멤버 선택</option>
-              {otherMembers.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
-            {transferArmed ? (
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  type="button"
-                  className="btn btn--sm bandset__danger"
-                  disabled={transferBusy}
-                  onClick={runTransfer}
-                >
-                  {transferBusy ? '위임 중…' : '정말 위임 — 나는 일반 멤버가 됩니다'}
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--sm"
-                  onClick={() => setTransferArmed(false)}
-                >
-                  취소
-                </button>
-              </div>
-            ) : (
+        <section className="bandset__sec">
+          <span className="kicker">로고 / 배너</span>
+          <div className="bandset__imgs">
+            <div className="bandset__img">
+              <span className="muted" style={{ fontSize: 11 }}>
+                로고
+              </span>
+              {currentBand.logoUrl ? (
+                <img src={currentBand.logoUrl} alt="로고" className="bandset__logo" />
+              ) : (
+                <span className="bandset__logo bandset__logo--empty">{currentBand.initial}</span>
+              )}
+              <input
+                ref={logoInput}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={onPick('logo')}
+              />
               <button
                 type="button"
                 className="btn btn--sm"
-                disabled={!transferTo}
-                onClick={() => setTransferArmed(true)}
+                onClick={() => logoInput.current?.click()}
               >
-                관리자 넘기기
+                변경
               </button>
-            )}
-          </>
-        )}
-      </section>
+            </div>
+            <div className="bandset__img">
+              <span className="muted" style={{ fontSize: 11 }}>
+                배너
+              </span>
+              <div
+                className="bandset__banner"
+                style={
+                  currentBand.bannerUrl
+                    ? { backgroundImage: `url(${currentBand.bannerUrl})` }
+                    : undefined
+                }
+              />
+              <input
+                ref={bannerInput}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={onPick('banner')}
+              />
+              <button
+                type="button"
+                className="btn btn--sm"
+                onClick={() => bannerInput.current?.click()}
+              >
+                변경
+              </button>
+            </div>
+          </div>
+        </section>
 
-      <section className="bandset__sec bandset__sec--danger">
-        <span className="kicker">위험 구역</span>
-        <span className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
-          밴드를 삭제하면 곡·일정·영상·멤버·초대 코드가 모두 사라집니다. 되돌릴 수 없습니다.
-        </span>
-        {deleteArmed ? (
-          <div style={{ display: 'flex', gap: 8 }}>
+        <section className="bandset__sec">
+          <span className="kicker">관리자 위임</span>
+          {otherMembers.length === 0 ? (
+            <span className="muted" style={{ fontSize: 12 }}>
+              위임할 다른 멤버가 없습니다.
+            </span>
+          ) : (
+            <>
+              <select
+                className="input"
+                value={transferTo}
+                onChange={(e) => {
+                  setTransferTo(e.target.value);
+                  setTransferArmed(false);
+                }}
+              >
+                <option value="">멤버 선택</option>
+                {otherMembers.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+              {transferArmed ? (
+                <div className="bandset__confirm">
+                  <button
+                    type="button"
+                    className="btn btn--sm bandset__danger"
+                    disabled={transferBusy}
+                    onClick={runTransfer}
+                  >
+                    {transferBusy ? '위임 중…' : '정말 위임 — 나는 일반 멤버가 됩니다'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--sm"
+                    onClick={() => setTransferArmed(false)}
+                  >
+                    취소
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn--sm"
+                  disabled={!transferTo}
+                  onClick={() => setTransferArmed(true)}
+                >
+                  관리자 넘기기
+                </button>
+              )}
+            </>
+          )}
+        </section>
+
+        <section className="bandset__sec bandset__sec--danger">
+          <span className="kicker">위험 구역</span>
+          <span className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
+            밴드를 삭제하면 곡·일정·영상·멤버·초대 코드가 모두 사라집니다. 되돌릴 수 없습니다.
+          </span>
+          {deleteArmed ? (
+            <div className="bandset__confirm">
+              <button
+                type="button"
+                className="btn btn--sm bandset__danger"
+                disabled={deleteBusy}
+                onClick={runDelete}
+              >
+                {deleteBusy ? '삭제 중…' : `정말 "${currentBand.name}" 삭제`}
+              </button>
+              <button type="button" className="btn btn--sm" onClick={() => setDeleteArmed(false)}>
+                취소
+              </button>
+            </div>
+          ) : (
             <button
               type="button"
               className="btn btn--sm bandset__danger"
-              disabled={deleteBusy}
-              onClick={runDelete}
+              onClick={() => setDeleteArmed(true)}
             >
-              {deleteBusy ? '삭제 중…' : `정말 "${currentBand.name}" 삭제`}
+              밴드 삭제
             </button>
-            <button type="button" className="btn btn--sm" onClick={() => setDeleteArmed(false)}>
-              취소
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            className="btn btn--sm bandset__danger"
-            onClick={() => setDeleteArmed(true)}
-          >
-            밴드 삭제
-          </button>
-        )}
-        {dangerMsg && (
-          <span style={{ fontSize: 11, color: 'var(--color-accent)' }}>{dangerMsg}</span>
-        )}
-      </section>
+          )}
+          {dangerMsg && (
+            <span style={{ fontSize: 11, color: 'var(--color-accent)' }}>{dangerMsg}</span>
+          )}
+        </section>
+      </div>
     </div>
   );
 }
