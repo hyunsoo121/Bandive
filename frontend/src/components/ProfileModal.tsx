@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useApp } from '../store/AppContext';
+import { Avatar } from './Avatar';
 import { Modal } from './Modal';
 
 interface Props {
@@ -7,13 +8,18 @@ interface Props {
 }
 
 const PW_RULE = /^(?=.*[A-Za-z])(?=.*\d).{8,72}$/;
+const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 
 export function ProfileModal({ onClose }: Props) {
-  const { user, updateProfile, changePassword } = useApp();
+  const { user, updateProfile, uploadAvatar, removeAvatar, changePassword } = useApp();
 
   const [nickname, setNickname] = useState(user?.name ?? '');
   const [savingName, setSavingName] = useState(false);
   const [nameMsg, setNameMsg] = useState<string | null>(null);
+
+  const avatarInput = useRef<HTMLInputElement>(null);
+  const [avatarBusy, setAvatarBusy] = useState(false);
+  const [avatarMsg, setAvatarMsg] = useState<string | null>(null);
 
   const [curPw, setCurPw] = useState('');
   const [newPw, setNewPw] = useState('');
@@ -25,6 +31,42 @@ export function ProfileModal({ onClose }: Props) {
   const isLocal = user.loginProvider === 'local';
 
   const nameDirty = nickname.trim().length > 0 && nickname.trim() !== user.name;
+
+  const pickAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file || avatarBusy) return;
+    if (!file.type.startsWith('image/')) {
+      setAvatarMsg('이미지 파일만 올릴 수 있습니다.');
+      return;
+    }
+    if (file.size > MAX_AVATAR_BYTES) {
+      setAvatarMsg('5MB 이하 이미지만 올릴 수 있습니다.');
+      return;
+    }
+    setAvatarBusy(true);
+    setAvatarMsg(null);
+    try {
+      await uploadAvatar(file);
+    } catch (err) {
+      setAvatarMsg(err instanceof Error ? err.message : '사진을 올리지 못했습니다.');
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
+
+  const clearAvatar = async () => {
+    if (avatarBusy) return;
+    setAvatarBusy(true);
+    setAvatarMsg(null);
+    try {
+      await removeAvatar();
+    } catch (err) {
+      setAvatarMsg(err instanceof Error ? err.message : '사진을 지우지 못했습니다.');
+    } finally {
+      setAvatarBusy(false);
+    }
+  };
 
   const saveName = async () => {
     if (!nameDirty || savingName) return;
@@ -62,6 +104,35 @@ export function ProfileModal({ onClose }: Props) {
   return (
     <Modal title="내 정보" width={400} onClose={onClose}>
       <div className="stack" style={{ gap: 16 }}>
+        <div className="field">
+          <label>프로필 사진</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Avatar label={user.initial} size={56} src={user.avatarUrl} />
+            <input ref={avatarInput} type="file" accept="image/*" hidden onChange={pickAvatar} />
+            <button
+              type="button"
+              className="btn btn--sm"
+              disabled={avatarBusy}
+              onClick={() => avatarInput.current?.click()}
+            >
+              {avatarBusy ? '처리 중…' : user.avatarUrl ? '변경' : '사진 추가'}
+            </button>
+            {user.avatarUrl && (
+              <button
+                type="button"
+                className="btn btn--sm"
+                disabled={avatarBusy}
+                onClick={clearAvatar}
+              >
+                제거
+              </button>
+            )}
+          </div>
+          {avatarMsg && (
+            <span style={{ fontSize: 11, color: 'var(--color-accent)' }}>{avatarMsg}</span>
+          )}
+        </div>
+
         <div className="field">
           <label htmlFor="pf-nick">닉네임</label>
           <div style={{ display: 'flex', gap: 8 }}>

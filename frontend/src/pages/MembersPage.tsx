@@ -225,7 +225,12 @@ function MemberRow({ member, canEditParts, canManage, onSetParts, onSetLeader, o
   return (
     <div className="members__row">
       <div className="members__row-top">
-        <Avatar label={member.initial} size={34} color={member.avatarColor} />
+        <Avatar
+          label={member.initial}
+          size={34}
+          src={member.avatarUrl}
+          color={member.avatarColor}
+        />
         <span className="stack" style={{ flex: 1, minWidth: 0, gap: 4 }}>
           <strong style={{ fontSize: 14 }}>{member.name}</strong>
           <span className="members__parts-line">

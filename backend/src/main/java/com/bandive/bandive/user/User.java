@@ -48,6 +48,10 @@ public class User extends BaseTimeEntity {
 	@Column(nullable = false, length = 20)
 	private AuthProvider provider;
 
+	/** 프로필 사진 (자체 스토리지 URL). 미설정이면 null → 프론트는 이니셜 아바타. */
+	@Column(name = "avatar_url", length = 500)
+	private String avatarUrl;
+
 	public static User ofKakao(String kakaoId, String nickname) {
 		return User.builder().kakaoId(kakaoId).nickname(nickname).provider(AuthProvider.KAKAO).build();
 	}
@@ -69,6 +73,11 @@ public class User extends BaseTimeEntity {
 	/** 비밀번호 해시 교체 (LOCAL 계정만). */
 	public void changePassword(String passwordHash) {
 		this.passwordHash = passwordHash;
+	}
+
+	/** 프로필 사진 URL 설정/해제(null). */
+	public void updateAvatar(String avatarUrl) {
+		this.avatarUrl = avatarUrl;
 	}
 
 	public boolean isLocal() {

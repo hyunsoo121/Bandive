@@ -6,7 +6,7 @@ import { BrandMark } from './BrandMark';
 import { NavIcon } from './NavIcon';
 import { Avatar } from './Avatar';
 import { GuestBanner } from './GuestBanner';
-import { DevRoleBar } from './DevRoleBar';
+// import { DevRoleBar } from './DevRoleBar'; // 잠깐 숨김 (아래 렌더도 주석)
 import { BandSwitcher } from './BandSwitcher';
 import { CreateBandModal } from './CreateBandModal';
 import { ProfileModal } from './ProfileModal';
@@ -128,6 +128,7 @@ export function AppLayout() {
             <Avatar
               label={meInitial}
               size={30}
+              src={user?.avatarUrl}
               color={user ? 'var(--color-text)' : 'var(--color-neutral-500)'}
             />
             <span className="stack" style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
@@ -181,7 +182,8 @@ export function AppLayout() {
         <nav className="app__tabbar">{navList('tab')}</nav>
       </div>
 
-      <DevRoleBar />
+      {/* 개발용 역할 스위처 — 사이드바 '내 정보' 영역을 가려서 잠깐 숨김. 필요하면 아래 주석 해제. */}
+      {/* <DevRoleBar /> */}
 
       {switcherOpen && <BandSwitcher onNavigate={(id) => navigate(`/bands/${id}`)} />}
       {createOpen && <CreateBandModal />}

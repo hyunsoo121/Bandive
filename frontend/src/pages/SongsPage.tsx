@@ -22,6 +22,7 @@ import type { MediaItem, Song, SongFolder } from '../types';
 import { Fab } from '../components/Fab';
 import { AddSongModal } from '../components/AddSongModal';
 import { PromptModal } from '../components/PromptModal';
+import { GuestPickerModal } from '../components/GuestPickerModal';
 import './SongsPage.css';
 
 const ROLE_LABEL: Record<string, string> = { owner: '관리자', member: '사용자', guest: '비회원' };
@@ -87,6 +88,7 @@ export function SongsPage() {
     null,
   );
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [guestPickerOpen, setGuestPickerOpen] = useState(false);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -363,7 +365,7 @@ export function SongsPage() {
                 onAssign={(songId, slotKey, value) =>
                   void assignPart(songId, slotKey, parseAssignee(value))
                 }
-                onAddGuest={(name) => addGuest(name)}
+                onAddGuestClick={() => setGuestPickerOpen(true)}
                 onMove={moveSongToFolder}
                 onRenameRequest={(f) => setPrompt({ mode: 'rename', folder: f })}
                 onDelete={removeSongFolder}
@@ -406,6 +408,16 @@ export function SongsPage() {
           onClose={() => setPrompt(null)}
         />
       )}
+
+      {guestPickerOpen && (
+        <GuestPickerModal
+          guests={guests}
+          addedGuestIds={[]}
+          onAddNew={addGuest}
+          onPick={async () => {}}
+          onClose={() => setGuestPickerOpen(false)}
+        />
+      )}
     </div>
   );
 }
@@ -429,7 +441,7 @@ interface GroupProps {
   onVote: (id: string) => void;
   onPromote: (id: string) => void;
   onAssign: (songId: string, slotKey: string, value: string) => void;
-  onAddGuest: (name: string) => Promise<unknown>;
+  onAddGuestClick: () => void;
   onMove: (songId: string, folderId: string | null) => void;
   onRenameRequest: (folder: SongFolder) => void;
   onDelete: (folderId: string) => void;
@@ -452,7 +464,7 @@ function FolderGroup({
   onVote,
   onPromote,
   onAssign,
-  onAddGuest,
+  onAddGuestClick,
   onMove,
   onRenameRequest,
   onDelete,
@@ -567,7 +579,7 @@ function FolderGroup({
                 onVote={() => onVote(song.id)}
                 onPromote={() => onPromote(song.id)}
                 onAssign={(slotKey, value) => onAssign(song.id, slotKey, value)}
-                onAddGuest={onAddGuest}
+                onAddGuestClick={onAddGuestClick}
                 onMove={(folderId) => onMove(song.id, folderId)}
               />
             ))}
@@ -596,7 +608,7 @@ interface RowProps {
   onVote: () => void;
   onPromote: () => void;
   onAssign: (slotKey: string, value: string) => void;
-  onAddGuest: (name: string) => Promise<unknown>;
+  onAddGuestClick: () => void;
   onMove: (folderId: string | null) => void;
 }
 
@@ -616,7 +628,7 @@ function SongRow({
   onVote,
   onPromote,
   onAssign,
-  onAddGuest,
+  onAddGuestClick,
   onMove,
 }: RowProps) {
   const chips = sessionChips(song);
@@ -624,7 +636,6 @@ function SongRow({
   const slots = slotsOf(song);
   const canAssign = song.status === 'CONFIRMED' && !isGuest;
   const showAssignReadonly = song.status === 'CONFIRMED' && isGuest;
-  const [guestPromptOpen, setGuestPromptOpen] = useState(false);
 
   const sortable = useSortable({ id: `S:${song.id}`, disabled: !dragEnabled });
   const style = {
@@ -743,11 +754,7 @@ function SongRow({
                 <div className="spread">
                   <span className="kicker">파트 배정 · 미지정 가능</span>
                   {canAddGuest && (
-                    <button
-                      type="button"
-                      className="songrow__guest-add"
-                      onClick={() => setGuestPromptOpen(true)}
-                    >
+                    <button type="button" className="songrow__guest-add" onClick={onAddGuestClick}>
                       ＋ 게스트
                     </button>
                   )}
@@ -772,21 +779,6 @@ function SongRow({
                   ))}
                 </div>
               </div>
-            )}
-
-            {guestPromptOpen && (
-              <PromptModal
-                title="게스트 추가"
-                label="게스트 이름"
-                placeholder="예: 세션 드러머"
-                submitLabel="추가"
-                maxLength={50}
-                onSubmit={(name) => {
-                  void onAddGuest(name);
-                  setGuestPromptOpen(false);
-                }}
-                onClose={() => setGuestPromptOpen(false)}
-              />
             )}
 
             {showAssignReadonly && (

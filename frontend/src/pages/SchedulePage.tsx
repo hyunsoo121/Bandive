@@ -356,7 +356,7 @@ export function SchedulePage() {
                   const st = statusStyle(r.status);
                   return (
                     <div key={r.id} className="sched__att-row">
-                      <Avatar label={r.initial} size={26} color={r.avatarColor} />
+                      <Avatar label={r.initial} size={26} src={r.avatarUrl} color={r.avatarColor} />
                       <span className="stack" style={{ flex: 1, minWidth: 0, gap: 1 }}>
                         <span style={{ fontSize: 13, fontWeight: 600 }}>{r.name}</span>
                         {r.parts.length > 0 && (

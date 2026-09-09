@@ -36,6 +36,18 @@ export function updateMe(nickname: string): Promise<MeDto> {
   return api.patch<MeDto>('/api/auth/me', { nickname });
 }
 
+/** 프로필 사진 업로드/교체. */
+export function uploadAvatar(file: File): Promise<MeDto> {
+  const form = new FormData();
+  form.append('file', file);
+  return api.upload<MeDto>('/api/auth/me/avatar', form);
+}
+
+/** 프로필 사진 제거. */
+export function removeAvatar(): Promise<MeDto> {
+  return api.del<MeDto>('/api/auth/me/avatar');
+}
+
 /** 비밀번호 변경 (이메일 로그인 계정만). 현재 비밀번호가 맞아야 함. */
 export function changePassword(currentPassword: string, newPassword: string): Promise<void> {
   return api.patch<void>('/api/auth/me/password', { currentPassword, newPassword });

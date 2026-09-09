@@ -15,10 +15,13 @@ import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.bandive.bandive.auth.dto.AccessTokenResponse;
 import com.bandive.bandive.auth.dto.LoginRequest;
@@ -32,6 +35,7 @@ import com.bandive.bandive.common.exception.BandiveException;
 import com.bandive.bandive.common.exception.ConflictException;
 import com.bandive.bandive.common.exception.NotFoundException;
 import com.bandive.bandive.common.exception.ValidationException;
+import com.bandive.bandive.common.storage.StorageService;
 import com.bandive.bandive.user.User;
 import com.bandive.bandive.user.UserRepository;
 
@@ -55,14 +59,18 @@ public class AuthController {
 
 	private final UserRepository users;
 
+	private final StorageService storage;
+
 	public AuthController(JwtProvider jwtProvider, RefreshTokenStore refreshTokenStore, CookieUtils cookieUtils,
-			SessionIssuer sessionIssuer, PasswordEncoder passwordEncoder, UserRepository users) {
+			SessionIssuer sessionIssuer, PasswordEncoder passwordEncoder, UserRepository users,
+			StorageService storage) {
 		this.jwtProvider = jwtProvider;
 		this.refreshTokenStore = refreshTokenStore;
 		this.cookieUtils = cookieUtils;
 		this.sessionIssuer = sessionIssuer;
 		this.passwordEncoder = passwordEncoder;
 		this.users = users;
+		this.storage = storage;
 	}
 
 	/** 이메일 회원가입 → 바로 로그인 상태로 (refresh 쿠키 + access). */
@@ -150,6 +158,28 @@ public class AuthController {
 	public MeResponse updateMe(@CurrentUser Long userId, @Valid @RequestBody ProfileUpdateRequest request) {
 		User user = findUser(userId);
 		user.updateNickname(request.nickname().trim());
+		return MeResponse.from(user);
+	}
+
+	/** 프로필 사진 업로드/교체. 이전 파일은 정리한다. */
+	@PostMapping("/me/avatar")
+	@Transactional
+	public MeResponse uploadAvatar(@CurrentUser Long userId, @RequestParam("file") MultipartFile file) {
+		User user = findUser(userId);
+		String previous = user.getAvatarUrl();
+		user.updateAvatar(storage.store("avatars", file));
+		storage.delete(previous);
+		return MeResponse.from(user);
+	}
+
+	/** 프로필 사진 제거 → 이니셜 아바타로. */
+	@DeleteMapping("/me/avatar")
+	@Transactional
+	public MeResponse removeAvatar(@CurrentUser Long userId) {
+		User user = findUser(userId);
+		String previous = user.getAvatarUrl();
+		user.updateAvatar(null);
+		storage.delete(previous);
 		return MeResponse.from(user);
 	}
 

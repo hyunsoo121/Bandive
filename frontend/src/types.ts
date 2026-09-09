@@ -22,6 +22,8 @@ export interface User {
   initial: string;
   /** 이메일 로그인 계정만. 카카오는 null */
   email: string | null;
+  /** 프로필 사진 (절대 URL). 없으면 null → 이니셜 아바타 */
+  avatarUrl: string | null;
   loginProvider: 'kakao' | 'local';
 }
 
@@ -52,6 +54,8 @@ export interface Member {
   bandId: string;
   name: string;
   initial: string;
+  /** 프로필 사진 (절대 URL). 없으면 null → 이니셜 아바타 */
+  avatarUrl: string | null;
   /** 이 밴드에서 맡은 세션(악기). 자유 문자열, 멤버당 최대 5개, 중복·다중 허용 */
   parts: string[];
   /** 밴드 리더 여부 (관리자와 별개, 밴드당 1명) */

@@ -38,6 +38,8 @@ export interface BandDto {
 export interface MemberDto {
   userId: number;
   nickname: string;
+  /** 프로필 사진 URL. 없으면 null */
+  avatarUrl: string | null;
   role: BandRoleDto;
   leader: boolean;
   parts: string[];
@@ -57,6 +59,8 @@ export interface MeDto {
   nickname: string;
   /** LOCAL 가입자만 값이 있음. 카카오 가입자는 null */
   email: string | null;
+  /** 프로필 사진 URL. 없으면 null */
+  avatarUrl: string | null;
   provider: 'KAKAO' | 'LOCAL';
 }
 

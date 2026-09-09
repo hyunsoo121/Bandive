@@ -44,6 +44,7 @@ export function toUser(dto: MeDto): User {
     name: dto.nickname,
     initial: initialOf(dto.nickname),
     email: dto.email,
+    avatarUrl: dto.avatarUrl ? fileUrl(dto.avatarUrl) : null,
     loginProvider: dto.provider === 'LOCAL' ? 'local' : 'kakao',
   };
 }
@@ -76,6 +77,7 @@ export function toMember(dto: MemberDto, bandId: string): Member {
     bandId,
     name: dto.nickname,
     initial: initialOf(dto.nickname),
+    avatarUrl: dto.avatarUrl ? fileUrl(dto.avatarUrl) : null,
     parts: dto.parts ?? [],
     leader: dto.leader ?? false,
     role: toRole(dto.role),

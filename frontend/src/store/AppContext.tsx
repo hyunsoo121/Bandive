@@ -148,6 +148,10 @@ interface AppState {
   logout: () => void;
   /** 내 닉네임 수정 (PATCH /api/auth/me) */
   updateProfile: (nickname: string) => Promise<void>;
+  /** 프로필 사진 업로드/교체 */
+  uploadAvatar: (file: File) => Promise<void>;
+  /** 프로필 사진 제거 */
+  removeAvatar: () => Promise<void>;
   /** 비밀번호 변경 (이메일 로그인 계정만) */
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   /** 밴드 생성 → 내 밴드에 추가하고 해당 밴드로 이동 */
@@ -489,6 +493,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const updateProfile = useCallback(async (nickname: string) => {
     setUser(toUser(await authApi.updateMe(nickname.trim())));
+  }, []);
+
+  const uploadAvatar = useCallback(async (file: File) => {
+    setUser(toUser(await authApi.uploadAvatar(file)));
+  }, []);
+
+  const removeAvatar = useCallback(async () => {
+    setUser(toUser(await authApi.removeAvatar()));
   }, []);
 
   const changePassword = useCallback(
@@ -873,6 +885,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     signup,
     logout,
     updateProfile,
+    uploadAvatar,
+    removeAvatar,
     changePassword,
     createBand,
     joinByInvite,

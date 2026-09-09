@@ -20,6 +20,7 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -111,7 +112,23 @@ class AuthControllerTest extends IntegrationTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.id").value(userId))
 			.andExpect(jsonPath("$.nickname").value("테스터"))
-			.andExpect(jsonPath("$.provider").value("KAKAO"));
+			.andExpect(jsonPath("$.provider").value("KAKAO"))
+			.andExpect(jsonPath("$.avatarUrl").value(org.hamcrest.Matchers.nullValue()));
+	}
+
+	@Test
+	void 프로필_사진을_지운다() throws Exception {
+		users.findById(userId).ifPresent(u -> {
+			u.updateAvatar("/files/avatars/x.png");
+			users.save(u);
+		});
+		String access = jwtProvider.createAccessToken(userId);
+
+		mvc.perform(delete("/api/auth/me/avatar").header(HttpHeaders.AUTHORIZATION, "Bearer " + access))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.avatarUrl").value(org.hamcrest.Matchers.nullValue()));
+
+		assertThat(users.findById(userId).orElseThrow().getAvatarUrl()).isNull();
 	}
 
 	@Test
