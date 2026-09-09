@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -17,6 +18,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.bandive.bandive.auth.CurrentUser;
+import com.bandive.bandive.auth.UserPrincipal;
 import com.bandive.bandive.member.dto.LeaderRequest;
 import com.bandive.bandive.member.dto.MemberPartsRequest;
 import com.bandive.bandive.member.dto.MemberResponse;
@@ -33,8 +35,8 @@ public class MemberController {
 	}
 
 	@GetMapping
-	public List<MemberResponse> list(@PathVariable Long bandId) {
-		return memberService.list(bandId);
+	public List<MemberResponse> list(@PathVariable Long bandId, @AuthenticationPrincipal UserPrincipal principal) {
+		return memberService.list(bandId, principal != null ? principal.getId() : null);
 	}
 
 	/** 내 파트 설정/해제. literal "me" 라 아래 {userId} 패턴보다 우선 매칭된다. */

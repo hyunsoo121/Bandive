@@ -5,6 +5,7 @@ import java.util.List;
 import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.bandive.bandive.auth.CurrentUser;
+import com.bandive.bandive.auth.UserPrincipal;
 import com.bandive.bandive.guest.dto.GuestRequest;
 import com.bandive.bandive.guest.dto.GuestResponse;
 import com.bandive.bandive.guest.dto.GuestSessionRequest;
@@ -30,10 +32,10 @@ public class GuestController {
 		this.guestService = guestService;
 	}
 
-	/** 게스트 목록 — 공개. 이름순. */
+	/** 게스트 목록 — 밴드 공개범위 게이트 적용. 이름순. */
 	@GetMapping("/api/bands/{bandId}/guests")
-	public List<GuestResponse> list(@PathVariable Long bandId) {
-		return guestService.list(bandId);
+	public List<GuestResponse> list(@PathVariable Long bandId, @AuthenticationPrincipal UserPrincipal principal) {
+		return guestService.list(bandId, principal != null ? principal.getId() : null);
 	}
 
 	@PostMapping("/api/bands/{bandId}/guests")

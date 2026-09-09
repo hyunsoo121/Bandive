@@ -45,7 +45,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(BandController.class)
 class BandControllerTest {
 
-	private static final BandResponse SAMPLE = new BandResponse(1L, "내 밴드", "소개", null, null, 1, BandRole.OWNER,
+	private static final BandResponse SAMPLE = new BandResponse(1L, "내 밴드", "소개", null, null, 1,
+			com.bandive.bandive.band.BandVisibility.PUBLIC, BandRole.OWNER, com.bandive.bandive.band.MyRelation.MEMBER,
 			Instant.parse("2026-09-02T00:00:00Z"));
 
 	@Autowired
@@ -88,7 +89,7 @@ class BandControllerTest {
 
 	@Test
 	void 상세_조회는_비인증도_허용() throws Exception {
-		given(bandService.get(1L)).willReturn(SAMPLE);
+		given(bandService.get(1L, null)).willReturn(SAMPLE);
 
 		mvc.perform(get("/api/bands/1")).andExpect(status().isOk()).andExpect(jsonPath("$.name").value("내 밴드"));
 	}

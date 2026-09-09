@@ -42,7 +42,8 @@ class MemberServiceTest extends RepositoryTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new MemberService(bands, bandMembers);
+		service = new MemberService(bands, bandMembers,
+				new com.bandive.bandive.common.security.BandAccessGuard(bands, bandMembers));
 		band = em.persist(Fixtures.band("A"));
 	}
 
@@ -60,7 +61,7 @@ class MemberServiceTest extends RepositoryTest {
 		em.flush();
 		em.clear();
 
-		List<MemberResponse> members = service.list(band.getId());
+		List<MemberResponse> members = service.list(band.getId(), null);
 
 		assertThat(members).extracting(MemberResponse::nickname)
 			.containsExactly("nick-owner", "nick-early", "nick-late");
@@ -68,7 +69,7 @@ class MemberServiceTest extends RepositoryTest {
 
 	@Test
 	void 없는_밴드_목록은_404() {
-		assertThatThrownBy(() -> service.list(999L)).isInstanceOf(NotFoundException.class);
+		assertThatThrownBy(() -> service.list(999L, null)).isInstanceOf(NotFoundException.class);
 	}
 
 	@Test

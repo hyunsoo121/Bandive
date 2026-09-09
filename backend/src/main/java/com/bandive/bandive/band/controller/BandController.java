@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -20,9 +21,11 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.bandive.bandive.auth.CurrentUser;
+import com.bandive.bandive.auth.UserPrincipal;
 import com.bandive.bandive.band.dto.BandCreateRequest;
 import com.bandive.bandive.band.dto.BandResponse;
 import com.bandive.bandive.band.dto.BandUpdateRequest;
+import com.bandive.bandive.band.dto.BandVisibilityRequest;
 import com.bandive.bandive.band.dto.TransferOwnershipRequest;
 import com.bandive.bandive.band.service.BandService;
 
@@ -48,14 +51,20 @@ public class BandController {
 	}
 
 	@GetMapping("/{bandId}")
-	public BandResponse get(@PathVariable Long bandId) {
-		return bandService.get(bandId);
+	public BandResponse get(@PathVariable Long bandId, @AuthenticationPrincipal UserPrincipal principal) {
+		return bandService.get(bandId, principal != null ? principal.getId() : null);
 	}
 
 	@PatchMapping("/{bandId}")
 	@PreAuthorize("@bandGuard.isOwner(#bandId)")
 	public BandResponse update(@PathVariable Long bandId, @Valid @RequestBody BandUpdateRequest request) {
 		return bandService.update(bandId, request);
+	}
+
+	@PatchMapping("/{bandId}/visibility")
+	@PreAuthorize("@bandGuard.isOwner(#bandId)")
+	public BandResponse updateVisibility(@PathVariable Long bandId, @Valid @RequestBody BandVisibilityRequest request) {
+		return bandService.updateVisibility(bandId, request.visibility());
 	}
 
 	@PostMapping("/{bandId}/logo")

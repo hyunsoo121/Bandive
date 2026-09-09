@@ -10,6 +10,7 @@ import com.bandive.bandive.band.BandRepository;
 import com.bandive.bandive.common.exception.ConflictException;
 import com.bandive.bandive.common.exception.ForbiddenException;
 import com.bandive.bandive.common.exception.NotFoundException;
+import com.bandive.bandive.common.security.BandAccessGuard;
 import com.bandive.bandive.guest.Guest;
 import com.bandive.bandive.guest.GuestRepository;
 import com.bandive.bandive.guest.dto.GuestResponse;
@@ -31,16 +32,18 @@ public class GuestService {
 
 	private final BandMemberRepository bandMembers;
 
-	public GuestService(GuestRepository guests, BandRepository bands, BandMemberRepository bandMembers) {
+	private final BandAccessGuard bandAccess;
+
+	public GuestService(GuestRepository guests, BandRepository bands, BandMemberRepository bandMembers,
+			BandAccessGuard bandAccess) {
 		this.guests = guests;
 		this.bands = bands;
 		this.bandMembers = bandMembers;
+		this.bandAccess = bandAccess;
 	}
 
-	public List<GuestResponse> list(Long bandId) {
-		if (!bands.existsById(bandId)) {
-			throw new NotFoundException("BAND_NOT_FOUND", "밴드를 찾을 수 없습니다.");
-		}
+	public List<GuestResponse> list(Long bandId, Long viewerUserId) {
+		bandAccess.requireCanViewContent(bandId, viewerUserId);
 		return guests.findAllByBandIdOrderByNameAsc(bandId).stream().map(GuestResponse::from).toList();
 	}
 

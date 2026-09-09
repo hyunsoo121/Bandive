@@ -16,6 +16,7 @@ import com.bandive.bandive.common.exception.ConflictException;
 import com.bandive.bandive.common.exception.ForbiddenException;
 import com.bandive.bandive.common.exception.NotFoundException;
 import com.bandive.bandive.common.exception.ValidationException;
+import com.bandive.bandive.common.security.BandAccessGuard;
 import com.bandive.bandive.guest.Guest;
 import com.bandive.bandive.guest.GuestRepository;
 import com.bandive.bandive.member.BandMember;
@@ -62,9 +63,11 @@ public class SongService {
 
 	private final MusicSearchService musicSearch;
 
+	private final BandAccessGuard bandAccess;
+
 	public SongService(SongRepository songs, SongPartRepository parts, VoteRepository votes, BandRepository bands,
 			BandMemberRepository bandMembers, GuestRepository guests, UserRepository users,
-			SongFolderRepository folders, MusicSearchService musicSearch) {
+			SongFolderRepository folders, MusicSearchService musicSearch, BandAccessGuard bandAccess) {
 		this.songs = songs;
 		this.parts = parts;
 		this.votes = votes;
@@ -74,17 +77,19 @@ public class SongService {
 		this.users = users;
 		this.folders = folders;
 		this.musicSearch = musicSearch;
+		this.bandAccess = bandAccess;
 	}
 
 	public List<TrackSearchResult> search(String query) {
 		return musicSearch.search(query);
 	}
 
-	/** 곡 목록. status null 이면 전체. currentUserId null(비회원) 이면 votedByMe 는 전부 false. */
+	/**
+	 * 곡 목록. status null 이면 전체. currentUserId null(비회원) 이면 votedByMe 는 전부 false. 밴드 공개범위
+	 * 게이트 적용.
+	 */
 	public List<SongResponse> list(Long bandId, SongStatus status, Long currentUserId) {
-		if (!bands.existsById(bandId)) {
-			throw new NotFoundException("BAND_NOT_FOUND", "밴드를 찾을 수 없습니다.");
-		}
+		bandAccess.requireCanViewContent(bandId, currentUserId);
 		List<Song> found = songs.findAllForBand(bandId, status);
 		if (found.isEmpty()) {
 			return List.of();

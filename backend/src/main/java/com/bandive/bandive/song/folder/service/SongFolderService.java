@@ -12,6 +12,7 @@ import com.bandive.bandive.band.BandRepository;
 import com.bandive.bandive.common.exception.ForbiddenException;
 import com.bandive.bandive.common.exception.NotFoundException;
 import com.bandive.bandive.common.exception.ValidationException;
+import com.bandive.bandive.common.security.BandAccessGuard;
 import com.bandive.bandive.member.BandMember;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
@@ -37,18 +38,19 @@ public class SongFolderService {
 
 	private final BandMemberRepository bandMembers;
 
+	private final BandAccessGuard bandAccess;
+
 	public SongFolderService(SongFolderRepository folders, SongRepository songs, BandRepository bands,
-			BandMemberRepository bandMembers) {
+			BandMemberRepository bandMembers, BandAccessGuard bandAccess) {
 		this.folders = folders;
 		this.songs = songs;
 		this.bands = bands;
 		this.bandMembers = bandMembers;
+		this.bandAccess = bandAccess;
 	}
 
-	public List<SongFolderResponse> list(Long bandId) {
-		if (!bands.existsById(bandId)) {
-			throw new NotFoundException("BAND_NOT_FOUND", "밴드를 찾을 수 없습니다.");
-		}
+	public List<SongFolderResponse> list(Long bandId, Long viewerUserId) {
+		bandAccess.requireCanViewContent(bandId, viewerUserId);
 		return folders.findByBandIdOrderByStatusAscPositionAsc(bandId).stream().map(SongFolderResponse::from).toList();
 	}
 

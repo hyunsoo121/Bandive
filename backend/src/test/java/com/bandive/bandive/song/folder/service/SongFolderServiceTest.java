@@ -56,7 +56,8 @@ class SongFolderServiceTest extends RepositoryTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new SongFolderService(folders, songs, bands, bandMembers);
+		service = new SongFolderService(folders, songs, bands, bandMembers,
+				new com.bandive.bandive.common.security.BandAccessGuard(bands, bandMembers));
 		band = em.persist(Fixtures.band("A"));
 		ownerId = join("owner", BandRole.OWNER);
 		memberId = join("member", BandRole.MEMBER);

@@ -45,7 +45,8 @@ class GuestServiceTest extends RepositoryTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new GuestService(guests, bands, bandMembers);
+		service = new GuestService(guests, bands, bandMembers,
+				new com.bandive.bandive.common.security.BandAccessGuard(bands, bandMembers));
 		band = em.persist(Fixtures.band("A"));
 		ownerId = join("owner", BandRole.OWNER);
 		memberId = join("member", BandRole.MEMBER);
@@ -101,7 +102,7 @@ class GuestServiceTest extends RepositoryTest {
 		service.create(band.getId(), ownerId, "나");
 		em.flush();
 
-		assertThat(service.list(band.getId())).extracting(g -> g.name()).containsExactly("가", "나", "다");
+		assertThat(service.list(band.getId(), null)).extracting(g -> g.name()).containsExactly("가", "나", "다");
 	}
 
 	@Test

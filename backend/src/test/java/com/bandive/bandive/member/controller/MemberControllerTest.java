@@ -63,7 +63,7 @@ class MemberControllerTest {
 
 	@Test
 	void 멤버_목록은_공개다() throws Exception {
-		given(memberService.list(1L)).willReturn(List.of(
+		given(memberService.list(eq(1L), any())).willReturn(List.of(
 				new MemberResponse(10L, "관리자", null, BandRole.OWNER, true, List.of("GUITAR"),
 						Instant.parse("2026-09-01T00:00:00Z")),
 				new MemberResponse(11L, "멤버", null, BandRole.MEMBER, false, List.of(),

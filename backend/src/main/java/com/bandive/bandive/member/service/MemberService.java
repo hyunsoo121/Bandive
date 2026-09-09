@@ -9,6 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import com.bandive.bandive.band.BandRepository;
 import com.bandive.bandive.common.exception.ConflictException;
 import com.bandive.bandive.common.exception.NotFoundException;
+import com.bandive.bandive.common.security.BandAccessGuard;
 import com.bandive.bandive.member.BandMember;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
@@ -28,15 +29,20 @@ public class MemberService {
 
 	private final BandMemberRepository bandMembers;
 
-	public MemberService(BandRepository bands, BandMemberRepository bandMembers) {
+	private final BandAccessGuard bandAccess;
+
+	public MemberService(BandRepository bands, BandMemberRepository bandMembers, BandAccessGuard bandAccess) {
 		this.bands = bands;
 		this.bandMembers = bandMembers;
+		this.bandAccess = bandAccess;
 	}
 
-	public List<MemberResponse> list(Long bandId) {
-		if (!bands.existsById(bandId)) {
-			throw new NotFoundException("BAND_NOT_FOUND", "밴드를 찾을 수 없습니다.");
-		}
+	public List<MemberResponse> list(Long bandId, Long viewerUserId) {
+		bandAccess.requireCanViewContent(bandId, viewerUserId);
+		return allMembers(bandId);
+	}
+
+	private List<MemberResponse> allMembers(Long bandId) {
 		return bandMembers.findAllByBandIdWithUser(bandId)
 			.stream()
 			.sorted(DISPLAY_ORDER)
@@ -71,7 +77,7 @@ public class MemberService {
 			BandMember target = requireMember(bandId, targetUserId, "MEMBER_NOT_FOUND", "해당 멤버를 찾을 수 없습니다.");
 			target.setLeader(true);
 		}
-		return list(bandId);
+		return allMembers(bandId);
 	}
 
 	/** 관리자가 다른 멤버를 추방. */

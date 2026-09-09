@@ -76,7 +76,8 @@ class SongServiceTest extends RepositoryTest {
 	@BeforeEach
 	void setUp() {
 		service = new SongService(songs, parts, votes, bands, bandMembers, guests, users, folders,
-				new StubMusicSearchService());
+				new StubMusicSearchService(),
+				new com.bandive.bandive.common.security.BandAccessGuard(bands, bandMembers));
 		band = em.persist(Fixtures.band("A"));
 		ownerId = joinMember("owner", BandRole.OWNER);
 		memberId = joinMember("member", BandRole.MEMBER);

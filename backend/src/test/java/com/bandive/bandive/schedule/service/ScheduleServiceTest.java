@@ -71,7 +71,8 @@ class ScheduleServiceTest extends RepositoryTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new ScheduleService(schedules, attendances, media, bands, bandMembers, guests, users);
+		service = new ScheduleService(schedules, attendances, media, bands, bandMembers, guests, users,
+				new com.bandive.bandive.common.security.BandAccessGuard(bands, bandMembers));
 		band = em.persist(Fixtures.band("A"));
 		ownerId = joinMember("owner", BandRole.OWNER);
 		memberId = joinMember("member", BandRole.MEMBER);

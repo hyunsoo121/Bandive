@@ -9,6 +9,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.bandive.bandive.band.Band;
 import com.bandive.bandive.band.BandRepository;
+import com.bandive.bandive.band.BandVisibility;
+import com.bandive.bandive.band.MyRelation;
 import com.bandive.bandive.band.dto.BandCreateRequest;
 import com.bandive.bandive.band.dto.BandResponse;
 import com.bandive.bandive.band.dto.BandUpdateRequest;
@@ -58,16 +60,37 @@ public class BandService {
 		User owner = users.findById(userId)
 			.orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "사용자를 찾을 수 없습니다."));
 
-		Band band = bands.save(Band.builder().name(request.name()).description(request.description()).build());
+		Band band = bands.save(Band.builder()
+			.name(request.name())
+			.description(request.description())
+			.visibility(request.visibility() != null ? request.visibility() : BandVisibility.PUBLIC)
+			.build());
 		bandMembers
 			.save(BandMember.builder().band(band).user(owner).role(BandRole.OWNER).joinedAt(Instant.now()).build());
 
 		return BandResponse.from(band, 1, BandRole.OWNER);
 	}
 
-	public BandResponse get(Long bandId) {
+	/**
+	 * 밴드 표지 조회. PRIVATE 밴드는 멤버가 아니면 존재를 숨겨 404. FOLLOWERS/PUBLIC 은 표지(이름·소개)를 누구에게나 준다
+	 * (콘텐츠는 각 스코프 GET 에서 별도 게이트).
+	 */
+	public BandResponse get(Long bandId, Long userId) {
 		Band band = findBand(bandId);
-		return BandResponse.from(band, bandMembers.countByBandId(bandId));
+		BandRole role = userId == null ? null
+				: bandMembers.findByBandIdAndUserId(bandId, userId).map(BandMember::getRole).orElse(null);
+		if (role == null && band.getVisibility() == BandVisibility.PRIVATE) {
+			throw new NotFoundException("BAND_NOT_FOUND", "밴드를 찾을 수 없습니다.");
+		}
+		MyRelation relation = role != null ? MyRelation.MEMBER : MyRelation.NONE;
+		return BandResponse.from(band, bandMembers.countByBandId(bandId), role, relation);
+	}
+
+	@Transactional
+	public BandResponse updateVisibility(Long bandId, BandVisibility visibility) {
+		Band band = findBand(bandId);
+		band.changeVisibility(visibility);
+		return BandResponse.from(band, bandMembers.countByBandId(bandId), BandRole.OWNER);
 	}
 
 	public List<BandResponse> myBands(Long userId) {

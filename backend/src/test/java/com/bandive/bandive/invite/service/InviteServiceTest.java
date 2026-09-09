@@ -51,7 +51,7 @@ class InviteServiceTest extends IntegrationTest {
 	@BeforeEach
 	void setUp() {
 		ownerId = users.save(User.ofKakao("owner-" + UUID.randomUUID(), "장")).getId();
-		bandId = bandService.create(ownerId, new BandCreateRequest("밴드-" + UUID.randomUUID(), null)).id();
+		bandId = bandService.create(ownerId, new BandCreateRequest("밴드-" + UUID.randomUUID(), null, null)).id();
 	}
 
 	private Long newUser() {

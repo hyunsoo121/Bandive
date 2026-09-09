@@ -5,6 +5,7 @@ import java.util.List;
 import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -16,6 +17,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.bandive.bandive.auth.CurrentUser;
+import com.bandive.bandive.auth.UserPrincipal;
 import com.bandive.bandive.song.folder.dto.CreateFolderRequest;
 import com.bandive.bandive.song.folder.dto.FolderOrderRequest;
 import com.bandive.bandive.song.folder.dto.RenameFolderRequest;
@@ -31,10 +33,10 @@ public class SongFolderController {
 		this.folderService = folderService;
 	}
 
-	/** 폴더 목록 — 공개. 위시/합주 폴더 모두, status·position 순. */
+	/** 폴더 목록 — 밴드 공개범위 게이트 적용. 위시/합주 폴더 모두, status·position 순. */
 	@GetMapping("/api/bands/{bandId}/song-folders")
-	public List<SongFolderResponse> list(@PathVariable Long bandId) {
-		return folderService.list(bandId);
+	public List<SongFolderResponse> list(@PathVariable Long bandId, @AuthenticationPrincipal UserPrincipal principal) {
+		return folderService.list(bandId, principal != null ? principal.getId() : null);
 	}
 
 	@PostMapping("/api/bands/{bandId}/song-folders")

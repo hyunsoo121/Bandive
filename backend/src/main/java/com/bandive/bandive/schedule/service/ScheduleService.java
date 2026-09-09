@@ -12,6 +12,7 @@ import com.bandive.bandive.band.Band;
 import com.bandive.bandive.band.BandRepository;
 import com.bandive.bandive.common.exception.ForbiddenException;
 import com.bandive.bandive.common.exception.NotFoundException;
+import com.bandive.bandive.common.security.BandAccessGuard;
 import com.bandive.bandive.guest.Guest;
 import com.bandive.bandive.guest.GuestRepository;
 import com.bandive.bandive.media.Media;
@@ -48,8 +49,11 @@ public class ScheduleService {
 
 	private final UserRepository users;
 
+	private final BandAccessGuard bandAccess;
+
 	public ScheduleService(ScheduleRepository schedules, AttendanceRepository attendances, MediaRepository media,
-			BandRepository bands, BandMemberRepository bandMembers, GuestRepository guests, UserRepository users) {
+			BandRepository bands, BandMemberRepository bandMembers, GuestRepository guests, UserRepository users,
+			BandAccessGuard bandAccess) {
 		this.schedules = schedules;
 		this.attendances = attendances;
 		this.media = media;
@@ -57,12 +61,11 @@ public class ScheduleService {
 		this.bandMembers = bandMembers;
 		this.guests = guests;
 		this.users = users;
+		this.bandAccess = bandAccess;
 	}
 
 	public List<ScheduleResponse> list(Long bandId, Long currentUserId) {
-		if (!bands.existsById(bandId)) {
-			throw new NotFoundException("BAND_NOT_FOUND", "밴드를 찾을 수 없습니다.");
-		}
+		bandAccess.requireCanViewContent(bandId, currentUserId);
 		List<Schedule> found = schedules.findAllForBand(bandId);
 		if (found.isEmpty()) {
 			return List.of();
