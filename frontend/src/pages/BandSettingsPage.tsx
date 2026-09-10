@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
+import type { BandVisibility } from '../types';
+import { VISIBILITY_LABEL, VISIBILITY_HINT, VISIBILITY_ORDER } from '../lib/bandVisibility';
 import './BandSettingsPage.css';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -18,6 +20,7 @@ export function BandSettingsPage() {
     members,
     user,
     updateBand,
+    updateBandVisibility,
     uploadBandLogo,
     uploadBandBanner,
     transferOwnership,
@@ -40,6 +43,9 @@ export function BandSettingsPage() {
   const [deleteBusy, setDeleteBusy] = useState(false);
   const [dangerMsg, setDangerMsg] = useState<string | null>(null);
 
+  const [visBusy, setVisBusy] = useState(false);
+  const [visMsg, setVisMsg] = useState<string | null>(null);
+
   if (!currentBand) return null;
   if (role !== 'owner') return <Navigate to={`/bands/${currentBand.id}`} replace />;
 
@@ -61,6 +67,20 @@ export function BandSettingsPage() {
       setInfoMsg(e instanceof Error ? e.message : '저장하지 못했습니다.');
     } finally {
       setSavingInfo(false);
+    }
+  };
+
+  const chooseVisibility = async (next: BandVisibility) => {
+    if (next === currentBand?.visibility || visBusy) return;
+    setVisBusy(true);
+    setVisMsg(null);
+    try {
+      await updateBandVisibility(next);
+      setVisMsg('공개범위를 바꿨습니다.');
+    } catch (e) {
+      setVisMsg(e instanceof Error ? e.message : '바꾸지 못했습니다.');
+    } finally {
+      setVisBusy(false);
     }
   };
 
@@ -160,6 +180,36 @@ export function BandSettingsPage() {
               </span>
             )}
           </div>
+        </section>
+
+        <section className="bandset__sec">
+          <span className="kicker">공개범위</span>
+          <div className="seg">
+            {VISIBILITY_ORDER.map((v) => (
+              <button
+                key={v}
+                type="button"
+                className={`seg__opt${currentBand.visibility === v ? ' seg__opt--on' : ''}`}
+                disabled={visBusy}
+                onClick={() => chooseVisibility(v)}
+              >
+                {VISIBILITY_LABEL[v]}
+              </button>
+            ))}
+          </div>
+          <span className="muted" style={{ fontSize: 12, lineHeight: 1.5 }}>
+            {VISIBILITY_HINT[currentBand.visibility]}
+          </span>
+          {currentBand.visibility !== 'PUBLIC' && (
+            <span className="muted" style={{ fontSize: 11, lineHeight: 1.5 }}>
+              전체공개였을 때 공개로 올린 영상은, 밴드를 다시 전체공개하면 그대로 다시 보입니다.
+            </span>
+          )}
+          {visMsg && (
+            <span className="muted" style={{ fontSize: 11 }}>
+              {visMsg}
+            </span>
+          )}
         </section>
 
         <section className="bandset__sec">

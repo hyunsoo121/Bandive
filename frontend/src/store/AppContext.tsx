@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import type {
   AttendanceStatus,
   Band,
+  BandVisibility,
   Guest,
   MediaItem,
   MediaKind,
@@ -25,6 +26,7 @@ import type {
   User,
   Visibility,
 } from '../types';
+import { ApiError } from '../api/types';
 import * as authApi from '../api/auth';
 import * as bandApi from '../api/bands';
 import * as inviteApi from '../api/invites';
@@ -108,6 +110,8 @@ interface AppState {
   currentBandId: string | null;
   /** 현재 밴드 상세 (GET /api/bands/{id}). 로딩 중이거나 없으면 null */
   currentBand: Band | null;
+  /** 밴드 표지는 봤지만 콘텐츠는 게이트됨 (FOLLOWERS 밴드에 팔로우 안 함) — 화면은 RestrictedBandView */
+  bandRestricted: boolean;
   /** 세션 복구(첫 refresh) 진행 중 */
   bootLoading: boolean;
   /** 현재 밴드 상세/멤버/콘텐츠 로딩 중 */
@@ -154,12 +158,14 @@ interface AppState {
   removeAvatar: () => Promise<void>;
   /** 비밀번호 변경 (이메일 로그인 계정만) */
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
-  /** 밴드 생성 → 내 밴드에 추가하고 해당 밴드로 이동 */
-  createBand: (name: string) => Promise<void>;
+  /** 밴드 생성 → 내 밴드에 추가하고 해당 밴드로 이동. visibility 생략 시 PUBLIC */
+  createBand: (name: string, visibility?: BandVisibility) => Promise<void>;
   /** 초대 코드로 가입 → 가입한 밴드 반환 */
   joinByInvite: (code: string) => Promise<Band>;
   /** 밴드 이름·소개 수정 (관리자) */
   updateBand: (name: string, description: string | null) => Promise<void>;
+  /** 밴드 공개범위 변경 (관리자) */
+  updateBandVisibility: (visibility: BandVisibility) => Promise<void>;
   /** 관리자 위임 (관리자) */
   transferOwnership: (userId: string) => Promise<void>;
   /** 밴드 삭제 (관리자) → 홈으로 */
@@ -269,6 +275,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [bands, setBands] = useState<Band[]>([]);
   const [currentBandId, setCurrentBandIdState] = useState<string | null>(null);
   const [currentBand, setCurrentBand] = useState<Band | null>(null);
+  /** 밴드 표지는 봤지만 콘텐츠는 게이트됨 (FOLLOWERS 밴드에 팔로우 안 함). */
+  const [bandRestricted, setBandRestricted] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [invite, setInvite] = useState<InviteInfo | null>(null);
@@ -321,37 +329,54 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     let alive = true;
     setBandLoading(true);
+    setBandRestricted(false);
     setInvite(null);
+    const clearContent = () => {
+      setMembers([]);
+      setGuests([]);
+      setSongs([]);
+      setSongFolders([]);
+      setSchedules([]);
+      setMedia([]);
+    };
     (async () => {
+      // 1) 표지 먼저 — PRIVATE 비멤버면 404 → "없는 밴드" 처리
+      let bandDto;
       try {
-        const [band, mem, guestList, songList, folderList, schedList, mediaList] =
-          await Promise.all([
-            bandApi.getBand(currentBandId),
-            memberApi.listMembers(currentBandId),
-            guestApi.listGuests(currentBandId),
-            songApi.listSongs(currentBandId),
-            songFolderApi.listFolders(currentBandId),
-            scheduleApi.listSchedules(currentBandId),
-            mediaApi.listMedia(currentBandId),
-          ]);
+        bandDto = await bandApi.getBand(currentBandId);
+      } catch {
+        if (alive) {
+          setCurrentBand(null);
+          clearContent();
+          setBandLoading(false);
+        }
+        return;
+      }
+      if (!alive) return;
+      setCurrentBand(toBand(bandDto));
+
+      // 2) 콘텐츠 — FOLLOWERS 밴드에 팔로우 안 했으면 403 CONTENT_RESTRICTED
+      try {
+        const [mem, guestList, songList, folderList, schedList, mediaList] = await Promise.all([
+          memberApi.listMembers(currentBandId),
+          guestApi.listGuests(currentBandId),
+          songApi.listSongs(currentBandId),
+          songFolderApi.listFolders(currentBandId),
+          scheduleApi.listSchedules(currentBandId),
+          mediaApi.listMedia(currentBandId),
+        ]);
         if (!alive) return;
-        setCurrentBand(toBand(band));
+        setBandRestricted(false);
         setMembers(mem.map((m) => toMember(m, currentBandId)));
         setGuests(guestList.map(toGuest));
         setSongs(songList.map(toSong));
         setSongFolders(folderList.map(toSongFolder));
         setSchedules(sortSchedules(schedList.map(toSchedule)));
         setMedia(mediaList.map(toMedia));
-      } catch {
-        if (alive) {
-          setCurrentBand(null);
-          setMembers([]);
-          setGuests([]);
-          setSongs([]);
-          setSongFolders([]);
-          setSchedules([]);
-          setMedia([]);
-        }
+      } catch (e) {
+        if (!alive) return;
+        setBandRestricted(e instanceof ApiError && e.code === 'CONTENT_RESTRICTED');
+        clearContent();
       } finally {
         if (alive) setBandLoading(false);
       }
@@ -411,10 +436,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [navigate]);
 
   const createBand = useCallback(
-    async (name: string) => {
+    async (name: string, visibility?: BandVisibility) => {
       const trimmed = name.trim();
       if (!trimmed) return;
-      const dto = await bandApi.createBand(trimmed);
+      const dto = await bandApi.createBand(trimmed, null, visibility);
       const band = toBand(dto); // 생성 응답에 role: 'OWNER' 포함됨
       setBands((prev) => [...prev, band]);
       setCreateOpen(false);
@@ -456,6 +481,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async (name: string, description: string | null) => {
       if (!currentBandId) return;
       applyBandUpdate(toBand(await bandApi.updateBand(currentBandId, name.trim(), description)));
+    },
+    [currentBandId, applyBandUpdate],
+  );
+  const updateBandVisibility = useCallback(
+    async (visibility: BandVisibility) => {
+      if (!currentBandId) return;
+      applyBandUpdate(toBand(await bandApi.setBandVisibility(currentBandId, visibility)));
     },
     [currentBandId, applyBandUpdate],
   );
@@ -887,6 +919,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     bands,
     currentBandId,
     currentBand,
+    bandRestricted,
     bootLoading,
     bandLoading,
     role,
@@ -913,6 +946,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     removeAvatar,
     changePassword,
     createBand,
+    updateBandVisibility,
     joinByInvite,
     updateBand,
     transferOwnership,

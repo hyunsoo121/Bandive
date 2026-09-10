@@ -23,6 +23,9 @@ export class ApiError extends Error {
 
 export type BandRoleDto = 'OWNER' | 'MEMBER';
 
+export type BandVisibilityDto = 'PRIVATE' | 'FOLLOWERS' | 'PUBLIC';
+export type BandRelationDto = 'MEMBER' | 'FOLLOWER' | 'PENDING' | 'NONE';
+
 export interface BandDto {
   id: number;
   name: string;
@@ -30,6 +33,9 @@ export interface BandDto {
   logoUrl: string | null;
   bannerUrl: string | null;
   memberCount: number;
+  visibility: BandVisibilityDto;
+  /** 현재 사용자와의 관계. 항상 채워짐 (비로그인이면 NONE). */
+  myRelation: BandRelationDto;
   /** GET /api/bands/my 에서만 채워질 예정. 없으면 매퍼가 'member' 로 fallback. */
   role?: BandRoleDto;
   createdAt: string;

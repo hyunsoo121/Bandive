@@ -16,6 +16,11 @@ export type AttendanceStatus = '참석' | '미정' | '불참';
 export type MediaKind = '합주' | '공연';
 export type Visibility = '멤버만' | '전체공개';
 
+/** 밴드 공개범위. PRIVATE=멤버만 / FOLLOWERS=멤버+승인 팔로워 / PUBLIC=누구나(탐색 노출). */
+export type BandVisibility = 'PRIVATE' | 'FOLLOWERS' | 'PUBLIC';
+/** 현재 사용자와 이 밴드의 관계. */
+export type BandRelation = 'MEMBER' | 'FOLLOWER' | 'PENDING' | 'NONE';
+
 export interface User {
   id: string;
   name: string;
@@ -66,6 +71,10 @@ export interface Band {
   logoUrl: string | null;
   /** 밴드 배너 (절대 URL). 없으면 null → 줄무늬 플레이스홀더 */
   bannerUrl: string | null;
+  /** 공개범위 */
+  visibility: BandVisibility;
+  /** 현재 사용자와의 관계 (비로그인이면 NONE) */
+  myRelation: BandRelation;
 }
 
 export interface Member {

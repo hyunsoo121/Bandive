@@ -10,6 +10,7 @@ import { GuestBanner } from './GuestBanner';
 import { BandSwitcher } from './BandSwitcher';
 import { CreateBandModal } from './CreateBandModal';
 import { ProfileModal } from './ProfileModal';
+import { RestrictedBandView } from './RestrictedBandView';
 import { FullscreenLoader } from '../pages/SystemPages';
 import './AppLayout.css';
 
@@ -22,6 +23,7 @@ export function AppLayout() {
     user,
     currentBandId,
     currentBand,
+    bandRestricted,
     bandLoading,
     role,
     switcherOpen,
@@ -65,6 +67,10 @@ export function AppLayout() {
         </Link>
       </div>
     );
+  }
+
+  if (bandRestricted) {
+    return <RestrictedBandView />;
   }
 
   const base = `/bands/${currentBand.id}`;

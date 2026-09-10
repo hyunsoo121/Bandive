@@ -1,5 +1,5 @@
 import { api } from './client';
-import type { BandDto } from './types';
+import type { BandDto, BandVisibilityDto } from './types';
 
 /** 밴드 상세 — 공개(GET). 비회원/비멤버도 열람 가능. */
 export const getBand = (bandId: string) => api.get<BandDto>(`/api/bands/${bandId}`);
@@ -7,11 +7,18 @@ export const getBand = (bandId: string) => api.get<BandDto>(`/api/bands/${bandId
 /** 내가 속한 밴드 목록 — 인증 필요. */
 export const getMyBands = () => api.get<BandDto[]>('/api/bands/my');
 
-export const createBand = (name: string, description?: string | null) =>
-  api.post<BandDto>('/api/bands', { name, description: description ?? null });
+export const createBand = (
+  name: string,
+  description?: string | null,
+  visibility?: BandVisibilityDto,
+) => api.post<BandDto>('/api/bands', { name, description: description ?? null, visibility });
 
 export const updateBand = (bandId: string, name: string, description: string | null) =>
   api.patch<BandDto>(`/api/bands/${bandId}`, { name, description });
+
+/** 밴드 공개범위 변경 (관리자). */
+export const setBandVisibility = (bandId: string, visibility: BandVisibilityDto) =>
+  api.patch<BandDto>(`/api/bands/${bandId}/visibility`, { visibility });
 
 function fileForm(file: File): FormData {
   const form = new FormData();

@@ -80,6 +80,8 @@ export function toBand(dto: BandDto): Band {
     note: dto.description ?? '',
     logoUrl: dto.logoUrl ? fileUrl(dto.logoUrl) : null,
     bannerUrl: dto.bannerUrl ? fileUrl(dto.bannerUrl) : null,
+    visibility: dto.visibility ?? 'PUBLIC',
+    myRelation: dto.myRelation ?? 'NONE',
   };
 }
 
