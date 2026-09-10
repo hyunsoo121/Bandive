@@ -54,6 +54,9 @@ class SongServiceTest extends RepositoryTest {
 	private BandMemberRepository bandMembers;
 
 	@Autowired
+	private com.bandive.bandive.follow.BandFollowRepository follows;
+
+	@Autowired
 	private GuestRepository guests;
 
 	@Autowired
@@ -77,7 +80,7 @@ class SongServiceTest extends RepositoryTest {
 	void setUp() {
 		service = new SongService(songs, parts, votes, bands, bandMembers, guests, users, folders,
 				new StubMusicSearchService(),
-				new com.bandive.bandive.common.security.BandAccessGuard(bands, bandMembers));
+				new com.bandive.bandive.common.security.BandAccessGuard(bands, bandMembers, follows));
 		band = em.persist(Fixtures.band("A"));
 		ownerId = joinMember("owner", BandRole.OWNER);
 		memberId = joinMember("member", BandRole.MEMBER);

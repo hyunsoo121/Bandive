@@ -33,7 +33,11 @@ public final class Fixtures {
 	}
 
 	public static Band band(String name) {
-		return Band.builder().name(name).visibility(com.bandive.bandive.band.BandVisibility.PUBLIC).build();
+		return band(name, com.bandive.bandive.band.BandVisibility.PUBLIC);
+	}
+
+	public static Band band(String name, com.bandive.bandive.band.BandVisibility visibility) {
+		return Band.builder().name(name).visibility(visibility).build();
 	}
 
 	public static BandMember member(Band band, User user, BandRole role) {

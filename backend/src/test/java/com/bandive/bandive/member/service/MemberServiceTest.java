@@ -34,6 +34,9 @@ class MemberServiceTest extends RepositoryTest {
 	private BandMemberRepository bandMembers;
 
 	@Autowired
+	private com.bandive.bandive.follow.BandFollowRepository follows;
+
+	@Autowired
 	private TestEntityManager em;
 
 	private MemberService service;
@@ -43,7 +46,7 @@ class MemberServiceTest extends RepositoryTest {
 	@BeforeEach
 	void setUp() {
 		service = new MemberService(bands, bandMembers,
-				new com.bandive.bandive.common.security.BandAccessGuard(bands, bandMembers));
+				new com.bandive.bandive.common.security.BandAccessGuard(bands, bandMembers, follows));
 		band = em.persist(Fixtures.band("A"));
 	}
 

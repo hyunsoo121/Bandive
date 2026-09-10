@@ -44,6 +44,9 @@ class SongFolderServiceTest extends RepositoryTest {
 	private BandMemberRepository bandMembers;
 
 	@Autowired
+	private com.bandive.bandive.follow.BandFollowRepository follows;
+
+	@Autowired
 	private TestEntityManager em;
 
 	private SongFolderService service;
@@ -57,7 +60,7 @@ class SongFolderServiceTest extends RepositoryTest {
 	@BeforeEach
 	void setUp() {
 		service = new SongFolderService(folders, songs, bands, bandMembers,
-				new com.bandive.bandive.common.security.BandAccessGuard(bands, bandMembers));
+				new com.bandive.bandive.common.security.BandAccessGuard(bands, bandMembers, follows));
 		band = em.persist(Fixtures.band("A"));
 		ownerId = join("owner", BandRole.OWNER);
 		memberId = join("member", BandRole.MEMBER);

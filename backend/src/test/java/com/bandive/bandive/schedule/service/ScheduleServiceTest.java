@@ -50,6 +50,9 @@ class ScheduleServiceTest extends RepositoryTest {
 	private BandMemberRepository bandMembers;
 
 	@Autowired
+	private com.bandive.bandive.follow.BandFollowRepository follows;
+
+	@Autowired
 	private com.bandive.bandive.guest.GuestRepository guests;
 
 	@Autowired
@@ -72,7 +75,7 @@ class ScheduleServiceTest extends RepositoryTest {
 	@BeforeEach
 	void setUp() {
 		service = new ScheduleService(schedules, attendances, media, bands, bandMembers, guests, users,
-				new com.bandive.bandive.common.security.BandAccessGuard(bands, bandMembers));
+				new com.bandive.bandive.common.security.BandAccessGuard(bands, bandMembers, follows));
 		band = em.persist(Fixtures.band("A"));
 		ownerId = joinMember("owner", BandRole.OWNER);
 		memberId = joinMember("member", BandRole.MEMBER);

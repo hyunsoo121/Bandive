@@ -40,6 +40,9 @@ class BandServiceTest extends RepositoryTest {
 	private BandMemberRepository bandMembers;
 
 	@Autowired
+	private com.bandive.bandive.follow.BandFollowRepository follows;
+
+	@Autowired
 	private UserRepository users;
 
 	@Autowired
@@ -56,7 +59,7 @@ class BandServiceTest extends RepositoryTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new BandService(bands, bandMembers, users, storage, inviteCodes, inviteCodeCache);
+		service = new BandService(bands, bandMembers, users, storage, inviteCodes, inviteCodeCache, follows);
 	}
 
 	@Test
@@ -100,6 +103,28 @@ class BandServiceTest extends RepositoryTest {
 		assertThat(service.get(bandId, ownerId).myRelation()).isEqualTo(com.bandive.bandive.band.MyRelation.MEMBER);
 		assertThatThrownBy(() -> service.get(bandId, strangerId)).isInstanceOf(NotFoundException.class);
 		assertThatThrownBy(() -> service.get(bandId, null)).isInstanceOf(NotFoundException.class);
+	}
+
+	@Test
+	void FOLLOWERS_밴드_myRelation_은_팔로우_상태를_반영한다() {
+		Long ownerId = em.persist(Fixtures.user("o")).getId();
+		User fan = em.persist(Fixtures.user("fan"));
+		Long bandId = service
+			.create(ownerId, new BandCreateRequest("팬클럽", null, com.bandive.bandive.band.BandVisibility.FOLLOWERS))
+			.id();
+		em.flush();
+
+		assertThat(service.get(bandId, fan.getId()).myRelation()).isEqualTo(com.bandive.bandive.band.MyRelation.NONE);
+
+		follows.save(com.bandive.bandive.follow.BandFollow.builder()
+			.band(bands.findById(bandId).orElseThrow())
+			.user(fan)
+			.status(com.bandive.bandive.follow.FollowStatus.PENDING)
+			.build());
+		em.flush();
+		em.clear();
+		assertThat(service.get(bandId, fan.getId()).myRelation())
+			.isEqualTo(com.bandive.bandive.band.MyRelation.PENDING);
 	}
 
 	@Test

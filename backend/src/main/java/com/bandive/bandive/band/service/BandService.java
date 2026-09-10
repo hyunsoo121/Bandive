@@ -16,6 +16,8 @@ import com.bandive.bandive.band.dto.BandResponse;
 import com.bandive.bandive.band.dto.BandUpdateRequest;
 import com.bandive.bandive.common.exception.NotFoundException;
 import com.bandive.bandive.common.storage.StorageService;
+import com.bandive.bandive.follow.BandFollowRepository;
+import com.bandive.bandive.follow.FollowStatus;
 import com.bandive.bandive.invite.InviteCodeRepository;
 import com.bandive.bandive.invite.service.InviteCodeCache;
 import com.bandive.bandive.member.BandMember;
@@ -44,14 +46,18 @@ public class BandService {
 
 	private final InviteCodeCache inviteCodeCache;
 
+	private final BandFollowRepository follows;
+
 	public BandService(BandRepository bands, BandMemberRepository bandMembers, UserRepository users,
-			StorageService storage, InviteCodeRepository inviteCodes, InviteCodeCache inviteCodeCache) {
+			StorageService storage, InviteCodeRepository inviteCodes, InviteCodeCache inviteCodeCache,
+			BandFollowRepository follows) {
 		this.bands = bands;
 		this.bandMembers = bandMembers;
 		this.users = users;
 		this.storage = storage;
 		this.inviteCodes = inviteCodes;
 		this.inviteCodeCache = inviteCodeCache;
+		this.follows = follows;
 	}
 
 	/** 밴드 생성 — 만든 사람을 자동으로 OWNER 멤버로 등록. */
@@ -82,8 +88,19 @@ public class BandService {
 		if (role == null && band.getVisibility() == BandVisibility.PRIVATE) {
 			throw new NotFoundException("BAND_NOT_FOUND", "밴드를 찾을 수 없습니다.");
 		}
-		MyRelation relation = role != null ? MyRelation.MEMBER : MyRelation.NONE;
-		return BandResponse.from(band, bandMembers.countByBandId(bandId), role, relation);
+		return BandResponse.from(band, bandMembers.countByBandId(bandId), role, myRelation(bandId, userId, role));
+	}
+
+	private MyRelation myRelation(Long bandId, Long userId, BandRole role) {
+		if (role != null) {
+			return MyRelation.MEMBER;
+		}
+		if (userId == null) {
+			return MyRelation.NONE;
+		}
+		return follows.findByBandIdAndUserId(bandId, userId)
+			.map(f -> f.getStatus() == FollowStatus.APPROVED ? MyRelation.FOLLOWER : MyRelation.PENDING)
+			.orElse(MyRelation.NONE);
 	}
 
 	@Transactional
