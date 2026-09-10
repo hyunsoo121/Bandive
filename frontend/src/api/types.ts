@@ -25,6 +25,15 @@ export type BandRoleDto = 'OWNER' | 'MEMBER';
 
 export type BandVisibilityDto = 'PRIVATE' | 'FOLLOWERS' | 'PUBLIC';
 export type BandRelationDto = 'MEMBER' | 'FOLLOWER' | 'PENDING' | 'NONE';
+export type FollowStatusDto = 'PENDING' | 'APPROVED';
+
+export interface FollowerDto {
+  userId: number;
+  nickname: string;
+  status: FollowStatusDto;
+  requestedAt: string;
+  decidedAt: string | null;
+}
 
 export interface BandDto {
   id: number;

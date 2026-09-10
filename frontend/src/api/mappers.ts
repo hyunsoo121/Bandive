@@ -4,6 +4,7 @@ import { fileUrl } from './client';
 import { ATT_TO_KO } from '../lib/schedule';
 import type {
   Band,
+  Follower,
   Guest,
   MediaItem,
   Member,
@@ -16,6 +17,7 @@ import type {
 import type {
   BandDto,
   BandRoleDto,
+  FollowerDto,
   GuestDto,
   MediaDto,
   MediaPlatformDto,
@@ -82,6 +84,16 @@ export function toBand(dto: BandDto): Band {
     bannerUrl: dto.bannerUrl ? fileUrl(dto.bannerUrl) : null,
     visibility: dto.visibility ?? 'PUBLIC',
     myRelation: dto.myRelation ?? 'NONE',
+  };
+}
+
+export function toFollower(dto: FollowerDto): Follower {
+  return {
+    userId: String(dto.userId),
+    nickname: dto.nickname,
+    initial: initialOf(dto.nickname),
+    status: dto.status,
+    requestedAt: dto.requestedAt,
   };
 }
 

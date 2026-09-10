@@ -21,6 +21,15 @@ export type BandVisibility = 'PRIVATE' | 'FOLLOWERS' | 'PUBLIC';
 /** 현재 사용자와 이 밴드의 관계. */
 export type BandRelation = 'MEMBER' | 'FOLLOWER' | 'PENDING' | 'NONE';
 
+/** 관리자에게 보이는 팔로워/요청자 한 명. */
+export interface Follower {
+  userId: string;
+  nickname: string;
+  initial: string;
+  status: 'PENDING' | 'APPROVED';
+  requestedAt: string;
+}
+
 export interface User {
   id: string;
   name: string;

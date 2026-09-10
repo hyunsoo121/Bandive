@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import { Avatar } from './Avatar';
@@ -5,13 +6,24 @@ import { BrandMark } from './BrandMark';
 import { VISIBILITY_HINT } from '../lib/bandVisibility';
 import './RestrictedBandView.css';
 
-/**
- * 밴드 표지는 보이지만 콘텐츠는 게이트된 화면 (주로 FOLLOWERS 밴드에 팔로우 안 한 경우).
- * 팔로우 요청 버튼은 P2 에서 붙는다.
- */
+/** 밴드 표지는 보이지만 콘텐츠는 게이트된 화면 (FOLLOWERS 밴드에 팔로우 안 함 / 승인 대기). */
 export function RestrictedBandView() {
-  const { currentBand, user, openLogin } = useApp();
+  const { currentBand, user, openLogin, requestFollow, cancelFollow } = useApp();
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
   if (!currentBand) return null;
+
+  const run = async (fn: () => Promise<void>, fail: string) => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await fn();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : fail);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="restricted">
@@ -28,17 +40,33 @@ export function RestrictedBandView() {
 
         <p className="restricted__hint">{VISIBILITY_HINT[currentBand.visibility]}</p>
 
-        {currentBand.myRelation === 'PENDING' ? (
-          <span className="restricted__pending">팔로우 요청 대기 중</span>
-        ) : !user ? (
+        {!user ? (
           <button type="button" className="btn btn--primary" onClick={openLogin}>
             로그인하고 팔로우 요청
           </button>
+        ) : currentBand.myRelation === 'PENDING' ? (
+          <div className="restricted__actions">
+            <span className="restricted__pending">팔로우 요청 대기 중</span>
+            <button
+              type="button"
+              className="btn btn--sm"
+              disabled={busy}
+              onClick={() => run(cancelFollow, '요청을 취소하지 못했습니다.')}
+            >
+              요청 취소
+            </button>
+          </div>
         ) : (
-          <span className="muted" style={{ fontSize: 12 }}>
-            팔로우 요청 기능은 곧 제공됩니다.
-          </span>
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={busy}
+            onClick={() => run(requestFollow, '팔로우 요청에 실패했습니다.')}
+          >
+            {busy ? '요청 중…' : '팔로우 요청'}
+          </button>
         )}
+        {err && <span className="restricted__err">{err}</span>}
 
         <Link className="btn btn--sm" to="/">
           홈으로

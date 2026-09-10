@@ -12,6 +12,7 @@ import type {
   AttendanceStatus,
   Band,
   BandVisibility,
+  Follower,
   Guest,
   MediaItem,
   MediaKind,
@@ -32,12 +33,14 @@ import * as bandApi from '../api/bands';
 import * as inviteApi from '../api/invites';
 import * as memberApi from '../api/members';
 import * as guestApi from '../api/guests';
+import * as followApi from '../api/follow';
 import * as songApi from '../api/songs';
 import * as songFolderApi from '../api/songFolders';
 import * as scheduleApi from '../api/schedules';
 import * as mediaApi from '../api/media';
 import {
   toBand,
+  toFollower,
   toGuest,
   toMedia,
   toMember,
@@ -166,6 +169,18 @@ interface AppState {
   updateBand: (name: string, description: string | null) => Promise<void>;
   /** 밴드 공개범위 변경 (관리자) */
   updateBandVisibility: (visibility: BandVisibility) => Promise<void>;
+  /** 이 밴드에 팔로우 요청 (FOLLOWERS 밴드, 로그인 필요) → myRelation PENDING */
+  requestFollow: () => Promise<void>;
+  /** 팔로우 요청 취소 / 언팔로우 → myRelation NONE */
+  cancelFollow: () => Promise<void>;
+  /** 현재 밴드의 승인 대기 팔로워 (관리자만 채워짐) */
+  pendingFollowers: Follower[];
+  /** 대기 팔로워 목록 다시 불러오기 (관리자) */
+  refreshFollowers: () => Promise<void>;
+  /** 팔로우 요청 승인 (관리자) */
+  approveFollower: (userId: string) => Promise<void>;
+  /** 팔로우 요청 거절 / 팔로워 제거 (관리자) */
+  rejectFollower: (userId: string) => Promise<void>;
   /** 관리자 위임 (관리자) */
   transferOwnership: (userId: string) => Promise<void>;
   /** 밴드 삭제 (관리자) → 홈으로 */
@@ -277,6 +292,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [currentBand, setCurrentBand] = useState<Band | null>(null);
   /** 밴드 표지는 봤지만 콘텐츠는 게이트됨 (FOLLOWERS 밴드에 팔로우 안 함). */
   const [bandRestricted, setBandRestricted] = useState(false);
+  const [pendingFollowers, setPendingFollowers] = useState<Follower[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [invite, setInvite] = useState<InviteInfo | null>(null);
@@ -330,6 +346,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     let alive = true;
     setBandLoading(true);
     setBandRestricted(false);
+    setPendingFollowers([]);
     setInvite(null);
     const clearContent = () => {
       setMembers([]);
@@ -490,6 +507,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
       applyBandUpdate(toBand(await bandApi.setBandVisibility(currentBandId, visibility)));
     },
     [currentBandId, applyBandUpdate],
+  );
+
+  const patchRelation = useCallback((relation: Band['myRelation']) => {
+    setCurrentBand((prev) => (prev ? { ...prev, myRelation: relation } : prev));
+  }, []);
+
+  const requestFollow = useCallback(async () => {
+    if (!currentBandId) return;
+    await followApi.requestFollow(currentBandId);
+    patchRelation('PENDING');
+  }, [currentBandId, patchRelation]);
+
+  const cancelFollow = useCallback(async () => {
+    if (!currentBandId) return;
+    await followApi.cancelFollow(currentBandId);
+    patchRelation('NONE');
+  }, [currentBandId, patchRelation]);
+
+  const refreshFollowers = useCallback(async () => {
+    if (!currentBandId) {
+      setPendingFollowers([]);
+      return;
+    }
+    try {
+      const list = await followApi.listFollowers(currentBandId, 'PENDING');
+      setPendingFollowers(list.map(toFollower));
+    } catch {
+      setPendingFollowers([]);
+    }
+  }, [currentBandId]);
+
+  const approveFollower = useCallback(
+    async (userId: string) => {
+      if (!currentBandId) return;
+      await followApi.approveFollower(currentBandId, userId);
+      setPendingFollowers((prev) => prev.filter((f) => f.userId !== userId));
+    },
+    [currentBandId],
+  );
+
+  const rejectFollower = useCallback(
+    async (userId: string) => {
+      if (!currentBandId) return;
+      await followApi.removeFollower(currentBandId, userId);
+      setPendingFollowers((prev) => prev.filter((f) => f.userId !== userId));
+    },
+    [currentBandId],
   );
 
   const transferOwnership = useCallback(
@@ -920,6 +984,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     currentBandId,
     currentBand,
     bandRestricted,
+    pendingFollowers,
     bootLoading,
     bandLoading,
     role,
@@ -947,6 +1012,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     changePassword,
     createBand,
     updateBandVisibility,
+    requestFollow,
+    cancelFollow,
+    refreshFollowers,
+    approveFollower,
+    rejectFollower,
     joinByInvite,
     updateBand,
     transferOwnership,

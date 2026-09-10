@@ -40,12 +40,21 @@
   padding: 10px 12px;
   margin: 8px 0 4px;
 }
+.restricted__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .restricted__pending {
   font-size: 12px;
   font-weight: 700;
   padding: 8px 14px;
   border: 2px solid var(--color-neutral-400);
   color: var(--color-neutral-700);
+}
+.restricted__err {
+  font-size: 12px;
+  color: var(--color-accent);
 }
 .restricted__brand {
   opacity: 0.5;
