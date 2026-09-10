@@ -152,13 +152,22 @@ public class AuthController {
 		return MeResponse.from(findUser(userId));
 	}
 
-	/** 내 정보 수정 — 현재는 닉네임만. */
+	/** 내 정보 수정 — 닉네임 + 한 줄 소개. */
 	@PatchMapping("/me")
 	@Transactional
 	public MeResponse updateMe(@CurrentUser Long userId, @Valid @RequestBody ProfileUpdateRequest request) {
 		User user = findUser(userId);
 		user.updateNickname(request.nickname().trim());
+		user.updateBio(trimToNull(request.bio()));
 		return MeResponse.from(user);
+	}
+
+	private static String trimToNull(String value) {
+		if (value == null) {
+			return null;
+		}
+		String trimmed = value.trim();
+		return trimmed.isEmpty() ? null : trimmed;
 	}
 
 	/** 프로필 사진 업로드/교체. 이전 파일은 정리한다. */

@@ -11,6 +11,7 @@ import type {
   SessionShape,
   Song,
   User,
+  UserProfile,
 } from '../types';
 import type {
   BandDto,
@@ -22,6 +23,7 @@ import type {
   MeDto,
   ScheduleDto,
   SongDto,
+  UserProfileDto,
 } from './types';
 
 /** 이름의 첫 글자(그래프임 단위) — 이니셜 아바타용. */
@@ -45,7 +47,26 @@ export function toUser(dto: MeDto): User {
     initial: initialOf(dto.nickname),
     email: dto.email,
     avatarUrl: dto.avatarUrl ? fileUrl(dto.avatarUrl) : null,
+    bio: dto.bio,
     loginProvider: dto.provider === 'LOCAL' ? 'local' : 'kakao',
+  };
+}
+
+export function toUserProfile(dto: UserProfileDto): UserProfile {
+  return {
+    id: String(dto.id),
+    name: dto.nickname,
+    initial: initialOf(dto.nickname),
+    avatarUrl: dto.avatarUrl ? fileUrl(dto.avatarUrl) : null,
+    bio: dto.bio,
+    bands: dto.bands.map((b) => ({
+      id: String(b.id),
+      name: b.name,
+      initial: initialOf(b.name),
+      logoUrl: b.logoUrl ? fileUrl(b.logoUrl) : null,
+      memberCount: b.memberCount,
+      myRole: b.role === 'OWNER' ? 'owner' : 'member',
+    })),
   };
 }
 
@@ -186,10 +207,12 @@ export function toMedia(dto: MediaDto): MediaItem {
     date: shortDate(dto.createdAt),
     createdAtMs: Date.parse(dto.createdAt) || 0,
     kind: dto.type === 'PERFORMANCE' ? '공연' : '합주',
-    visibility: dto.visibility === 'LINK_PUBLIC' ? '링크 공개' : '멤버만',
+    visibility: dto.visibility === 'LINK_PUBLIC' ? '전체공개' : '멤버만',
     uploadedByUserId: String(dto.uploadedByUserId),
     scheduleId: dto.scheduleId != null ? String(dto.scheduleId) : null,
     songId: dto.songId != null ? String(dto.songId) : null,
     songTitle: dto.songTitle,
+    likeCount: dto.likeCount,
+    likedByMe: dto.likedByMe,
   };
 }

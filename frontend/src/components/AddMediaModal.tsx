@@ -14,7 +14,7 @@ interface Props {
 }
 
 const KINDS: MediaKind[] = ['합주', '공연'];
-const SCOPES: Visibility[] = ['멤버만', '링크 공개'];
+const SCOPES: Visibility[] = ['멤버만', '전체공개'];
 const YT_OR_DRIVE = /(youtube\.com|youtu\.be|drive\.google\.com|docs\.google\.com)/i;
 
 export function AddMediaModal({ bandId, schedules, editing, onClose, onSubmitted }: Props) {

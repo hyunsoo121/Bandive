@@ -1,5 +1,11 @@
 import { api } from './client';
-import type { MediaCreateBody, MediaDto, MediaUpdateBody, MediaVisibilityDto } from './types';
+import type {
+  MediaCreateBody,
+  MediaDto,
+  MediaLikeResultDto,
+  MediaUpdateBody,
+  MediaVisibilityDto,
+} from './types';
 
 /** 영상 목록 — 공개(GET). 공개범위 필터 적용(비회원·비멤버는 LINK_PUBLIC 만). scheduleId 로 일정 필터. */
 export const listMedia = (bandId: string, scheduleId?: string) =>
@@ -19,3 +25,11 @@ export const changeVisibility = (mediaId: string, visibility: MediaVisibilityDto
 
 /** 영상 삭제 (등록자 본인 또는 관리자). */
 export const deleteMedia = (mediaId: string) => api.del<void>(`/api/media/${mediaId}`);
+
+/** 좋아요 (로그인, 멱등). 갱신된 카운트·내 좋아요 여부 반환. */
+export const likeMedia = (mediaId: string) =>
+  api.post<MediaLikeResultDto>(`/api/media/${mediaId}/like`, {});
+
+/** 좋아요 취소 (로그인, 멱등). */
+export const unlikeMedia = (mediaId: string) =>
+  api.del<MediaLikeResultDto>(`/api/media/${mediaId}/like`);

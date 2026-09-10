@@ -20,7 +20,7 @@ const stripe = (a: string, b: string) =>
   `repeating-linear-gradient(135deg, ${a} 0 12px, ${b} 12px 24px)`;
 
 export function MediaPage() {
-  const { currentBand, role, user, media: allMedia, schedules, removeMedia } = useApp();
+  const { currentBand, role, user, media: allMedia, schedules, removeMedia, likeMedia } = useApp();
   const guard = useGuard();
   const isGuest = role === 'guest';
 
@@ -35,7 +35,7 @@ export function MediaPage() {
 
   const bandMedia = allMedia.filter((m) => m.bandId === bandId);
   // 공개범위 적용: 비회원은 '멤버만' 영상 제외 (기획서 8.7)
-  const visible = bandMedia.filter((m) => !isGuest || m.visibility === '링크 공개');
+  const visible = bandMedia.filter((m) => !isGuest || m.visibility === '전체공개');
   const hiddenCount = bandMedia.length - visible.length;
   const list = visible.filter((m) => filter === '전체' || m.kind === filter);
 
@@ -125,26 +125,49 @@ export function MediaPage() {
                   >
                     {m.visibility}
                   </span>
-                  {canManage(m) && (
-                    <span className="media__actions">
-                      <button
-                        type="button"
-                        className="media__act"
-                        onClick={guard(() => setEditing(m))}
+                  <span className="media__foot-right">
+                    <button
+                      type="button"
+                      className={`media__like${m.likedByMe ? ' is-liked' : ''}`}
+                      onClick={guard(() => void likeMedia(m.id))}
+                      aria-pressed={m.likedByMe}
+                      title={m.likedByMe ? '좋아요 취소' : '좋아요'}
+                    >
+                      <svg
+                        className="media__like-icon"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        fill={m.likedByMe ? 'currentColor' : 'none'}
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
                       >
-                        수정
-                      </button>
-                      <button
-                        type="button"
-                        className="media__act media__act--danger"
-                        onClick={guard(() => {
-                          if (confirm('이 영상을 삭제할까요?')) void removeMedia(m.id);
-                        })}
-                      >
-                        삭제
-                      </button>
-                    </span>
-                  )}
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                      </svg>
+                      <span className="media__like-count">{m.likeCount}</span>
+                    </button>
+                    {canManage(m) && (
+                      <span className="media__actions">
+                        <button
+                          type="button"
+                          className="media__act"
+                          onClick={guard(() => setEditing(m))}
+                        >
+                          수정
+                        </button>
+                        <button
+                          type="button"
+                          className="media__act media__act--danger"
+                          onClick={guard(() => {
+                            if (confirm('이 영상을 삭제할까요?')) void removeMedia(m.id);
+                          })}
+                        >
+                          삭제
+                        </button>
+                      </span>
+                    )}
+                  </span>
                 </div>
               </div>
             </article>

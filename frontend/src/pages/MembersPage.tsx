@@ -3,6 +3,7 @@ import { useApp } from '../store/AppContext';
 import { Avatar } from '../components/Avatar';
 import { PartsPickerModal } from '../components/PartsPickerModal';
 import { DangerConfirmModal } from '../components/DangerConfirmModal';
+import { UserProfileModal } from '../components/UserProfileModal';
 import { PromptModal } from '../components/PromptModal';
 import { GuestSessionModal } from '../components/GuestSessionModal';
 import type { Guest, Member } from '../types';
@@ -32,6 +33,7 @@ export function MembersPage() {
   const [issuing, setIssuing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [leaveOpen, setLeaveOpen] = useState(false);
+  const [profileUserId, setProfileUserId] = useState<string | null>(null);
 
   if (!currentBand) return null;
 
@@ -105,6 +107,7 @@ export function MembersPage() {
             member={m}
             canEditParts={isOwner || m.id === user?.id}
             canManage={isOwner}
+            onOpenProfile={() => setProfileUserId(m.id)}
             onSetParts={(parts) => runSetParts(m.id, parts)}
             onSetLeader={(on) => runSetLeader(on ? m.id : null)}
             onKick={() => kickMember(m.id)}
@@ -202,6 +205,10 @@ export function MembersPage() {
           onClose={() => setLeaveOpen(false)}
         />
       )}
+
+      {profileUserId && (
+        <UserProfileModal userId={profileUserId} onClose={() => setProfileUserId(null)} />
+      )}
     </div>
   );
 }
@@ -212,12 +219,21 @@ interface RowProps {
   member: Member;
   canEditParts: boolean;
   canManage: boolean;
+  onOpenProfile: () => void;
   onSetParts: (parts: string[]) => void;
   onSetLeader: (on: boolean) => void;
   onKick: () => Promise<void>;
 }
 
-function MemberRow({ member, canEditParts, canManage, onSetParts, onSetLeader, onKick }: RowProps) {
+function MemberRow({
+  member,
+  canEditParts,
+  canManage,
+  onOpenProfile,
+  onSetParts,
+  onSetLeader,
+  onKick,
+}: RowProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [kickOpen, setKickOpen] = useState(false);
   const parts = member.parts;
@@ -225,14 +241,23 @@ function MemberRow({ member, canEditParts, canManage, onSetParts, onSetLeader, o
   return (
     <div className="members__row">
       <div className="members__row-top">
-        <Avatar
-          label={member.initial}
-          size={34}
-          src={member.avatarUrl}
-          color={member.avatarColor}
-        />
+        <button
+          type="button"
+          className="members__profile-btn"
+          onClick={onOpenProfile}
+          aria-label={`${member.name} 프로필`}
+        >
+          <Avatar
+            label={member.initial}
+            size={34}
+            src={member.avatarUrl}
+            color={member.avatarColor}
+          />
+        </button>
         <span className="stack" style={{ flex: 1, minWidth: 0, gap: 4 }}>
-          <strong style={{ fontSize: 14 }}>{member.name}</strong>
+          <button type="button" className="members__name-btn" onClick={onOpenProfile}>
+            {member.name}
+          </button>
           <span className="members__parts-line">
             {parts.length ? (
               parts.map((p) => (

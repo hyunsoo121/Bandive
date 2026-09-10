@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.bandive.bandive.auth.CurrentUser;
 import com.bandive.bandive.auth.UserPrincipal;
 import com.bandive.bandive.media.dto.MediaCreateRequest;
+import com.bandive.bandive.media.dto.MediaLikeResult;
 import com.bandive.bandive.media.dto.MediaResponse;
 import com.bandive.bandive.media.dto.MediaUpdateRequest;
 import com.bandive.bandive.media.dto.VisibilityRequest;
@@ -67,6 +68,17 @@ public class MediaController {
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void delete(@PathVariable Long mediaId, @CurrentUser Long userId) {
 		mediaService.delete(mediaId, userId);
+	}
+
+	/** 좋아요 — 로그인 필요, 멱등. */
+	@PostMapping("/api/media/{mediaId}/like")
+	public MediaLikeResult like(@PathVariable Long mediaId, @CurrentUser Long userId) {
+		return mediaService.like(mediaId, userId);
+	}
+
+	@DeleteMapping("/api/media/{mediaId}/like")
+	public MediaLikeResult unlike(@PathVariable Long mediaId, @CurrentUser Long userId) {
+		return mediaService.unlike(mediaId, userId);
 	}
 
 }

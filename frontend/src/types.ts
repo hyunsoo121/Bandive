@@ -14,7 +14,7 @@ export type ScheduleType = 'REHEARSAL' | 'PERFORMANCE';
 export type AttendanceStatus = '참석' | '미정' | '불참';
 
 export type MediaKind = '합주' | '공연';
-export type Visibility = '멤버만' | '링크 공개';
+export type Visibility = '멤버만' | '전체공개';
 
 export interface User {
   id: string;
@@ -24,7 +24,26 @@ export interface User {
   email: string | null;
   /** 프로필 사진 (절대 URL). 없으면 null → 이니셜 아바타 */
   avatarUrl: string | null;
+  /** 한 줄 소개. 없으면 null */
+  bio: string | null;
   loginProvider: 'kakao' | 'local';
+}
+
+/** 다른 사람 공개 프로필 (GET /api/users/{id}) */
+export interface UserProfile {
+  id: string;
+  name: string;
+  initial: string;
+  avatarUrl: string | null;
+  bio: string | null;
+  bands: {
+    id: string;
+    name: string;
+    initial: string;
+    logoUrl: string | null;
+    memberCount: number;
+    myRole: 'owner' | 'member';
+  }[];
 }
 
 export interface SongFolder {
@@ -169,4 +188,8 @@ export interface MediaItem {
   songId: string | null;
   /** 연결된 곡 제목 (표시용). 없으면 null */
   songTitle: string | null;
+  /** 좋아요 수 */
+  likeCount: number;
+  /** 현재 유저가 좋아요 눌렀는지. 비회원이면 false */
+  likedByMe: boolean;
 }

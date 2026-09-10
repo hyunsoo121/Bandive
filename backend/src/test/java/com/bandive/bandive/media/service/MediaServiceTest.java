@@ -49,6 +49,9 @@ class MediaServiceTest extends RepositoryTest {
 	private UserRepository users;
 
 	@Autowired
+	private com.bandive.bandive.media.MediaLikeRepository mediaLikes;
+
+	@Autowired
 	private TestEntityManager em;
 
 	private MediaService service;
@@ -61,7 +64,7 @@ class MediaServiceTest extends RepositoryTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new MediaService(media, schedules, songs, bands, bandMembers, users);
+		service = new MediaService(media, schedules, songs, bands, bandMembers, users, mediaLikes);
 		band = em.persist(Fixtures.band("A"));
 		ownerId = joinMember("owner", BandRole.OWNER);
 		memberId = joinMember("member", BandRole.MEMBER);
@@ -236,6 +239,42 @@ class MediaServiceTest extends RepositoryTest {
 			.id();
 		em.flush();
 		assertThatThrownBy(() -> service.delete(another, thirdId)).isInstanceOf(ForbiddenException.class);
+	}
+
+	@Test
+	void 좋아요는_멱등이고_카운트와_내여부를_돌려준다() {
+		Long mediaId = service.create(band.getId(), memberId, req("https://a.com/v", MediaVisibility.LINK_PUBLIC, null))
+			.id();
+		em.flush();
+
+		assertThat(service.like(mediaId, memberId))
+			.isEqualTo(new com.bandive.bandive.media.dto.MediaLikeResult(1L, true));
+		// 두 번 눌러도 1
+		assertThat(service.like(mediaId, memberId).likeCount()).isEqualTo(1L);
+		assertThat(service.like(mediaId, ownerId).likeCount()).isEqualTo(2L);
+
+		// 취소도 멱등
+		assertThat(service.unlike(mediaId, memberId))
+			.isEqualTo(new com.bandive.bandive.media.dto.MediaLikeResult(1L, false));
+		assertThat(service.unlike(mediaId, memberId).likeCount()).isEqualTo(1L);
+	}
+
+	@Test
+	void 목록은_좋아요_수와_내_좋아요_여부를_채운다() {
+		Long mediaId = service.create(band.getId(), memberId, req("https://a.com/v", MediaVisibility.LINK_PUBLIC, null))
+			.id();
+		service.like(mediaId, memberId);
+		service.like(mediaId, ownerId);
+		em.flush();
+		em.clear();
+
+		MediaResponse asMember = service.list(band.getId(), null, memberId).get(0);
+		assertThat(asMember.likeCount()).isEqualTo(2L);
+		assertThat(asMember.likedByMe()).isTrue();
+
+		MediaResponse asAnon = service.list(band.getId(), null, null).get(0);
+		assertThat(asAnon.likeCount()).isEqualTo(2L);
+		assertThat(asAnon.likedByMe()).isFalse();
 	}
 
 }

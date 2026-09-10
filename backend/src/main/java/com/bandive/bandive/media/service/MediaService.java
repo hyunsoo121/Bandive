@@ -1,6 +1,10 @@
 package com.bandive.bandive.media.service;
 
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -11,11 +15,14 @@ import com.bandive.bandive.common.exception.ForbiddenException;
 import com.bandive.bandive.common.exception.NotFoundException;
 import com.bandive.bandive.common.exception.ValidationException;
 import com.bandive.bandive.media.Media;
+import com.bandive.bandive.media.MediaLike;
+import com.bandive.bandive.media.MediaLikeRepository;
 import com.bandive.bandive.media.MediaPlatform;
 import com.bandive.bandive.media.MediaRepository;
 import com.bandive.bandive.media.MediaType;
 import com.bandive.bandive.media.MediaVisibility;
 import com.bandive.bandive.media.dto.MediaCreateRequest;
+import com.bandive.bandive.media.dto.MediaLikeResult;
 import com.bandive.bandive.media.dto.MediaResponse;
 import com.bandive.bandive.media.dto.MediaUpdateRequest;
 import com.bandive.bandive.member.BandMember;
@@ -45,14 +52,17 @@ public class MediaService {
 
 	private final UserRepository users;
 
+	private final MediaLikeRepository mediaLikes;
+
 	public MediaService(MediaRepository media, ScheduleRepository schedules, SongRepository songs, BandRepository bands,
-			BandMemberRepository bandMembers, UserRepository users) {
+			BandMemberRepository bandMembers, UserRepository users, MediaLikeRepository mediaLikes) {
 		this.media = media;
 		this.schedules = schedules;
 		this.songs = songs;
 		this.bands = bands;
 		this.bandMembers = bandMembers;
 		this.users = users;
+		this.mediaLikes = mediaLikes;
 	}
 
 	/** 공개범위 필터 적용. 밴드 멤버면 전부, 그 외(비회원·비멤버)는 LINK_PUBLIC 만. */
@@ -61,7 +71,24 @@ public class MediaService {
 			throw new NotFoundException("BAND_NOT_FOUND", "밴드를 찾을 수 없습니다.");
 		}
 		boolean isMember = currentUserId != null && bandMembers.existsByBandIdAndUserId(bandId, currentUserId);
-		return media.findVisible(bandId, scheduleId, isMember).stream().map(MediaResponse::from).toList();
+		List<Media> visible = media.findVisible(bandId, scheduleId, isMember);
+
+		List<Long> ids = visible.stream().map(Media::getId).toList();
+		Map<Long, Long> likeCounts = new HashMap<>();
+		Set<Long> likedIds = Set.of();
+		if (!ids.isEmpty()) {
+			for (Object[] row : mediaLikes.countByMediaIds(ids)) {
+				likeCounts.put((Long) row[0], (Long) row[1]);
+			}
+			if (currentUserId != null) {
+				likedIds = new HashSet<>(mediaLikes.findLikedMediaIds(currentUserId, ids));
+			}
+		}
+
+		Set<Long> liked = likedIds;
+		return visible.stream()
+			.map(m -> MediaResponse.from(m, likeCounts.getOrDefault(m.getId(), 0L), liked.contains(m.getId())))
+			.toList();
 	}
 
 	@Transactional
@@ -86,7 +113,7 @@ public class MediaService {
 			.platform(MediaPlatform.detect(request.externalUrl()))
 			.visibility(visibility)
 			.build());
-		return MediaResponse.from(saved);
+		return MediaResponse.from(saved, 0L, false);
 	}
 
 	/**
@@ -107,7 +134,7 @@ public class MediaService {
 		Song song = request.songId() != null ? resolveSong(request.songId(), found.getBand().getId()) : found.getSong();
 
 		found.edit(url, platform, type, visibility, title, schedule, song);
-		return MediaResponse.from(found);
+		return toResponse(found, userId);
 	}
 
 	/** 공개 범위 변경 — 등록자 본인 또는 관리자. */
@@ -116,7 +143,7 @@ public class MediaService {
 		Media found = findMedia(mediaId);
 		requireUploaderOrOwner(found, userId);
 		found.changeVisibility(visibility);
-		return MediaResponse.from(found);
+		return toResponse(found, userId);
 	}
 
 	/** 삭제 — 등록자 본인 또는 관리자. */
@@ -125,6 +152,30 @@ public class MediaService {
 		Media found = findMedia(mediaId);
 		requireUploaderOrOwner(found, userId);
 		media.delete(found);
+	}
+
+	/** 좋아요 — 로그인 필요, 멱등. */
+	@Transactional
+	public MediaLikeResult like(Long mediaId, Long userId) {
+		Media found = findMedia(mediaId);
+		if (!mediaLikes.existsByMediaIdAndUserId(mediaId, userId)) {
+			mediaLikes.save(MediaLike.builder().media(found).user(users.getReferenceById(userId)).build());
+		}
+		return new MediaLikeResult(mediaLikes.countByMediaId(mediaId), true);
+	}
+
+	/** 좋아요 취소 — 로그인 필요, 멱등. */
+	@Transactional
+	public MediaLikeResult unlike(Long mediaId, Long userId) {
+		findMedia(mediaId);
+		mediaLikes.deleteByMediaIdAndUserId(mediaId, userId);
+		return new MediaLikeResult(mediaLikes.countByMediaId(mediaId), false);
+	}
+
+	private MediaResponse toResponse(Media found, Long userId) {
+		long likeCount = mediaLikes.countByMediaId(found.getId());
+		boolean likedByMe = userId != null && mediaLikes.existsByMediaIdAndUserId(found.getId(), userId);
+		return MediaResponse.from(found, likeCount, likedByMe);
 	}
 
 	private static String trimToNull(String value) {

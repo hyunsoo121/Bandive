@@ -33,6 +33,27 @@
   gap: 10px;
   flex-wrap: wrap;
 }
+.members__profile-btn {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  flex: none;
+  line-height: 0;
+}
+.members__name-btn {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+.members__name-btn:hover {
+  text-decoration: underline;
+}
 .members__role {
   font-size: 10px;
   font-weight: 700;

@@ -31,9 +31,9 @@ export function fetchMe(): Promise<MeDto> {
   return api.get<MeDto>('/api/auth/me');
 }
 
-/** 내 정보 수정 (현재는 닉네임만). */
-export function updateMe(nickname: string): Promise<MeDto> {
-  return api.patch<MeDto>('/api/auth/me', { nickname });
+/** 내 정보 수정 — 닉네임 + 한 줄 소개. */
+export function updateMe(nickname: string, bio: string): Promise<MeDto> {
+  return api.patch<MeDto>('/api/auth/me', { nickname, bio });
 }
 
 /** 프로필 사진 업로드/교체. */

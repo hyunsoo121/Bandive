@@ -147,7 +147,7 @@ interface AppState {
   signup: (email: string, password: string, nickname: string) => Promise<void>;
   logout: () => void;
   /** 내 닉네임 수정 (PATCH /api/auth/me) */
-  updateProfile: (nickname: string) => Promise<void>;
+  updateProfile: (nickname: string, bio: string) => Promise<void>;
   /** 프로필 사진 업로드/교체 */
   uploadAvatar: (file: File) => Promise<void>;
   /** 프로필 사진 제거 */
@@ -228,6 +228,8 @@ interface AppState {
   editMedia: (mediaId: string, input: EditMediaInput) => Promise<void>;
   /** 영상 삭제 (등록자 본인 또는 관리자) */
   removeMedia: (mediaId: string) => Promise<void>;
+  /** 영상 좋아요 토글 (로그인) — 현재 상태 기준으로 like/unlike */
+  likeMedia: (mediaId: string) => Promise<void>;
 
   /** 멤버 추방 (관리자) — userId */
   kickMember: (userId: string) => Promise<void>;
@@ -491,8 +493,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     navigate('/');
   }, [currentBandId, navigate]);
 
-  const updateProfile = useCallback(async (nickname: string) => {
-    setUser(toUser(await authApi.updateMe(nickname.trim())));
+  const updateProfile = useCallback(async (nickname: string, bio: string) => {
+    setUser(toUser(await authApi.updateMe(nickname.trim(), bio.trim())));
   }, []);
 
   const uploadAvatar = useCallback(async (file: File) => {
@@ -820,7 +822,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         externalUrl: input.url.trim(),
         title: input.title.trim() || undefined,
         type: input.kind === '공연' ? 'PERFORMANCE' : 'REHEARSAL',
-        visibility: input.visibility === '링크 공개' ? 'LINK_PUBLIC' : 'MEMBERS_ONLY',
+        visibility: input.visibility === '전체공개' ? 'LINK_PUBLIC' : 'MEMBERS_ONLY',
         scheduleId: input.scheduleId ? Number(input.scheduleId) : null,
         songId: input.songId ? Number(input.songId) : null,
       });
@@ -837,7 +839,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         externalUrl: input.url.trim(),
         title: input.title.trim(), // 빈 문자열 → 백엔드에서 제목 제거
         type: input.kind === '공연' ? 'PERFORMANCE' : 'REHEARSAL',
-        visibility: input.visibility === '링크 공개' ? 'LINK_PUBLIC' : 'MEMBERS_ONLY',
+        visibility: input.visibility === '전체공개' ? 'LINK_PUBLIC' : 'MEMBERS_ONLY',
         scheduleId: input.scheduleId ? Number(input.scheduleId) : null,
         songId: input.songId ? Number(input.songId) : null,
       });
@@ -856,6 +858,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (linkedScheduleId && currentBandId) await refreshSchedules(currentBandId);
     },
     [media, currentBandId, refreshSchedules],
+  );
+
+  const likeMedia = useCallback(
+    async (mediaId: string) => {
+      const item = media.find((m) => m.id === mediaId);
+      if (!item) return;
+      try {
+        const result = item.likedByMe
+          ? await mediaApi.unlikeMedia(mediaId)
+          : await mediaApi.likeMedia(mediaId);
+        setMedia((prev) =>
+          prev.map((m) =>
+            m.id === mediaId
+              ? { ...m, likeCount: result.likeCount, likedByMe: result.likedByMe }
+              : m,
+          ),
+        );
+      } catch (e) {
+        console.error('좋아요 처리 실패', e);
+      }
+    },
+    [media],
   );
 
   const value: AppState = {
@@ -916,6 +940,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     addMedia,
     editMedia,
     removeMedia,
+    likeMedia,
     kickMember,
     setMemberParts,
     setBandLeader,

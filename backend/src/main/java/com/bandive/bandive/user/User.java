@@ -52,6 +52,10 @@ public class User extends BaseTimeEntity {
 	@Column(name = "avatar_url", length = 500)
 	private String avatarUrl;
 
+	/** 한 줄 소개. 미설정이면 null. */
+	@Column(length = 100)
+	private String bio;
+
 	public static User ofKakao(String kakaoId, String nickname) {
 		return User.builder().kakaoId(kakaoId).nickname(nickname).provider(AuthProvider.KAKAO).build();
 	}
@@ -78,6 +82,11 @@ public class User extends BaseTimeEntity {
 	/** 프로필 사진 URL 설정/해제(null). */
 	public void updateAvatar(String avatarUrl) {
 		this.avatarUrl = avatarUrl;
+	}
+
+	/** 한 줄 소개 설정/해제(null). 호출부에서 trim·검증한 값을 넘긴다. */
+	public void updateBio(String bio) {
+		this.bio = bio;
 	}
 
 	public boolean isLocal() {

@@ -14,6 +14,7 @@ export function ProfileModal({ onClose }: Props) {
   const { user, updateProfile, uploadAvatar, removeAvatar, changePassword } = useApp();
 
   const [nickname, setNickname] = useState(user?.name ?? '');
+  const [bio, setBio] = useState(user?.bio ?? '');
   const [savingName, setSavingName] = useState(false);
   const [nameMsg, setNameMsg] = useState<string | null>(null);
 
@@ -30,7 +31,9 @@ export function ProfileModal({ onClose }: Props) {
   if (!user) return null;
   const isLocal = user.loginProvider === 'local';
 
-  const nameDirty = nickname.trim().length > 0 && nickname.trim() !== user.name;
+  const nameDirty =
+    nickname.trim().length > 0 &&
+    (nickname.trim() !== user.name || bio.trim() !== (user.bio ?? ''));
 
   const pickAvatar = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -73,7 +76,7 @@ export function ProfileModal({ onClose }: Props) {
     setSavingName(true);
     setNameMsg(null);
     try {
-      await updateProfile(nickname);
+      await updateProfile(nickname, bio);
       setNameMsg('저장했습니다.');
     } catch (e) {
       setNameMsg(e instanceof Error ? e.message : '저장하지 못했습니다.');
@@ -135,29 +138,40 @@ export function ProfileModal({ onClose }: Props) {
 
         <div className="field">
           <label htmlFor="pf-nick">닉네임</label>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <input
-              id="pf-nick"
-              className="input"
-              value={nickname}
-              maxLength={50}
-              onChange={(e) => setNickname(e.target.value)}
-              style={{ flex: 1 }}
-            />
+          <input
+            id="pf-nick"
+            className="input"
+            value={nickname}
+            maxLength={50}
+            onChange={(e) => setNickname(e.target.value)}
+          />
+        </div>
+
+        <div className="field">
+          <label htmlFor="pf-bio">한 줄 소개</label>
+          <input
+            id="pf-bio"
+            className="input"
+            value={bio}
+            maxLength={100}
+            placeholder="예: 메인 보컬 · 재즈 좋아함"
+            onChange={(e) => setBio(e.target.value)}
+          />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4 }}>
             <button
               type="button"
               className="btn btn--primary btn--sm"
               disabled={!nameDirty || savingName}
               onClick={saveName}
             >
-              {savingName ? '저장 중…' : '저장'}
+              {savingName ? '저장 중…' : '닉네임·소개 저장'}
             </button>
+            {nameMsg && (
+              <span className="muted" style={{ fontSize: 11 }}>
+                {nameMsg}
+              </span>
+            )}
           </div>
-          {nameMsg && (
-            <span className="muted" style={{ fontSize: 11 }}>
-              {nameMsg}
-            </span>
-          )}
         </div>
 
         <div className="field">

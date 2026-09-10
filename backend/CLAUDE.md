@@ -235,6 +235,8 @@
     **4-5 에서 미룬 것 완성**: `ScheduleResponse.media` 추가 (같은 공개범위 필터). `ScheduleService` 에 `MediaRepository` 주입.
     마이그레이션 없음. **159 테스트 그린.**
     - ✅ 2026-09-08 추가: 영상↔합주곡 연결. `V11` `media.song_id`(ON DELETE SET NULL) + `MediaCreateRequest`/`MediaUpdateRequest` 에 `songId`, `MediaResponse` 에 `songId`·`songTitle`. `MediaService.resolveSong` — 다른 밴드 곡 `SONG_BAND_MISMATCH` 400, WISHLIST 곡 `SONG_NOT_CONFIRMED` 400 (합주곡만 연결 가능). 프론트 `AddMediaModal` 에 "연결할 곡" select(CONFIRMED 곡만), `MediaPage` 카드에 "곡 · 제목" 표시.
+    - ✅ 영상 좋아요 (2026-09-09): `V16` `media_likes`(멱등, `uq_media_like(media_id,user_id)` + `idx(user_id)`, 곡 투표와 동일 패턴 — `MediaLike`/`MediaLikeRepository`). `POST/DELETE /api/media/{id}/like`(로그인, 멱등, `{likeCount,likedByMe}` 반환). `MediaResponse` 에 `likeCount`·`likedByMe` 추가 — 목록은 `countByMediaIds`/`findLikedMediaIds` 배치조회로 N+1 방지, 공개 GET 은 `@AuthenticationPrincipal`(익명이면 `likedByMe=false`). 일정 상세 임베드용 `MediaResponse.from(media)` 오버로드는 0/false. 프론트: `MediaPage` 카드 하단에 하트 버튼 + 카운트(투표 버튼 톤), `AppContext.likeMedia` 토글.
+      ⚠️ `V15` 는 다른 세션의 `V15__band_visibility` 라 `V16` 사용.
 - **Phase 5 — 외부 음원 검색 ✅ 완료 (2026-09-03)**: `song/service/ItunesMusicSearchService`
   (Apple iTunes Search API — 인증·API 키 불필요. 응답이 `Content-Type: text/javascript` 라 문자열로 받아 `ObjectMapper` 로 파싱.
   외부 장애·깨진 본문은 빈 목록으로 삼킴). `app.music.provider=itunes` 면 활성, 그 외 모든 값은 `StubMusicSearchService`

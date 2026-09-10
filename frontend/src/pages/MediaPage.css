@@ -127,9 +127,42 @@
   justify-content: space-between;
   gap: 8px;
 }
+.media__foot-right {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 .media__actions {
   display: flex;
   gap: 4px;
+}
+/* 좋아요 버튼 — 곡 카드 투표 버튼(.votebox) 과 같은 톤 */
+.media__like {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 11px;
+  padding: 3px 8px;
+  border: 2px solid var(--color-text);
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.media__like.is-liked {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+.media__like-icon {
+  display: block;
+  width: 13px;
+  height: 13px;
+  flex: none;
+}
+.media__like-count {
+  line-height: 1;
 }
 .media__act {
   font-size: 11px;

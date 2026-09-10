@@ -61,7 +61,24 @@ export interface MeDto {
   email: string | null;
   /** 프로필 사진 URL. 없으면 null */
   avatarUrl: string | null;
+  /** 한 줄 소개. 없으면 null */
+  bio: string | null;
   provider: 'KAKAO' | 'LOCAL';
+}
+
+/** GET /api/users/{id} — 다른 사람 공개 프로필 */
+export interface UserProfileDto {
+  id: number;
+  nickname: string;
+  avatarUrl: string | null;
+  bio: string | null;
+  bands: {
+    id: number;
+    name: string;
+    logoUrl: string | null;
+    memberCount: number;
+    role: BandRoleDto;
+  }[];
 }
 
 export interface AccessTokenDto {
@@ -204,7 +221,17 @@ export interface MediaDto {
   visibility: MediaVisibilityDto;
   uploadedByUserId: number;
   uploadedByNickname: string;
+  /** 좋아요 수 */
+  likeCount: number;
+  /** 현재 로그인 유저가 좋아요 눌렀는지. 비회원이면 항상 false */
+  likedByMe: boolean;
   createdAt: string;
+}
+
+/** POST/DELETE /api/media/{id}/like 응답 — 버튼만 갱신하면 되게. */
+export interface MediaLikeResultDto {
+  likeCount: number;
+  likedByMe: boolean;
 }
 
 export interface MediaCreateBody {
