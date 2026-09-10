@@ -148,10 +148,31 @@ export function HomePage() {
           <strong>{media.length}</strong>
           <span className="muted">영상</span>
         </Link>
-        <Link className="home__stat" to={`${base}/members`}>
+        <Link className="home__stat home__stat--desktop" to={`${base}/members`}>
+          <strong>{currentBand.memberCount}</strong>
+          <span className="muted">멤버</span>
+        </Link>
+        <Link className="home__stat" to={isOwner ? `${base}/followers` : `${base}/members`}>
           <strong>{currentBand.followerCount}</strong>
           <span className="muted">팔로워</span>
         </Link>
+      </div>
+
+      {/* 모바일: 멤버/팔로워/설정은 하단탭에 없으니 홈에서 진입 */}
+      <div className="home__manage">
+        <Link className="home__manage-link" to={`${base}/members`}>
+          멤버 관리
+        </Link>
+        {isOwner && (
+          <Link className="home__manage-link" to={`${base}/followers`}>
+            팔로워 관리
+          </Link>
+        )}
+        {isOwner && (
+          <Link className="home__manage-link" to={`${base}/settings`}>
+            밴드 설정
+          </Link>
+        )}
       </div>
 
       <div className="home__cols">

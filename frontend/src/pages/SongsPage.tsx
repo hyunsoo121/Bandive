@@ -18,6 +18,9 @@ import { CSS } from '@dnd-kit/utilities';
 import { useApp } from '../store/AppContext';
 import { useGuard } from '../hooks/useGuard';
 import { sessionChips, slotsOf } from '../lib/songs';
+import * as exploreApi from '../api/explore';
+import * as mediaApi from '../api/media';
+import type { ExploreVideoDto } from '../api/types';
 import type { MediaItem, Song, SongFolder } from '../types';
 import { Fab } from '../components/Fab';
 import { AddSongModal } from '../components/AddSongModal';
@@ -631,11 +634,55 @@ function SongRow({
   onAddGuestClick,
   onMove,
 }: RowProps) {
+  const { user, openLogin } = useApp();
   const chips = sessionChips(song);
   const hasRef = song.referenceVideoUrl.length > 0;
   const slots = slotsOf(song);
   const canAssign = song.status === 'CONFIRMED' && !isGuest;
   const showAssignReadonly = song.status === 'CONFIRMED' && isGuest;
+
+  // 다른 밴드가 공개한 같은 곡 합주 영상 (검색으로 추가된 합주곡만)
+  const canShowCovers =
+    song.status === 'CONFIRMED' && song.sourceType === 'SEARCH' && !!song.externalTrackId;
+  const [coversOpen, setCoversOpen] = useState(false);
+  const [covers, setCovers] = useState<ExploreVideoDto[] | null>(null);
+  const [coversLoading, setCoversLoading] = useState(false);
+
+  const toggleCovers = async () => {
+    const next = !coversOpen;
+    setCoversOpen(next);
+    if (next && covers === null && song.externalTrackId) {
+      setCoversLoading(true);
+      try {
+        setCovers(await exploreApi.exploreSongVideos(song.externalTrackId, song.bandId));
+      } catch {
+        setCovers([]);
+      } finally {
+        setCoversLoading(false);
+      }
+    }
+  };
+
+  const toggleCoverLike = async (v: ExploreVideoDto) => {
+    if (!user) {
+      openLogin();
+      return;
+    }
+    try {
+      const res = v.likedByMe
+        ? await mediaApi.unlikeMedia(String(v.mediaId))
+        : await mediaApi.likeMedia(String(v.mediaId));
+      setCovers((prev) =>
+        (prev ?? []).map((x) =>
+          x.mediaId === v.mediaId
+            ? { ...x, likeCount: res.likeCount, likedByMe: res.likedByMe }
+            : x,
+        ),
+      );
+    } catch {
+      /* 무시 */
+    }
+  };
 
   const sortable = useSortable({ id: `S:${song.id}`, disabled: !dragEnabled });
   const style = {
@@ -853,6 +900,70 @@ function SongRow({
                     </span>
                   </a>
                 ))}
+              </div>
+            )}
+
+            {canShowCovers && (
+              <div className="stack" style={{ gap: 6 }}>
+                <button type="button" className="songrow__covers-toggle" onClick={toggleCovers}>
+                  <span className="kicker">
+                    다른 밴드 합주 영상
+                    {covers !== null && covers.length > 0 ? ` ${covers.length}` : ''}
+                  </span>
+                  <span className="songrow__caret">{coversOpen ? '닫기 ▲' : '보기 ▼'}</span>
+                </button>
+
+                {coversOpen && (
+                  <>
+                    {coversLoading && (
+                      <span className="muted" style={{ fontSize: 11 }}>
+                        불러오는 중…
+                      </span>
+                    )}
+                    {!coversLoading && covers !== null && covers.length === 0 && (
+                      <span className="muted" style={{ fontSize: 11 }}>
+                        아직 이 곡을 전체공개한 다른 밴드가 없어요.
+                      </span>
+                    )}
+                    {(covers ?? []).map((v) => (
+                      <div key={v.mediaId} className="songrow__cover">
+                        <a
+                          className="songrow__media"
+                          href={v.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ flex: 1, minWidth: 0 }}
+                        >
+                          {v.thumbnailUrl ? (
+                            <img
+                              className="songrow__media-thumb"
+                              src={v.thumbnailUrl}
+                              alt=""
+                              loading="lazy"
+                            />
+                          ) : (
+                            <span className="songrow__media-thumb songrow__media-thumb--empty" />
+                          )}
+                          <span className="stack" style={{ gap: 2, minWidth: 0, flex: 1 }}>
+                            <strong style={{ fontSize: 12 }}>{v.bandName}</strong>
+                            {v.title && (
+                              <span className="muted" style={{ fontSize: 10 }}>
+                                {v.title}
+                              </span>
+                            )}
+                          </span>
+                        </a>
+                        <button
+                          type="button"
+                          className={`songrow__cover-like${v.likedByMe ? ' is-liked' : ''}`}
+                          onClick={() => toggleCoverLike(v)}
+                        >
+                          ♥ {v.likeCount}
+                        </button>
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
             )}
           </div>

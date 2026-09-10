@@ -8,6 +8,7 @@ import { SongsPage } from './pages/SongsPage';
 import { SchedulePage } from './pages/SchedulePage';
 import { MediaPage } from './pages/MediaPage';
 import { MembersPage } from './pages/MembersPage';
+import { FollowersPage } from './pages/FollowersPage';
 import { BandSettingsPage } from './pages/BandSettingsPage';
 import { ExplorePage } from './pages/ExplorePage';
 import { HomeRedirect, InviteJoin, OAuthFailure, OAuthSuccess } from './pages/SystemPages';
@@ -41,6 +42,7 @@ export default function App() {
             <Route path="schedule" element={<SchedulePage />} />
             <Route path="media" element={<MediaPage />} />
             <Route path="members" element={<MembersPage />} />
+            <Route path="followers" element={<FollowersPage />} />
             <Route path="settings" element={<BandSettingsPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

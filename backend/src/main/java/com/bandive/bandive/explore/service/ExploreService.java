@@ -82,9 +82,15 @@ public class ExploreService {
 			.toList();
 	}
 
-	public List<ExploreVideoResponse> trackVideos(String externalTrackId, Long viewerUserId) {
-		return withLikes(explore.videosByTrack(externalTrackId, MediaVisibility.LINK_PUBLIC, BandVisibility.PUBLIC),
-				viewerUserId);
+	/**
+	 * 한 트랙의 공개 합주 영상. {@code excludeBandId} 가 있으면 그 밴드 영상은 뺀다 (곡 상세에서 "다른 밴드 합주 영상" 용).
+	 */
+	public List<ExploreVideoResponse> trackVideos(String externalTrackId, Long excludeBandId, Long viewerUserId) {
+		List<Media> videos = excludeBandId == null
+				? explore.videosByTrack(externalTrackId, MediaVisibility.LINK_PUBLIC, BandVisibility.PUBLIC)
+				: explore.videosByTrackExcludingBand(externalTrackId, excludeBandId, MediaVisibility.LINK_PUBLIC,
+						BandVisibility.PUBLIC);
+		return withLikes(videos, viewerUserId);
 	}
 
 	private List<ExploreVideoResponse> withLikes(List<Media> videos, Long viewerUserId) {

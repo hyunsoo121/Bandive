@@ -5,6 +5,7 @@ import java.util.List;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.bandive.bandive.auth.UserPrincipal;
@@ -41,10 +42,12 @@ public class ExploreController {
 		return exploreService.tracks();
 	}
 
+	/** {@code excludeBandId} 를 주면 그 밴드 영상은 제외 — 곡 상세의 "다른 밴드 합주 영상". */
 	@GetMapping("/api/explore/songs/{externalTrackId}/media")
 	public List<ExploreVideoResponse> songVideos(@PathVariable String externalTrackId,
+			@RequestParam(name = "excludeBandId", required = false) Long excludeBandId,
 			@AuthenticationPrincipal UserPrincipal principal) {
-		return exploreService.trackVideos(externalTrackId, principal != null ? principal.getId() : null);
+		return exploreService.trackVideos(externalTrackId, excludeBandId, principal != null ? principal.getId() : null);
 	}
 
 }

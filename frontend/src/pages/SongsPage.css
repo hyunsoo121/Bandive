@@ -340,6 +340,39 @@
 .songrow__media-thumb--empty {
   background: repeating-linear-gradient(135deg, #9b9797 0 8px, #bab6b6 8px 16px);
 }
+
+/* 다른 밴드 합주 영상 */
+.songrow__covers-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.songrow__cover {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.songrow__cover-like {
+  flex: none;
+  font-size: 11px;
+  font-weight: 800;
+  font-family: var(--font-heading);
+  padding: 4px 8px;
+  border: 2px solid var(--color-text);
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.songrow__cover-like.is-liked {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
 .songrow__guest-add {
   font-size: 11px;
   font-weight: 700;

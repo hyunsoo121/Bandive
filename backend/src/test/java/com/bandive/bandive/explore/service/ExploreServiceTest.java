@@ -111,7 +111,7 @@ class ExploreServiceTest extends RepositoryTest {
 			assertThat(t.bandCount()).isEqualTo(1);
 		});
 
-		assertThat(service.trackVideos("t1", null)).singleElement()
+		assertThat(service.trackVideos("t1", null, null)).singleElement()
 			.satisfies(v -> assertThat(v.url()).isEqualTo("https://youtu.be/pub-public"),
 					v -> assertThat(v.bandName()).isEqualTo("공개"), v -> assertThat(v.likeCount()).isZero());
 
@@ -149,11 +149,27 @@ class ExploreServiceTest extends RepositoryTest {
 		em.flush();
 		em.clear();
 
-		assertThat(service.trackVideos("t9", fan.getId())).singleElement().satisfies(x -> {
+		assertThat(service.trackVideos("t9", null, fan.getId())).singleElement().satisfies(x -> {
 			assertThat(x.likeCount()).isEqualTo(1);
 			assertThat(x.likedByMe()).isTrue();
 		});
-		assertThat(service.trackVideos("t9", null).getFirst().likedByMe()).isFalse();
+		assertThat(service.trackVideos("t9", null, null).getFirst().likedByMe()).isFalse();
+	}
+
+	@Test
+	void 다른_밴드_합주영상은_내_밴드를_제외한다() {
+		Band mine = em.persist(Fixtures.band("우리밴드", BandVisibility.PUBLIC));
+		Band other = em.persist(Fixtures.band("옆밴드", BandVisibility.PUBLIC));
+		em.persist(Fixtures.member(mine, owner, BandRole.OWNER));
+		video(mine, track(mine, "shared", "좋은 날"), "https://youtu.be/mine", MediaVisibility.LINK_PUBLIC);
+		video(other, track(other, "shared", "좋은 날"), "https://youtu.be/other", MediaVisibility.LINK_PUBLIC);
+		em.flush();
+		em.clear();
+
+		assertThat(service.trackVideos("shared", null, null)).extracting(v -> v.url())
+			.containsExactlyInAnyOrder("https://youtu.be/mine", "https://youtu.be/other");
+		assertThat(service.trackVideos("shared", mine.getId(), null)).singleElement()
+			.satisfies(v -> assertThat(v.url()).isEqualTo("https://youtu.be/other"));
 	}
 
 }

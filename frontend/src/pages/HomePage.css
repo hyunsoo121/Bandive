@@ -129,6 +129,36 @@
   font-size: 11px;
 }
 
+/* 홈에서 멤버/설정 진입 — 모바일 전용 (데스크탑은 사이드바에 있음) */
+.home__manage {
+  display: none;
+}
+.home__manage-link {
+  flex: 1;
+  text-align: center;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+  text-decoration: none;
+  border-bottom: 2px solid var(--color-text);
+}
+.home__manage-link + .home__manage-link {
+  border-left: 1px solid var(--color-divider);
+}
+.home__manage-link:active {
+  background: var(--color-neutral-100);
+}
+
+@media (max-width: 900px) {
+  .home__manage {
+    display: flex;
+  }
+  .home__stat--desktop {
+    display: none;
+  }
+}
+
 /* ─── 섹션 레이아웃 ─── */
 .home__cols {
   display: grid;

@@ -149,6 +149,8 @@ export interface Song {
   artist: string;
   status: SongStatus;
   sourceType: SourceType;
+  /** 검색으로 추가한 곡의 외부 트랙 id. 직접입력(MANUAL)이면 null — 다른 밴드 합주 영상 조회 키 */
+  externalTrackId: string | null;
   proposer: string;
   memo: string;
   referenceVideoUrl: string;

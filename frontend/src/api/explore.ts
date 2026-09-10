@@ -16,5 +16,10 @@ export const exploreBand = (bandId: string) =>
 
 export const exploreSongs = () => api.get<ExploreTrackDto[]>('/api/explore/songs');
 
-export const exploreSongVideos = (externalTrackId: string) =>
-  api.get<ExploreVideoDto[]>(`/api/explore/songs/${encodeURIComponent(externalTrackId)}/media`);
+/** excludeBandId 를 주면 그 밴드 영상은 제외 — 곡 상세의 "다른 밴드 합주 영상". */
+export const exploreSongVideos = (externalTrackId: string, excludeBandId?: string) =>
+  api.get<ExploreVideoDto[]>(
+    `/api/explore/songs/${encodeURIComponent(externalTrackId)}/media${
+      excludeBandId ? `?excludeBandId=${encodeURIComponent(excludeBandId)}` : ''
+    }`,
+  );

@@ -40,6 +40,21 @@ public interface ExploreRepository extends Repository<Media, Long> {
 			""")
 	List<Media> videosByTrack(String trackId, MediaVisibility mediaPublic, BandVisibility bandPublic);
 
+	/** 같은 트랙의 다른 밴드 공개 합주 영상 (내 밴드 제외). */
+	@Query("""
+			select m from Media m
+			  join fetch m.band
+			  join fetch m.song
+			  join fetch m.uploadedBy
+			where m.song.externalTrackId = :trackId
+			  and m.band.id <> :excludeBandId
+			  and m.visibility = :mediaPublic
+			  and m.band.visibility = :bandPublic
+			order by m.createdAt desc
+			""")
+	List<Media> videosByTrackExcludingBand(String trackId, Long excludeBandId, MediaVisibility mediaPublic,
+			BandVisibility bandPublic);
+
 	@Query("""
 			select m from Media m
 			  join fetch m.band

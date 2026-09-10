@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
-import { NAV_ITEMS } from '../lib/nav';
+import { EXPLORE_NAV, NAV_ITEMS, TAB_KEYS } from '../lib/nav';
 import { BrandMark } from './BrandMark';
 import { NavIcon } from './NavIcon';
 import { Avatar } from './Avatar';
@@ -39,22 +39,44 @@ export function AppChrome({ children }: { children: ReactNode }) {
   const meName = user ? user.name : '게스트';
   const meInitial = user ? user.initial : '?';
 
-  const navList = (variant: 'side' | 'tab') =>
-    base
-      ? NAV_ITEMS.map((item) => (
-          <NavLink
-            key={item.key}
-            to={item.to ? `${base}/${item.to}` : base}
-            end={!item.to}
-            className={({ isActive }) =>
-              `${variant === 'side' ? 'sidenav__item' : 'tabbar__item'}${isActive ? ' is-active' : ''}`
-            }
-          >
-            <NavIcon d1={item.d1} d2={item.d2} size={variant === 'side' ? 19 : 20} />
-            <span>{item.label}</span>
-          </NavLink>
-        ))
-      : null;
+  const cls = (variant: 'side' | 'tab') => (variant === 'side' ? 'sidenav__item' : 'tabbar__item');
+
+  const bandLink = (
+    variant: 'side' | 'tab',
+    item: { key: string; label: string; to: string; d1: string; d2: string },
+  ) => (
+    <NavLink
+      key={item.key}
+      to={item.to ? `${base}/${item.to}` : base!}
+      end={!item.to}
+      className={({ isActive }) => `${cls(variant)}${isActive ? ' is-active' : ''}`}
+    >
+      <NavIcon d1={item.d1} d2={item.d2} size={variant === 'side' ? 19 : 20} />
+      <span>{item.label}</span>
+    </NavLink>
+  );
+
+  const exploreLink = (variant: 'side' | 'tab') => (
+    <NavLink
+      key="explore"
+      to={EXPLORE_NAV.to}
+      className={({ isActive }) => `${cls(variant)}${isActive ? ' is-active' : ''}`}
+    >
+      <NavIcon d1={EXPLORE_NAV.d1} d2={EXPLORE_NAV.d2} size={variant === 'side' ? 19 : 20} />
+      <span>{EXPLORE_NAV.label}</span>
+    </NavLink>
+  );
+
+  // 데스크탑 사이드바: 전체 + 설정 + 탐색.  모바일 하단탭: 홈·곡·일정·영상 + 탐색 (멤버/설정은 홈에서).
+  const sideNav = base ? NAV_ITEMS.map((item) => bandLink('side', item)) : null;
+  const tabNav = base
+    ? [
+        ...NAV_ITEMS.filter((i) => (TAB_KEYS as readonly string[]).includes(i.key)).map((item) =>
+          bandLink('tab', item),
+        ),
+        exploreLink('tab'),
+      ]
+    : null;
 
   return (
     <div className="app">
@@ -89,7 +111,19 @@ export function AppChrome({ children }: { children: ReactNode }) {
         )}
 
         <nav className="sidenav">
-          {navList('side')}
+          {sideNav}
+          {base && role === 'owner' && (
+            <NavLink
+              to={`${base}/followers`}
+              className={({ isActive }) => `sidenav__item${isActive ? ' is-active' : ''}`}
+            >
+              <NavIcon
+                d1="M16 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8"
+                d2="M3 21c0-3.3 3-5 7-5m6.5 6 4.5-4.2-1.6-1.8-2.9 2.7-1.4-1.3L14 15z"
+              />
+              <span>팔로워</span>
+            </NavLink>
+          )}
           {base && role === 'owner' && (
             <NavLink
               to={`${base}/settings`}
@@ -102,13 +136,7 @@ export function AppChrome({ children }: { children: ReactNode }) {
               <span>설정</span>
             </NavLink>
           )}
-          <NavLink
-            to="/explore"
-            className={({ isActive }) => `sidenav__item${isActive ? ' is-active' : ''}`}
-          >
-            <NavIcon d1="M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18" d2="m15 9-2 5-5 2 2-5z" />
-            <span>탐색</span>
-          </NavLink>
+          {exploreLink('side')}
         </nav>
 
         <div className="sidebar__me">
@@ -167,7 +195,7 @@ export function AppChrome({ children }: { children: ReactNode }) {
         <main className="app__content scr">{children}</main>
 
         {/* 모바일 하단 탭바 */}
-        {navList('tab') && <nav className="app__tabbar">{navList('tab')}</nav>}
+        {tabNav && <nav className="app__tabbar">{tabNav}</nav>}
       </div>
 
       {switcherOpen && <BandSwitcher onNavigate={(id) => navigate(`/bands/${id}`)} />}
