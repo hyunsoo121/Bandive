@@ -15,6 +15,7 @@ import com.bandive.bandive.follow.BandFollow;
 import com.bandive.bandive.follow.BandFollowRepository;
 import com.bandive.bandive.follow.FollowStatus;
 import com.bandive.bandive.follow.dto.FollowerResponse;
+import com.bandive.bandive.follow.dto.FollowingBandResponse;
 import com.bandive.bandive.member.BandMember;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
@@ -73,6 +74,11 @@ public class FollowService {
 	public List<FollowerResponse> listFollowers(Long bandId, Long ownerId, FollowStatus status) {
 		requireOwner(bandId, ownerId);
 		return follows.findAllForBand(bandId, status).stream().map(FollowerResponse::from).toList();
+	}
+
+	/** 로그인 유저 본인이 팔로우한 밴드 목록 (요청 대기 + 승인 모두). */
+	public List<FollowingBandResponse> listMyFollowing(Long userId) {
+		return follows.findFollowingByUser(userId).stream().map(FollowingBandResponse::of).toList();
 	}
 
 	/** 관리자 — 팔로우 요청 승인. */

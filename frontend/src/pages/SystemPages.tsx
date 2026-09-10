@@ -59,6 +59,9 @@ export function HomeRedirect() {
           </button>
         </>
       )}
+      <Link className="btn btn--ghost btn--sm" to="/explore">
+        다른 밴드 구경하기
+      </Link>
       {createOpen && <CreateBandModal />}
     </CenterBox>
   );

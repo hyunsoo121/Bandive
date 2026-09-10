@@ -27,12 +27,64 @@ export type BandVisibilityDto = 'PRIVATE' | 'FOLLOWERS' | 'PUBLIC';
 export type BandRelationDto = 'MEMBER' | 'FOLLOWER' | 'PENDING' | 'NONE';
 export type FollowStatusDto = 'PENDING' | 'APPROVED';
 
+/* ── 탐색 (Explore) ──────────────────────────────────────────── */
+
+export interface ExploreBandDto {
+  id: number;
+  name: string;
+  description: string | null;
+  logoUrl: string | null;
+  visibility: BandVisibilityDto;
+  memberCount: number;
+}
+
+export interface ExploreTrackDto {
+  externalTrackId: string;
+  title: string;
+  artist: string | null;
+  artworkUrl: string | null;
+  bandCount: number;
+  videoCount: number;
+}
+
+export interface ExploreVideoDto {
+  mediaId: number;
+  bandId: number;
+  bandName: string;
+  url: string;
+  title: string | null;
+  thumbnailUrl: string | null;
+  platform: MediaPlatformDto;
+  likeCount: number;
+  likedByMe: boolean;
+  createdAt: string;
+}
+
+export interface ExploreBandDetailDto {
+  band: ExploreBandDto;
+  myRelation: BandRelationDto;
+  /** PUBLIC 밴드면 공개 합주 영상, FOLLOWERS 면 빈 배열 */
+  videos: ExploreVideoDto[];
+}
+
 export interface FollowerDto {
   userId: number;
   nickname: string;
   status: FollowStatusDto;
   requestedAt: string;
   decidedAt: string | null;
+}
+
+/** GET /api/me/following — 내가 팔로우한 밴드 한 곳 */
+export interface FollowingBandDto {
+  bandId: number;
+  name: string;
+  description: string | null;
+  logoUrl: string | null;
+  visibility: BandVisibilityDto;
+  memberCount: number;
+  status: FollowStatusDto;
+  requestedAt: string;
 }
 
 export interface BandDto {
@@ -42,6 +94,8 @@ export interface BandDto {
   logoUrl: string | null;
   bannerUrl: string | null;
   memberCount: number;
+  /** 승인된 팔로워 수. FOLLOWERS 밴드가 아니면 0 */
+  followerCount: number;
   visibility: BandVisibilityDto;
   /** 현재 사용자와의 관계. 항상 채워짐 (비로그인이면 NONE). */
   myRelation: BandRelationDto;

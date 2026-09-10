@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import { Avatar } from './Avatar';
 import { Modal } from './Modal';
@@ -11,7 +12,7 @@ const PW_RULE = /^(?=.*[A-Za-z])(?=.*\d).{8,72}$/;
 const MAX_AVATAR_BYTES = 5 * 1024 * 1024;
 
 export function ProfileModal({ onClose }: Props) {
-  const { user, updateProfile, uploadAvatar, removeAvatar, changePassword } = useApp();
+  const { user, following, updateProfile, uploadAvatar, removeAvatar, changePassword } = useApp();
 
   const [nickname, setNickname] = useState(user?.name ?? '');
   const [bio, setBio] = useState(user?.bio ?? '');
@@ -179,6 +180,18 @@ export function ProfileModal({ onClose }: Props) {
           <span style={{ fontSize: 13 }}>
             {isLocal ? `이메일 · ${user.email}` : '카카오 로그인'}
           </span>
+        </div>
+
+        <div className="field">
+          <label>팔로우한 밴드</label>
+          <Link
+            to="/explore?tab=following"
+            className="btn btn--sm"
+            style={{ alignSelf: 'flex-start' }}
+            onClick={onClose}
+          >
+            팔로잉 {following.length}개 보기
+          </Link>
         </div>
 
         {isLocal && (

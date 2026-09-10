@@ -148,6 +148,10 @@ export function HomePage() {
           <strong>{media.length}</strong>
           <span className="muted">영상</span>
         </Link>
+        <Link className="home__stat" to={`${base}/members`}>
+          <strong>{currentBand.followerCount}</strong>
+          <span className="muted">팔로워</span>
+        </Link>
       </div>
 
       <div className="home__cols">

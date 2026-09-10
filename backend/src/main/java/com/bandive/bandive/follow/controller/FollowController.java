@@ -17,6 +17,7 @@ import com.bandive.bandive.auth.CurrentUser;
 import com.bandive.bandive.auth.UserPrincipal;
 import com.bandive.bandive.follow.FollowStatus;
 import com.bandive.bandive.follow.dto.FollowerResponse;
+import com.bandive.bandive.follow.dto.FollowingBandResponse;
 import com.bandive.bandive.follow.service.FollowService;
 
 @RestController
@@ -48,6 +49,12 @@ public class FollowController {
 			@RequestParam(name = "status", required = false) FollowStatus status,
 			@AuthenticationPrincipal UserPrincipal principal) {
 		return followService.listFollowers(bandId, principal != null ? principal.getId() : null, status);
+	}
+
+	/** 내가 팔로우한 밴드 목록 (요청 대기 + 승인). */
+	@GetMapping("/api/me/following")
+	public List<FollowingBandResponse> myFollowing(@CurrentUser Long userId) {
+		return followService.listMyFollowing(userId);
 	}
 
 	/** 관리자 — 팔로우 요청 승인. */

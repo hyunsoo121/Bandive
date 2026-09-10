@@ -13,6 +13,7 @@ import type {
   Band,
   BandVisibility,
   Follower,
+  FollowingBand,
   Guest,
   MediaItem,
   MediaKind,
@@ -41,6 +42,7 @@ import * as mediaApi from '../api/media';
 import {
   toBand,
   toFollower,
+  toFollowingBand,
   toGuest,
   toMedia,
   toMember,
@@ -175,12 +177,23 @@ interface AppState {
   cancelFollow: () => Promise<void>;
   /** 현재 밴드의 승인 대기 팔로워 (관리자만 채워짐) */
   pendingFollowers: Follower[];
-  /** 대기 팔로워 목록 다시 불러오기 (관리자) */
+  /** 현재 밴드의 승인된 팔로워 (관리자만 채워짐) */
+  approvedFollowers: Follower[];
+  /** 팔로워 목록(대기 + 승인) 다시 불러오기 (관리자) */
   refreshFollowers: () => Promise<void>;
-  /** 팔로우 요청 승인 (관리자) */
+  /** 팔로우 요청 승인 (관리자) → 대기 → 승인 목록으로 이동 */
   approveFollower: (userId: string) => Promise<void>;
-  /** 팔로우 요청 거절 / 팔로워 제거 (관리자) */
+  /** 팔로우 요청 거절 (관리자) */
   rejectFollower: (userId: string) => Promise<void>;
+  /** 승인된 팔로워 내보내기 (관리자) */
+  removeFollower: (userId: string) => Promise<void>;
+  /** 내가 팔로우한 밴드 (탐색 > 팔로잉). 로그인 유저만 */
+  following: FollowingBand[];
+  followingLoading: boolean;
+  /** 내 팔로잉 목록 다시 불러오기 */
+  refreshFollowing: () => Promise<void>;
+  /** 팔로우 취소 / 언팔로우 (밴드 지정) → following 목록에서 제거 */
+  unfollowBand: (bandId: string) => Promise<void>;
   /** 관리자 위임 (관리자) */
   transferOwnership: (userId: string) => Promise<void>;
   /** 밴드 삭제 (관리자) → 홈으로 */
@@ -293,6 +306,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   /** 밴드 표지는 봤지만 콘텐츠는 게이트됨 (FOLLOWERS 밴드에 팔로우 안 함). */
   const [bandRestricted, setBandRestricted] = useState(false);
   const [pendingFollowers, setPendingFollowers] = useState<Follower[]>([]);
+  const [approvedFollowers, setApprovedFollowers] = useState<Follower[]>([]);
+  const [following, setFollowing] = useState<FollowingBand[]>([]);
+  const [followingLoading, setFollowingLoading] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [invite, setInvite] = useState<InviteInfo | null>(null);
@@ -347,6 +363,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setBandLoading(true);
     setBandRestricted(false);
     setPendingFollowers([]);
+    setApprovedFollowers([]);
     setInvite(null);
     const clearContent = () => {
       setMembers([]);
@@ -513,38 +530,90 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setCurrentBand((prev) => (prev ? { ...prev, myRelation: relation } : prev));
   }, []);
 
+  const refreshFollowing = useCallback(async () => {
+    if (!user) {
+      setFollowing([]);
+      return;
+    }
+    setFollowingLoading(true);
+    try {
+      const list = await followApi.myFollowing();
+      setFollowing(list.map(toFollowingBand));
+    } catch {
+      setFollowing([]);
+    } finally {
+      setFollowingLoading(false);
+    }
+  }, [user]);
+
+  // 로그인 상태가 되면 내 팔로잉 목록 로드, 로그아웃되면 비움
+  useEffect(() => {
+    if (user) void refreshFollowing();
+    else setFollowing([]);
+  }, [user, refreshFollowing]);
+
   const requestFollow = useCallback(async () => {
     if (!currentBandId) return;
     await followApi.requestFollow(currentBandId);
     patchRelation('PENDING');
-  }, [currentBandId, patchRelation]);
+    void refreshFollowing();
+  }, [currentBandId, patchRelation, refreshFollowing]);
 
   const cancelFollow = useCallback(async () => {
     if (!currentBandId) return;
     await followApi.cancelFollow(currentBandId);
     patchRelation('NONE');
+    setFollowing((prev) => prev.filter((f) => f.bandId !== currentBandId));
   }, [currentBandId, patchRelation]);
+
+  const unfollowBand = useCallback(
+    async (bandId: string) => {
+      await followApi.cancelFollow(bandId);
+      setFollowing((prev) => prev.filter((f) => f.bandId !== bandId));
+      if (bandId === currentBandId) patchRelation('NONE');
+    },
+    [currentBandId, patchRelation],
+  );
 
   const refreshFollowers = useCallback(async () => {
     if (!currentBandId) {
       setPendingFollowers([]);
+      setApprovedFollowers([]);
       return;
     }
     try {
-      const list = await followApi.listFollowers(currentBandId, 'PENDING');
-      setPendingFollowers(list.map(toFollower));
+      const list = (await followApi.listFollowers(currentBandId)).map(toFollower);
+      setPendingFollowers(list.filter((f) => f.status === 'PENDING'));
+      setApprovedFollowers(list.filter((f) => f.status === 'APPROVED'));
     } catch {
       setPendingFollowers([]);
+      setApprovedFollowers([]);
     }
   }, [currentBandId]);
+
+  const bumpFollowerCount = useCallback((delta: number) => {
+    setCurrentBand((prev) =>
+      prev ? { ...prev, followerCount: Math.max(0, prev.followerCount + delta) } : prev,
+    );
+  }, []);
 
   const approveFollower = useCallback(
     async (userId: string) => {
       if (!currentBandId) return;
       await followApi.approveFollower(currentBandId, userId);
-      setPendingFollowers((prev) => prev.filter((f) => f.userId !== userId));
+      setPendingFollowers((prev) => {
+        const moved = prev.find((f) => f.userId === userId);
+        if (moved) {
+          setApprovedFollowers((cur) => [
+            ...cur,
+            { ...moved, status: 'APPROVED', decidedAt: new Date().toISOString() },
+          ]);
+        }
+        return prev.filter((f) => f.userId !== userId);
+      });
+      bumpFollowerCount(1);
     },
-    [currentBandId],
+    [currentBandId, bumpFollowerCount],
   );
 
   const rejectFollower = useCallback(
@@ -554,6 +623,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setPendingFollowers((prev) => prev.filter((f) => f.userId !== userId));
     },
     [currentBandId],
+  );
+
+  const removeFollower = useCallback(
+    async (userId: string) => {
+      if (!currentBandId) return;
+      await followApi.removeFollower(currentBandId, userId);
+      setApprovedFollowers((prev) => prev.filter((f) => f.userId !== userId));
+      bumpFollowerCount(-1);
+    },
+    [currentBandId, bumpFollowerCount],
   );
 
   const transferOwnership = useCallback(
@@ -985,6 +1064,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     currentBand,
     bandRestricted,
     pendingFollowers,
+    approvedFollowers,
+    following,
+    followingLoading,
     bootLoading,
     bandLoading,
     role,
@@ -1014,9 +1096,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
     updateBandVisibility,
     requestFollow,
     cancelFollow,
+    unfollowBand,
     refreshFollowers,
+    refreshFollowing,
     approveFollower,
     rejectFollower,
+    removeFollower,
     joinByInvite,
     updateBand,
     transferOwnership,

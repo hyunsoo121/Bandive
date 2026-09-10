@@ -126,6 +126,30 @@ class FollowServiceTest extends RepositoryTest {
 	}
 
 	@Test
+	void 내가_팔로우한_밴드를_상태와_멤버수와_함께_준다() {
+		Band other = em.persist(Fixtures.band("B", BandVisibility.FOLLOWERS));
+		em.persist(Fixtures.member(other, em.find(User.class, ownerId), BandRole.OWNER));
+
+		service.request(band.getId(), outsiderId);
+		service.request(other.getId(), outsiderId);
+		em.flush();
+		service.approve(other.getId(), ownerId, outsiderId);
+		em.flush();
+		em.clear();
+
+		var mine = service.listMyFollowing(outsiderId);
+
+		assertThat(mine).hasSize(2);
+		assertThat(mine).filteredOn(f -> f.bandId().equals(other.getId())).singleElement().satisfies(f -> {
+			assertThat(f.status()).isEqualTo(FollowStatus.APPROVED);
+			assertThat(f.memberCount()).isEqualTo(1);
+		});
+		assertThat(mine).filteredOn(f -> f.bandId().equals(band.getId()))
+			.singleElement()
+			.satisfies(f -> assertThat(f.status()).isEqualTo(FollowStatus.PENDING));
+	}
+
+	@Test
 	void 취소_거절하면_행이_사라진다() {
 		service.request(band.getId(), outsiderId);
 		em.flush();

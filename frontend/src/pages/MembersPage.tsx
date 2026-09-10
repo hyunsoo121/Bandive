@@ -29,9 +29,11 @@ export function MembersPage() {
     invite,
     issueInviteCode,
     pendingFollowers,
+    approvedFollowers,
     refreshFollowers,
     approveFollower,
     rejectFollower,
+    removeFollower,
   } = useApp();
   const [copied, setCopied] = useState(false);
   const [issuing, setIssuing] = useState(false);
@@ -123,6 +125,86 @@ export function MembersPage() {
         ))}
       </div>
 
+      {isOwner &&
+        (currentBand.visibility === 'FOLLOWERS' ||
+          approvedFollowers.length > 0 ||
+          pendingFollowers.length > 0) && (
+          <section className="members__follows">
+            <div className="spread">
+              <span className="kicker">팔로워</span>
+              <span style={{ fontSize: 11, fontWeight: 700 }}>{approvedFollowers.length}명</span>
+            </div>
+
+            {approvedFollowers.length === 0 ? (
+              <span className="muted" style={{ fontSize: 12 }}>
+                {currentBand.visibility === 'FOLLOWERS'
+                  ? '아직 승인된 팔로워가 없습니다.'
+                  : '팔로워 공개로 바꾸면 다른 사용자가 팔로우를 요청할 수 있어요.'}
+              </span>
+            ) : (
+              approvedFollowers.map((f) => (
+                <div key={f.userId} className="members__follow-row">
+                  <Avatar label={f.initial} size={26} color="var(--color-neutral-500)" />
+                  <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600 }}>
+                    {f.nickname}
+                  </span>
+                  <button
+                    type="button"
+                    className="members__follow-btn"
+                    onClick={() =>
+                      runGuest(() => removeFollower(f.userId), '팔로워를 내보내지 못했습니다.')
+                    }
+                  >
+                    내보내기
+                  </button>
+                </div>
+              ))
+            )}
+
+            {pendingFollowers.length > 0 && (
+              <>
+                <div
+                  className="spread"
+                  style={{
+                    marginTop: 6,
+                    paddingTop: 8,
+                    borderTop: '1px solid var(--color-neutral-300)',
+                  }}
+                >
+                  <span className="kicker">받은 요청</span>
+                  <span style={{ fontSize: 11, fontWeight: 700 }}>{pendingFollowers.length}건</span>
+                </div>
+                {pendingFollowers.map((f) => (
+                  <div key={f.userId} className="members__follow-row">
+                    <Avatar label={f.initial} size={26} color="var(--color-neutral-500)" />
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600 }}>
+                      {f.nickname}
+                    </span>
+                    <button
+                      type="button"
+                      className="members__follow-btn members__follow-btn--ok"
+                      onClick={() =>
+                        runGuest(() => approveFollower(f.userId), '승인하지 못했습니다.')
+                      }
+                    >
+                      승인
+                    </button>
+                    <button
+                      type="button"
+                      className="members__follow-btn"
+                      onClick={() =>
+                        runGuest(() => rejectFollower(f.userId), '거절하지 못했습니다.')
+                      }
+                    >
+                      거절
+                    </button>
+                  </div>
+                ))}
+              </>
+            )}
+          </section>
+        )}
+
       <GuestSection
         guests={guests}
         canManage={isOwner}
@@ -133,43 +215,6 @@ export function MembersPage() {
         }
         onRemove={(id) => runGuest(() => removeGuest(id), '게스트를 삭제하지 못했습니다.')}
       />
-
-      {isOwner && (currentBand.visibility === 'FOLLOWERS' || pendingFollowers.length > 0) && (
-        <div className="members__follows">
-          <div className="spread">
-            <span className="kicker">팔로우 요청</span>
-            <span style={{ fontSize: 11, fontWeight: 700 }}>{pendingFollowers.length}건</span>
-          </div>
-          {pendingFollowers.length === 0 ? (
-            <span className="muted" style={{ fontSize: 12 }}>
-              대기 중인 요청이 없습니다.
-            </span>
-          ) : (
-            pendingFollowers.map((f) => (
-              <div key={f.userId} className="members__follow-row">
-                <Avatar label={f.initial} size={26} color="var(--color-neutral-500)" />
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600 }}>
-                  {f.nickname}
-                </span>
-                <button
-                  type="button"
-                  className="members__follow-btn members__follow-btn--ok"
-                  onClick={() => runGuest(() => approveFollower(f.userId), '승인하지 못했습니다.')}
-                >
-                  승인
-                </button>
-                <button
-                  type="button"
-                  className="members__follow-btn"
-                  onClick={() => runGuest(() => rejectFollower(f.userId), '거절하지 못했습니다.')}
-                >
-                  거절
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-      )}
 
       {error && (
         <p style={{ fontSize: 12, margin: '10px 16px 0', color: 'var(--color-accent)' }}>{error}</p>

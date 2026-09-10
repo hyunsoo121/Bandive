@@ -5,6 +5,7 @@ import { ATT_TO_KO } from '../lib/schedule';
 import type {
   Band,
   Follower,
+  FollowingBand,
   Guest,
   MediaItem,
   Member,
@@ -18,6 +19,7 @@ import type {
   BandDto,
   BandRoleDto,
   FollowerDto,
+  FollowingBandDto,
   GuestDto,
   MediaDto,
   MediaPlatformDto,
@@ -78,6 +80,7 @@ export function toBand(dto: BandDto): Band {
     name: dto.name,
     initial: initialOf(dto.name),
     memberCount: dto.memberCount,
+    followerCount: dto.followerCount ?? 0,
     myRole: toRole(dto.role),
     note: dto.description ?? '',
     logoUrl: dto.logoUrl ? fileUrl(dto.logoUrl) : null,
@@ -92,6 +95,20 @@ export function toFollower(dto: FollowerDto): Follower {
     userId: String(dto.userId),
     nickname: dto.nickname,
     initial: initialOf(dto.nickname),
+    status: dto.status,
+    requestedAt: dto.requestedAt,
+    decidedAt: dto.decidedAt,
+  };
+}
+
+export function toFollowingBand(dto: FollowingBandDto): FollowingBand {
+  return {
+    bandId: String(dto.bandId),
+    name: dto.name,
+    initial: initialOf(dto.name),
+    logoUrl: dto.logoUrl ? fileUrl(dto.logoUrl) : null,
+    visibility: dto.visibility,
+    memberCount: dto.memberCount,
     status: dto.status,
     requestedAt: dto.requestedAt,
   };

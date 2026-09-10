@@ -25,6 +25,19 @@ public interface BandFollowRepository extends JpaRepository<BandFollow, Long> {
 			""")
 	List<BandFollow> findAllForBand(Long bandId, FollowStatus status);
 
+	/**
+	 * 내가 팔로우한 밴드 — {@code [Band, FollowStatus, Instant createdAt, long memberCount]}, 최근
+	 * 요청 순.
+	 */
+	@Query("""
+			select f.band, f.status, f.createdAt,
+			       (select count(m.id) from BandMember m where m.band.id = f.band.id)
+			from BandFollow f
+			where f.user.id = :userId
+			order by f.createdAt desc
+			""")
+	List<Object[]> findFollowingByUser(Long userId);
+
 	@Modifying(clearAutomatically = true, flushAutomatically = true)
 	@Query("delete from BandFollow f where f.band.id = :bandId and f.user.id = :userId")
 	void deleteByBandIdAndUserId(Long bandId, Long userId);

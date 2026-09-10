@@ -88,7 +88,13 @@ public class BandService {
 		if (role == null && band.getVisibility() == BandVisibility.PRIVATE) {
 			throw new NotFoundException("BAND_NOT_FOUND", "밴드를 찾을 수 없습니다.");
 		}
-		return BandResponse.from(band, bandMembers.countByBandId(bandId), role, myRelation(bandId, userId, role));
+		return BandResponse.from(band, bandMembers.countByBandId(bandId), followerCount(bandId), role,
+				myRelation(bandId, userId, role));
+	}
+
+	/** 승인된 팔로워 수. FOLLOWERS 밴드가 아니면 사실상 0. */
+	private long followerCount(Long bandId) {
+		return follows.countByBandIdAndStatus(bandId, FollowStatus.APPROVED);
 	}
 
 	private MyRelation myRelation(Long bandId, Long userId, BandRole role) {
@@ -107,14 +113,15 @@ public class BandService {
 	public BandResponse updateVisibility(Long bandId, BandVisibility visibility) {
 		Band band = findBand(bandId);
 		band.changeVisibility(visibility);
-		return BandResponse.from(band, bandMembers.countByBandId(bandId), BandRole.OWNER);
+		return BandResponse.from(band, bandMembers.countByBandId(bandId), followerCount(bandId), BandRole.OWNER);
 	}
 
 	public List<BandResponse> myBands(Long userId) {
 		return bandMembers.findAllByUserId(userId)
 			.stream()
 			.map(membership -> BandResponse.from(membership.getBand(),
-					bandMembers.countByBandId(membership.getBand().getId()), membership.getRole()))
+					bandMembers.countByBandId(membership.getBand().getId()),
+					followerCount(membership.getBand().getId()), membership.getRole()))
 			.toList();
 	}
 
@@ -122,7 +129,7 @@ public class BandService {
 	public BandResponse update(Long bandId, BandUpdateRequest request) {
 		Band band = findBand(bandId);
 		band.updateInfo(request.name(), request.description());
-		return BandResponse.from(band, bandMembers.countByBandId(bandId), BandRole.OWNER);
+		return BandResponse.from(band, bandMembers.countByBandId(bandId), followerCount(bandId), BandRole.OWNER);
 	}
 
 	@Transactional
@@ -131,7 +138,7 @@ public class BandService {
 		String previous = band.getLogoUrl();
 		band.changeLogo(storage.store(LOGO_DIR, file));
 		storage.delete(previous);
-		return BandResponse.from(band, bandMembers.countByBandId(bandId), BandRole.OWNER);
+		return BandResponse.from(band, bandMembers.countByBandId(bandId), followerCount(bandId), BandRole.OWNER);
 	}
 
 	@Transactional
@@ -140,7 +147,7 @@ public class BandService {
 		String previous = band.getBannerUrl();
 		band.changeBanner(storage.store(BANNER_DIR, file));
 		storage.delete(previous);
-		return BandResponse.from(band, bandMembers.countByBandId(bandId), BandRole.OWNER);
+		return BandResponse.from(band, bandMembers.countByBandId(bandId), followerCount(bandId), BandRole.OWNER);
 	}
 
 	/** 관리자 위임 — 대상은 OWNER, 이전 관리자는 MEMBER 로. 대상 == 본인이면 no-op. */

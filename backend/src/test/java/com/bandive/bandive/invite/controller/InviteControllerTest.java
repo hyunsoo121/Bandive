@@ -40,7 +40,7 @@ class InviteControllerTest {
 	private static final InviteCodeResponse CODE = new InviteCodeResponse("ABCD2345",
 			"http://localhost:5173/invite/ABCD2345", null, null, 0);
 
-	private static final BandResponse BAND = new BandResponse(1L, "내 밴드", null, null, null, 2,
+	private static final BandResponse BAND = new BandResponse(1L, "내 밴드", null, null, null, 2, 0,
 			com.bandive.bandive.band.BandVisibility.PUBLIC, BandRole.MEMBER, com.bandive.bandive.band.MyRelation.MEMBER,
 			Instant.parse("2026-09-02T00:00:00Z"));
 

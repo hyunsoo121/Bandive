@@ -28,6 +28,20 @@ export interface Follower {
   initial: string;
   status: 'PENDING' | 'APPROVED';
   requestedAt: string;
+  /** 승인 시각. 대기 중이면 null */
+  decidedAt: string | null;
+}
+
+/** 내가 팔로우한 밴드 한 곳 (탐색 > 팔로잉 탭). */
+export interface FollowingBand {
+  bandId: string;
+  name: string;
+  initial: string;
+  logoUrl: string | null;
+  visibility: BandVisibility;
+  memberCount: number;
+  status: 'PENDING' | 'APPROVED';
+  requestedAt: string;
 }
 
 export interface User {
@@ -73,6 +87,8 @@ export interface Band {
   name: string;
   initial: string;
   memberCount: number;
+  /** 승인된 팔로워 수 (FOLLOWERS 밴드가 아니면 0) */
+  followerCount: number;
   myRole: Role;
   /** 홈 배너/서브텍스트용 요약 */
   note: string;

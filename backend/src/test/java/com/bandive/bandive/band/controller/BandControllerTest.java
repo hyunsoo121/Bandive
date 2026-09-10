@@ -45,7 +45,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(BandController.class)
 class BandControllerTest {
 
-	private static final BandResponse SAMPLE = new BandResponse(1L, "내 밴드", "소개", null, null, 1,
+	private static final BandResponse SAMPLE = new BandResponse(1L, "내 밴드", "소개", null, null, 1, 0,
 			com.bandive.bandive.band.BandVisibility.PUBLIC, BandRole.OWNER, com.bandive.bandive.band.MyRelation.MEMBER,
 			Instant.parse("2026-09-02T00:00:00Z"));
 

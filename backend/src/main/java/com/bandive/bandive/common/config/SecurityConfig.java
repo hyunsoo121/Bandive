@@ -59,7 +59,7 @@ public class SecurityConfig {
 				.requestMatchers(HttpMethod.POST, "/api/auth/refresh", "/api/auth/logout", "/api/auth/signup",
 						"/api/auth/login")
 				.permitAll()
-				.requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/bands/my")
+				.requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/bands/my", "/api/me/following")
 				.authenticated()
 				.requestMatchers(HttpMethod.GET, "/api/**")
 				.permitAll()
