@@ -1,0 +1,25 @@
+# 운영 리버스 프록시 + SPA 정적 서빙 + 자동 TLS(Let's Encrypt).
+# DOMAIN 은 docker-compose.prod.yml 이 컨테이너에 환경변수로 넣어준다 (.env 의 DOMAIN).
+
+{$DOMAIN:localhost} {
+	encode gzip
+
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+
+	# 백엔드로 보낼 경로: API, 카카오 OAuth2, 업로드 파일, 헬스체크
+	@backend path /api/* /oauth2/* /login/* /files/* /actuator/*
+	handle @backend {
+		reverse_proxy backend:8080
+	}
+
+	# 그 외는 SPA — 없는 경로는 index.html 로 폴백 (client-side 라우팅)
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

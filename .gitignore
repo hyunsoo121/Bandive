@@ -16,6 +16,8 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+.env.prod
+!.env.prod.example
 *.pem
 
 # ── Node (frontend) ─────────────────────────────────────────

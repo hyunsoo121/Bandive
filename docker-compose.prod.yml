@@ -1,0 +1,83 @@
+# 운영 배포용. EC2 인스턴스의 /opt/bandive 에 이 파일 + .env 만 두고
+# `docker compose -f docker-compose.prod.yml pull && up -d` 로 기동/갱신한다.
+# 이미지는 로컬에서 빌드하지 않고 GitHub Actions 가 ECR 에 push 한 것을 pull 해서 쓴다.
+services:
+  web:
+    image: ${ECR_REGISTRY}/bandive-frontend:latest
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      # Let's Encrypt 인증서 캐시 — 재배포마다 새로 발급받지 않게 반드시 영속화
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - backend
+
+  backend:
+    image: ${ECR_REGISTRY}/bandive-backend:latest
+    restart: unless-stopped
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/bandive
+      DB_USERNAME: ${DB_USERNAME}
+      DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET}
+      JWT_SECRET: ${JWT_SECRET}
+      APP_CORS_ALLOWED_ORIGINS: https://${DOMAIN}
+      APP_FRONTEND_BASE_URL: https://${DOMAIN}
+      APP_OAUTH2_SUCCESS_REDIRECT: https://${DOMAIN}/oauth/success
+      APP_OAUTH2_FAILURE_REDIRECT: https://${DOMAIN}/oauth/failure
+      APP_STORAGE_LOCAL_DIR: /app/uploads
+      APP_STORAGE_PUBLIC_BASE_URL: https://${DOMAIN}
+      MUSIC_PROVIDER: ${MUSIC_PROVIDER:-itunes}
+      MUSIC_COUNTRY: ${MUSIC_COUNTRY:-US}
+      MUSIC_LOCALIZE_COUNTRY: ${MUSIC_LOCALIZE_COUNTRY:-KR}
+    volumes:
+      - bandive-uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bandive
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      TZ: UTC
+    volumes:
+      - bandive-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d bandive"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - bandive-redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  bandive-pgdata:
+  bandive-redisdata:
+  bandive-uploads:
+  caddy-data:
+  caddy-config:
