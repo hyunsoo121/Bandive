@@ -41,7 +41,7 @@ class BandGuardTest extends RepositoryTest {
 	}
 
 	@Test
-	void 밴드장은_isOwner_와_isMember_모두_참() {
+	void 관리자는_isOwner_와_isMember_모두_참() {
 		Band band = em.persist(Fixtures.band("A"));
 		User owner = em.persist(Fixtures.user("owner"));
 		bandMembers.save(Fixtures.member(band, owner, BandRole.OWNER));

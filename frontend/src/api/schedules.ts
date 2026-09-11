@@ -20,9 +20,24 @@ export const createSchedule = (bandId: string, body: ScheduleCreateBody) =>
 export const updateSchedule = (scheduleId: string, body: Partial<ScheduleCreateBody>) =>
   api.patch<ScheduleDto>(`/api/schedules/${scheduleId}`, body);
 
-/** 일정 삭제 (밴드장). attendances cascade. */
+/** 일정 삭제 (관리자). attendances cascade. */
 export const deleteSchedule = (scheduleId: string) => api.del<void>(`/api/schedules/${scheduleId}`);
 
 /** 내 참석 여부 등록/변경 (밴드 멤버) — upsert. */
 export const setAttendance = (scheduleId: string, status: AttendanceStatusDto) =>
   api.post<ScheduleDto>(`/api/schedules/${scheduleId}/attendance`, { status });
+
+/** 관리자가 특정 멤버의 참석 여부를 대신 등록/변경 — upsert. */
+export const setMemberAttendance = (
+  scheduleId: string,
+  userId: string,
+  status: AttendanceStatusDto,
+) => api.post<ScheduleDto>(`/api/schedules/${scheduleId}/attendance/${userId}`, { status });
+
+/** 관리자가 게스트를 일정에 추가 (이미 있으면 그대로). 게스트는 항상 참석. */
+export const setGuestAttendance = (scheduleId: string, guestId: string) =>
+  api.post<ScheduleDto>(`/api/schedules/${scheduleId}/attendance/guests/${guestId}`);
+
+/** 관리자가 게스트를 일정에서 제외. */
+export const clearGuestAttendance = (scheduleId: string, guestId: string) =>
+  api.del<ScheduleDto>(`/api/schedules/${scheduleId}/attendance/guests/${guestId}`);

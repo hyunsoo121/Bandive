@@ -11,6 +11,8 @@ import com.bandive.bandive.common.exception.ConflictException;
 import com.bandive.bandive.common.exception.ForbiddenException;
 import com.bandive.bandive.common.exception.NotFoundException;
 import com.bandive.bandive.common.exception.ValidationException;
+import com.bandive.bandive.guest.Guest;
+import com.bandive.bandive.guest.GuestRepository;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
 import com.bandive.bandive.song.SongPartRepository;
@@ -52,7 +54,16 @@ class SongServiceTest extends RepositoryTest {
 	private BandMemberRepository bandMembers;
 
 	@Autowired
+	private com.bandive.bandive.follow.BandFollowRepository follows;
+
+	@Autowired
+	private GuestRepository guests;
+
+	@Autowired
 	private UserRepository users;
+
+	@Autowired
+	private com.bandive.bandive.song.folder.SongFolderRepository folders;
 
 	@Autowired
 	private TestEntityManager em;
@@ -67,7 +78,9 @@ class SongServiceTest extends RepositoryTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new SongService(songs, parts, votes, bands, bandMembers, users, new StubMusicSearchService());
+		service = new SongService(songs, parts, votes, bands, bandMembers, guests, users, folders,
+				new StubMusicSearchService(),
+				new com.bandive.bandive.common.security.BandAccessGuard(bands, bandMembers, follows));
 		band = em.persist(Fixtures.band("A"));
 		ownerId = joinMember("owner", BandRole.OWNER);
 		memberId = joinMember("member", BandRole.MEMBER);
@@ -80,7 +93,7 @@ class SongServiceTest extends RepositoryTest {
 	}
 
 	private SongCreateRequest manual(List<SessionSlot> sessions) {
-		return new SongCreateRequest("곡", "아티스트", SongSourceType.MANUAL, null, "메모", null, sessions);
+		return new SongCreateRequest("곡", "아티스트", SongSourceType.MANUAL, null, null, "메모", null, sessions);
 	}
 
 	// ── add ──────────────────────────────────────────────
@@ -107,7 +120,7 @@ class SongServiceTest extends RepositoryTest {
 
 	@Test
 	void SEARCH_인데_트랙id가_없으면_400() {
-		SongCreateRequest req = new SongCreateRequest("곡", "a", SongSourceType.SEARCH, "  ", null, null, null);
+		SongCreateRequest req = new SongCreateRequest("곡", "a", SongSourceType.SEARCH, "  ", null, null, null, null);
 
 		assertThatThrownBy(() -> service.add(band.getId(), memberId, req)).isInstanceOf(ValidationException.class)
 			.satisfies(ex -> assertThat(((ValidationException) ex).getCode()).isEqualTo("EXTERNAL_TRACK_ID_REQUIRED"));
@@ -157,7 +170,7 @@ class SongServiceTest extends RepositoryTest {
 	// ── confirm ──────────────────────────────────────────
 
 	@Test
-	void 밴드장은_곡을_확정한다() {
+	void 관리자는_곡을_확정한다() {
 		Long songId = service.add(band.getId(), memberId, manual(null)).id();
 		em.flush();
 
@@ -183,7 +196,7 @@ class SongServiceTest extends RepositoryTest {
 		em.flush();
 		Long partId = parts.findAllBySongId(songId).getFirst().getId();
 
-		assertThatThrownBy(() -> service.assignPart(songId, partId, memberId, memberId))
+		assertThatThrownBy(() -> service.assignPart(songId, partId, memberId, memberId, null))
 			.isInstanceOf(ConflictException.class)
 			.satisfies(ex -> assertThat(((ConflictException) ex).getCode()).isEqualTo("SONG_NOT_CONFIRMED"));
 	}
@@ -196,11 +209,42 @@ class SongServiceTest extends RepositoryTest {
 		service.confirm(songId, ownerId);
 		em.flush();
 
-		SongResponse assigned = service.assignPart(songId, partId, memberId, memberId);
+		SongResponse assigned = service.assignPart(songId, partId, memberId, memberId, null);
 		assertThat(assigned.parts().getFirst().assignedUserId()).isEqualTo(memberId);
 
-		SongResponse cleared = service.assignPart(songId, partId, memberId, null);
+		SongResponse cleared = service.assignPart(songId, partId, memberId, null, null);
 		assertThat(cleared.parts().getFirst().assignedUserId()).isNull();
+	}
+
+	@Test
+	void 게스트를_파트에_배정하면_멤버_배정은_비워진다() {
+		Long songId = service.add(band.getId(), memberId, manual(List.of(new SessionSlot("GUITAR", 1)))).id();
+		em.flush();
+		Long partId = parts.findAllBySongId(songId).getFirst().getId();
+		service.confirm(songId, ownerId);
+		Guest guest = em.persist(Fixtures.guest(band, "세션 기타"));
+		em.flush();
+
+		SongResponse assigned = service.assignPart(songId, partId, memberId, null, guest.getId());
+		assertThat(assigned.parts().getFirst().assignedGuestId()).isEqualTo(guest.getId());
+		assertThat(assigned.parts().getFirst().assignedName()).isEqualTo("세션 기타");
+
+		SongResponse toMember = service.assignPart(songId, partId, memberId, memberId, null);
+		assertThat(toMember.parts().getFirst().assignedGuestId()).isNull();
+		assertThat(toMember.parts().getFirst().assignedUserId()).isEqualTo(memberId);
+	}
+
+	@Test
+	void 멤버와_게스트를_동시에_배정하면_400() {
+		Long songId = service.add(band.getId(), memberId, manual(List.of(new SessionSlot("GUITAR", 1)))).id();
+		service.confirm(songId, ownerId);
+		Guest guest = em.persist(Fixtures.guest(band, "세션"));
+		em.flush();
+		Long partId = parts.findAllBySongId(songId).getFirst().getId();
+
+		assertThatThrownBy(() -> service.assignPart(songId, partId, memberId, memberId, guest.getId()))
+			.isInstanceOf(ValidationException.class)
+			.satisfies(ex -> assertThat(((ValidationException) ex).getCode()).isEqualTo("PART_ASSIGN_AMBIGUOUS"));
 	}
 
 	@Test
@@ -211,7 +255,7 @@ class SongServiceTest extends RepositoryTest {
 		Long partId = parts.findAllBySongId(songId).getFirst().getId();
 		Long outsiderId = em.persist(Fixtures.user("out2")).getId();
 
-		assertThatThrownBy(() -> service.assignPart(songId, partId, memberId, outsiderId))
+		assertThatThrownBy(() -> service.assignPart(songId, partId, memberId, outsiderId, null))
 			.isInstanceOf(NotFoundException.class)
 			.satisfies(ex -> assertThat(((NotFoundException) ex).getCode()).isEqualTo("MEMBER_NOT_FOUND"));
 	}
@@ -219,7 +263,7 @@ class SongServiceTest extends RepositoryTest {
 	// ── delete ───────────────────────────────────────────
 
 	@Test
-	void 밴드장은_곡을_삭제하고_파트_투표도_함께_사라진다() {
+	void 관리자는_곡을_삭제하고_파트_투표도_함께_사라진다() {
 		Long songId = service.add(band.getId(), memberId, manual(List.of(new SessionSlot("GUITAR", 1)))).id();
 		service.vote(songId, memberId);
 		em.flush();
@@ -240,6 +284,91 @@ class SongServiceTest extends RepositoryTest {
 		em.flush();
 
 		assertThatThrownBy(() -> service.delete(songId, memberId)).isInstanceOf(ForbiddenException.class);
+	}
+
+	// ── folder ───────────────────────────────────────────
+
+	@Test
+	void 곡을_같은_status_폴더로만_옮길_수_있고_멤버_누구나_가능() {
+		Long songId = service.add(band.getId(), memberId, manual(null)).id();
+		Long outsiderId = users.save(Fixtures.user("outsider")).getId();
+		com.bandive.bandive.song.folder.SongFolder wishFolder = em
+			.persist(com.bandive.bandive.song.folder.SongFolder.builder()
+				.band(band)
+				.name("커버")
+				.status(SongStatus.WISHLIST)
+				.position(0)
+				.build());
+		com.bandive.bandive.song.folder.SongFolder confFolder = em
+			.persist(com.bandive.bandive.song.folder.SongFolder.builder()
+				.band(band)
+				.name("정규")
+				.status(SongStatus.CONFIRMED)
+				.position(0)
+				.build());
+		em.flush();
+
+		// 밴드 멤버가 아니면 막힌다
+		assertThatThrownBy(() -> service.moveToFolder(songId, outsiderId, wishFolder.getId()))
+			.isInstanceOf(ForbiddenException.class);
+
+		// 관리자가 아닌 일반 멤버도 옮길 수 있다
+		assertThat(service.moveToFolder(songId, memberId, wishFolder.getId()).folderId()).isEqualTo(wishFolder.getId());
+
+		// WISHLIST 곡을 CONFIRMED 폴더로는 못 옮긴다
+		assertThatThrownBy(() -> service.moveToFolder(songId, memberId, confFolder.getId()))
+			.isInstanceOf(com.bandive.bandive.common.exception.ValidationException.class);
+
+		// null 이면 미분류
+		assertThat(service.moveToFolder(songId, memberId, null).folderId()).isNull();
+	}
+
+	@Test
+	void 그룹_안_곡_순서를_통째로_재지정한다() {
+		Long a = service.add(band.getId(), memberId, manual(null)).id();
+		Long b = service.add(band.getId(), memberId, manual(null)).id();
+		Long c = service.add(band.getId(), memberId, manual(null)).id();
+		em.flush();
+		em.clear();
+
+		// 처음엔 추가순 0,1,2
+		assertThat(positionsById()).containsEntry(a, 0).containsEntry(b, 1).containsEntry(c, 2);
+
+		service.reorder(band.getId(), memberId,
+				new com.bandive.bandive.song.dto.SongOrderRequest(SongStatus.WISHLIST, null, List.of(c, a, b)));
+		em.flush();
+		em.clear();
+
+		assertThat(positionsById()).containsEntry(c, 0).containsEntry(a, 1).containsEntry(b, 2);
+
+		// 그룹의 곡 집합과 다르면 거부
+		assertThatThrownBy(() -> service.reorder(band.getId(), memberId,
+				new com.bandive.bandive.song.dto.SongOrderRequest(SongStatus.WISHLIST, null, List.of(a, b))))
+			.isInstanceOf(com.bandive.bandive.common.exception.ValidationException.class);
+	}
+
+	private java.util.Map<Long, Integer> positionsById() {
+		return songs.findAllByBandId(band.getId())
+			.stream()
+			.collect(java.util.stream.Collectors.toMap(com.bandive.bandive.song.Song::getId,
+					com.bandive.bandive.song.Song::getPosition));
+	}
+
+	@Test
+	void 승격하면_폴더에서_빠진다() {
+		Long songId = service.add(band.getId(), memberId, manual(null)).id();
+		com.bandive.bandive.song.folder.SongFolder folder = em
+			.persist(com.bandive.bandive.song.folder.SongFolder.builder()
+				.band(band)
+				.name("커버")
+				.status(SongStatus.WISHLIST)
+				.position(0)
+				.build());
+		em.flush();
+		service.moveToFolder(songId, ownerId, folder.getId());
+		em.flush();
+
+		assertThat(service.confirm(songId, ownerId).folderId()).isNull();
 	}
 
 }

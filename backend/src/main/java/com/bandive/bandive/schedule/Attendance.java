@@ -11,9 +11,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 
 import com.bandive.bandive.common.entity.BaseTimeEntity;
+import com.bandive.bandive.guest.Guest;
 import com.bandive.bandive.user.User;
 
 import lombok.AccessLevel;
@@ -22,10 +22,13 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+/**
+ * 한 일정에 대한 참석. 대상은 실멤버({@code user}) 또는 게스트({@code guest}) 중 정확히 하나 (DB 부분 유니크 + CHECK
+ * 제약이 배타성을 보장). 게스트는 관리자가 일정에 추가하며 항상 {@code ATTENDING} 이다.
+ */
 @Getter
 @Entity
-@Table(name = "attendances",
-		uniqueConstraints = @UniqueConstraint(name = "uq_attendance", columnNames = { "schedule_id", "user_id" }))
+@Table(name = "attendances")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
@@ -39,9 +42,13 @@ public class Attendance extends BaseTimeEntity {
 	@JoinColumn(name = "schedule_id", nullable = false)
 	private Schedule schedule;
 
-	@ManyToOne(fetch = FetchType.LAZY, optional = false)
-	@JoinColumn(name = "user_id", nullable = false)
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "user_id")
 	private User user;
+
+	@ManyToOne(fetch = FetchType.LAZY)
+	@JoinColumn(name = "guest_id")
+	private Guest guest;
 
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)

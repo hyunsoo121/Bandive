@@ -20,7 +20,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -45,7 +47,7 @@ class AuthControllerTest extends IntegrationTest {
 
 	@BeforeEach
 	void setUp() {
-		userId = users.save(User.builder().kakaoId("kakao-" + UUID.randomUUID()).nickname("테스터").build()).getId();
+		userId = users.save(User.ofKakao("kakao-" + UUID.randomUUID(), "테스터")).getId();
 	}
 
 	@AfterEach
@@ -109,7 +111,153 @@ class AuthControllerTest extends IntegrationTest {
 		mvc.perform(get("/api/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + access))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.id").value(userId))
-			.andExpect(jsonPath("$.nickname").value("테스터"));
+			.andExpect(jsonPath("$.nickname").value("테스터"))
+			.andExpect(jsonPath("$.provider").value("KAKAO"))
+			.andExpect(jsonPath("$.avatarUrl").value(org.hamcrest.Matchers.nullValue()));
+	}
+
+	@Test
+	void 프로필_사진을_지운다() throws Exception {
+		users.findById(userId).ifPresent(u -> {
+			u.updateAvatar("/files/avatars/x.png");
+			users.save(u);
+		});
+		String access = jwtProvider.createAccessToken(userId);
+
+		mvc.perform(delete("/api/auth/me/avatar").header(HttpHeaders.AUTHORIZATION, "Bearer " + access))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.avatarUrl").value(org.hamcrest.Matchers.nullValue()));
+
+		assertThat(users.findById(userId).orElseThrow().getAvatarUrl()).isNull();
+	}
+
+	@Test
+	void 닉네임을_수정한다() throws Exception {
+		String access = jwtProvider.createAccessToken(userId);
+
+		mvc.perform(patch("/api/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + access)
+			.contentType("application/json")
+			.content("{\"nickname\":\"  새이름  \"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.nickname").value("새이름"));
+
+		assertThat(users.findById(userId).orElseThrow().getNickname()).isEqualTo("새이름");
+	}
+
+	@Test
+	void 빈_닉네임은_400() throws Exception {
+		String access = jwtProvider.createAccessToken(userId);
+
+		mvc.perform(patch("/api/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + access)
+			.contentType("application/json")
+			.content("{\"nickname\":\"   \"}")).andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void 카카오_계정은_비밀번호를_바꿀_수_없다() throws Exception {
+		String access = jwtProvider.createAccessToken(userId);
+
+		mvc.perform(patch("/api/auth/me/password").header(HttpHeaders.AUTHORIZATION, "Bearer " + access)
+			.contentType("application/json")
+			.content("{\"currentPassword\":\"x\",\"newPassword\":\"newpass12\"}"))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("PASSWORD_CHANGE_UNSUPPORTED"));
+	}
+
+	@Test
+	void 이메일_계정_비밀번호_변경_흐름() throws Exception {
+		String email = "pw-" + UUID.randomUUID() + "@example.com";
+		String access = mvcSignup(email, "pass1234", "비번유저");
+		Long id = users.findByEmail(email).orElseThrow().getId();
+
+		// 현재 비밀번호가 틀리면 400
+		mvc.perform(patch("/api/auth/me/password").header(HttpHeaders.AUTHORIZATION, "Bearer " + access)
+			.contentType("application/json")
+			.content("{\"currentPassword\":\"wrongpass1\",\"newPassword\":\"newpass12\"}"))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("CURRENT_PASSWORD_MISMATCH"));
+
+		// 맞으면 204, 새 비밀번호로 로그인 가능
+		mvc.perform(patch("/api/auth/me/password").header(HttpHeaders.AUTHORIZATION, "Bearer " + access)
+			.contentType("application/json")
+			.content("{\"currentPassword\":\"pass1234\",\"newPassword\":\"newpass12\"}"))
+			.andExpect(status().isNoContent());
+
+		mvc.perform(post("/api/auth/login").contentType("application/json")
+			.content("{\"email\":\"" + email + "\",\"password\":\"newpass12\"}")).andExpect(status().isOk());
+
+		refreshTokenStore.delete(id);
+		users.deleteById(id);
+	}
+
+	private String mvcSignup(String email, String password, String nickname) throws Exception {
+		String json = mvc
+			.perform(post("/api/auth/signup").contentType("application/json")
+				.content("{\"email\":\"" + email + "\",\"password\":\"" + password + "\",\"nickname\":\"" + nickname
+						+ "\"}"))
+			.andExpect(status().isCreated())
+			.andReturn()
+			.getResponse()
+			.getContentAsString();
+		return json.replaceAll(".*\"accessToken\"\\s*:\\s*\"([^\"]+)\".*", "$1");
+	}
+
+	@Test
+	void 이메일_회원가입은_201_과_access_토큰_그리고_refresh_쿠키() throws Exception {
+		String email = "signup-" + UUID.randomUUID() + "@example.com";
+
+		mvc.perform(post("/api/auth/signup").contentType("application/json")
+			.content("{\"email\":\"" + email + "\",\"password\":\"pass1234\",\"nickname\":\"이메일가입자\"}"))
+			.andExpect(status().isCreated())
+			.andExpect(jsonPath("$.accessToken").isNotEmpty())
+			.andExpect(cookie().exists(CookieUtils.REFRESH_COOKIE));
+
+		User created = users.findByEmail(email).orElseThrow();
+		assertThat(created.getPasswordHash()).isNotBlank().isNotEqualTo("pass1234");
+		users.deleteById(created.getId());
+	}
+
+	@Test
+	void 약한_비밀번호는_400() throws Exception {
+		mvc.perform(post("/api/auth/signup").contentType("application/json")
+			.content("{\"email\":\"weak@example.com\",\"password\":\"onlyletters\",\"nickname\":\"약비번\"}"))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+	}
+
+	@Test
+	void 이미_가입된_이메일이면_409() throws Exception {
+		String email = "dup-" + UUID.randomUUID() + "@example.com";
+		String body = "{\"email\":\"" + email + "\",\"password\":\"pass1234\",\"nickname\":\"먼저\"}";
+		mvc.perform(post("/api/auth/signup").contentType("application/json").content(body))
+			.andExpect(status().isCreated());
+
+		mvc.perform(post("/api/auth/signup").contentType("application/json").content(body))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.code").value("EMAIL_TAKEN"));
+
+		users.findByEmail(email).ifPresent(u -> users.deleteById(u.getId()));
+	}
+
+	@Test
+	void 이메일_로그인_성공과_틀린_비밀번호_401() throws Exception {
+		String email = "login-" + UUID.randomUUID() + "@example.com";
+		mvc.perform(post("/api/auth/signup").contentType("application/json")
+			.content("{\"email\":\"" + email + "\",\"password\":\"pass1234\",\"nickname\":\"로그인유저\"}"))
+			.andExpect(status().isCreated());
+
+		mvc.perform(post("/api/auth/login").contentType("application/json")
+			.content("{\"email\":\"" + email + "\",\"password\":\"pass1234\"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.accessToken").isNotEmpty())
+			.andExpect(cookie().exists(CookieUtils.REFRESH_COOKIE));
+
+		mvc.perform(post("/api/auth/login").contentType("application/json")
+			.content("{\"email\":\"" + email + "\",\"password\":\"wrongpass1\"}"))
+			.andExpect(status().isUnauthorized())
+			.andExpect(jsonPath("$.code").value("LOGIN_FAILED"));
+
+		users.findByEmail(email).ifPresent(u -> users.deleteById(u.getId()));
 	}
 
 }

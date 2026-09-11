@@ -23,6 +23,8 @@ import com.bandive.bandive.auth.UserPrincipal;
 import com.bandive.bandive.song.SongStatus;
 import com.bandive.bandive.song.dto.PartAssignRequest;
 import com.bandive.bandive.song.dto.SongCreateRequest;
+import com.bandive.bandive.song.dto.SongFolderAssignRequest;
+import com.bandive.bandive.song.dto.SongOrderRequest;
 import com.bandive.bandive.song.dto.SongResponse;
 import com.bandive.bandive.song.dto.TrackSearchResult;
 import com.bandive.bandive.song.dto.VoteResult;
@@ -78,7 +80,24 @@ public class SongController {
 	public SongResponse assignPart(@PathVariable Long songId, @PathVariable Long partId, @CurrentUser Long userId,
 			@RequestBody(required = false) PartAssignRequest request) {
 		Long targetUserId = request == null ? null : request.userId();
-		return songService.assignPart(songId, partId, userId, targetUserId);
+		Long targetGuestId = request == null ? null : request.guestId();
+		return songService.assignPart(songId, partId, userId, targetUserId, targetGuestId);
+	}
+
+	/** 곡을 폴더로 이동 (밴드 멤버 누구나). {@code folderId} null 이면 미분류. */
+	@PutMapping("/api/songs/{songId}/folder")
+	public SongResponse moveToFolder(@PathVariable Long songId, @CurrentUser Long userId,
+			@RequestBody(required = false) SongFolderAssignRequest request) {
+		return songService.moveToFolder(songId, userId, request == null ? null : request.folderId());
+	}
+
+	/** 한 그룹 안 곡 순서 재지정 (밴드 멤버 누구나). */
+	@PutMapping("/api/bands/{bandId}/songs/order")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	@PreAuthorize("@bandGuard.isMember(#bandId)")
+	public void reorder(@PathVariable Long bandId, @CurrentUser Long userId,
+			@Valid @RequestBody SongOrderRequest request) {
+		songService.reorder(bandId, userId, request);
 	}
 
 	@DeleteMapping("/api/songs/{songId}")

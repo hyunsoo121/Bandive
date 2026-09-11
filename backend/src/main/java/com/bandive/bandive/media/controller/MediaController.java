@@ -20,7 +20,9 @@ import org.springframework.web.bind.annotation.RestController;
 import com.bandive.bandive.auth.CurrentUser;
 import com.bandive.bandive.auth.UserPrincipal;
 import com.bandive.bandive.media.dto.MediaCreateRequest;
+import com.bandive.bandive.media.dto.MediaLikeResult;
 import com.bandive.bandive.media.dto.MediaResponse;
+import com.bandive.bandive.media.dto.MediaUpdateRequest;
 import com.bandive.bandive.media.dto.VisibilityRequest;
 import com.bandive.bandive.media.service.MediaService;
 
@@ -49,6 +51,13 @@ public class MediaController {
 		return mediaService.create(bandId, userId, request);
 	}
 
+	/** 부분 수정 (URL·제목·종류·공개범위·연결일정) — 등록자 본인 또는 관리자. */
+	@PatchMapping("/api/media/{mediaId}")
+	public MediaResponse update(@PathVariable Long mediaId, @CurrentUser Long userId,
+			@Valid @RequestBody MediaUpdateRequest request) {
+		return mediaService.update(mediaId, userId, request);
+	}
+
 	@PatchMapping("/api/media/{mediaId}/visibility")
 	public MediaResponse changeVisibility(@PathVariable Long mediaId, @CurrentUser Long userId,
 			@Valid @RequestBody VisibilityRequest request) {
@@ -59,6 +68,17 @@ public class MediaController {
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void delete(@PathVariable Long mediaId, @CurrentUser Long userId) {
 		mediaService.delete(mediaId, userId);
+	}
+
+	/** 좋아요 — 로그인 필요, 멱등. */
+	@PostMapping("/api/media/{mediaId}/like")
+	public MediaLikeResult like(@PathVariable Long mediaId, @CurrentUser Long userId) {
+		return mediaService.like(mediaId, userId);
+	}
+
+	@DeleteMapping("/api/media/{mediaId}/like")
+	public MediaLikeResult unlike(@PathVariable Long mediaId, @CurrentUser Long userId) {
+		return mediaService.unlike(mediaId, userId);
 	}
 
 }

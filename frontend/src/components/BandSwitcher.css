@@ -53,6 +53,39 @@
 .switcher__create:hover {
   background: var(--color-neutral-100);
 }
+.switcher__links {
+  display: flex;
+  gap: 8px;
+  padding-top: 12px;
+}
+.switcher__link {
+  flex: 1;
+  padding: 9px;
+  border: 1px solid var(--color-neutral-400);
+  background: var(--color-bg);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.switcher__link:hover {
+  border-color: var(--color-text);
+}
+.switcher__account {
+  width: calc(100% + 32px);
+  margin: 12px -16px -16px;
+  padding: 14px 16px;
+  border: 0;
+  border-top: 1px solid var(--color-divider);
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-neutral-700);
+  cursor: pointer;
+  text-align: left;
+}
+.switcher__account:hover {
+  background: var(--color-neutral-100);
+}
 .switcher__plus {
   width: 40px;
   height: 40px;

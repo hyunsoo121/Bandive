@@ -11,6 +11,7 @@ import com.bandive.bandive.common.security.BandGuard;
 import com.bandive.bandive.media.MediaPlatform;
 import com.bandive.bandive.media.MediaType;
 import com.bandive.bandive.media.MediaVisibility;
+import com.bandive.bandive.media.dto.MediaLikeResult;
 import com.bandive.bandive.media.dto.MediaResponse;
 import com.bandive.bandive.media.service.MediaService;
 
@@ -45,9 +46,9 @@ class MediaControllerTest {
 
 	private static final String JSON = "application/json";
 
-	private static final MediaResponse MEDIA = new MediaResponse(5L, 1L, null, MediaType.PERFORMANCE,
-			"https://youtu.be/x", MediaPlatform.YOUTUBE, MediaVisibility.MEMBERS_ONLY, 7L, "나",
-			Instant.parse("2026-09-02T00:00:00Z"));
+	private static final MediaResponse MEDIA = new MediaResponse(5L, 1L, null, null, null, MediaType.PERFORMANCE,
+			"https://youtu.be/x", "공연 영상", MediaPlatform.YOUTUBE, "https://img.youtube.com/vi/x/hqdefault.jpg",
+			MediaVisibility.MEMBERS_ONLY, 7L, "나", 0L, false, Instant.parse("2026-09-02T00:00:00Z"));
 
 	@Autowired
 	private MockMvc mvc;
@@ -119,9 +120,46 @@ class MediaControllerTest {
 	}
 
 	@Test
+	void 부분수정_PATCH() throws Exception {
+		given(mediaService.update(eq(5L), eq(7L), any())).willReturn(MEDIA);
+
+		mvc.perform(patch("/api/media/5").with(asUser(7L))
+			.contentType(JSON)
+			.content("{\"title\":\"새 제목\",\"type\":\"REHEARSAL\"}"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.title").value("공연 영상"));
+	}
+
+	@Test
+	void 부분수정_URL_형식_틀리면_400() throws Exception {
+		mvc.perform(patch("/api/media/5").with(asUser(7L)).contentType(JSON).content("{\"externalUrl\":\"ftp://x\"}"))
+			.andExpect(status().isBadRequest());
+	}
+
+	@Test
 	void 삭제는_204() throws Exception {
 		mvc.perform(delete("/api/media/5").with(asUser(7L))).andExpect(status().isNoContent());
 		then(mediaService).should().delete(5L, 7L);
+	}
+
+	@Test
+	void 좋아요는_로그인하면_카운트를_돌려준다() throws Exception {
+		given(mediaService.like(5L, 7L)).willReturn(new MediaLikeResult(3L, true));
+
+		mvc.perform(post("/api/media/5/like").with(asUser(7L)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.likeCount").value(3))
+			.andExpect(jsonPath("$.likedByMe").value(true));
+	}
+
+	@Test
+	void 좋아요_취소() throws Exception {
+		given(mediaService.unlike(5L, 7L)).willReturn(new MediaLikeResult(2L, false));
+
+		mvc.perform(delete("/api/media/5/like").with(asUser(7L)))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.likeCount").value(2))
+			.andExpect(jsonPath("$.likedByMe").value(false));
 	}
 
 	@TestConfiguration

@@ -40,6 +40,9 @@ class BandServiceTest extends RepositoryTest {
 	private BandMemberRepository bandMembers;
 
 	@Autowired
+	private com.bandive.bandive.follow.BandFollowRepository follows;
+
+	@Autowired
 	private UserRepository users;
 
 	@Autowired
@@ -56,14 +59,14 @@ class BandServiceTest extends RepositoryTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new BandService(bands, bandMembers, users, storage, inviteCodes, inviteCodeCache);
+		service = new BandService(bands, bandMembers, users, storage, inviteCodes, inviteCodeCache, follows);
 	}
 
 	@Test
 	void 밴드를_만들면_생성자가_OWNER_멤버로_등록된다() {
 		Long userId = em.persist(Fixtures.user("owner")).getId();
 
-		BandResponse created = service.create(userId, new BandCreateRequest("자립음악", "인디 밴드"));
+		BandResponse created = service.create(userId, new BandCreateRequest("자립음악", "인디 밴드", null));
 		em.flush();
 		em.clear();
 
@@ -77,34 +80,81 @@ class BandServiceTest extends RepositoryTest {
 
 	@Test
 	void 없는_유저로_생성하면_404() {
-		assertThatThrownBy(() -> service.create(999L, new BandCreateRequest("x", null)))
+		assertThatThrownBy(() -> service.create(999L, new BandCreateRequest("x", null, null)))
 			.isInstanceOf(NotFoundException.class);
 	}
 
 	@Test
 	void 없는_밴드_조회는_404() {
-		assertThatThrownBy(() -> service.get(999L)).isInstanceOf(NotFoundException.class)
+		assertThatThrownBy(() -> service.get(999L, null)).isInstanceOf(NotFoundException.class)
 			.satisfies(ex -> assertThat(((NotFoundException) ex).getCode()).isEqualTo("BAND_NOT_FOUND"));
+	}
+
+	@Test
+	void PRIVATE_밴드는_비멤버에게_404_로_숨긴다() {
+		Long ownerId = em.persist(Fixtures.user("o")).getId();
+		Long strangerId = em.persist(Fixtures.user("x")).getId();
+		Long bandId = service
+			.create(ownerId, new BandCreateRequest("비공개팀", null, com.bandive.bandive.band.BandVisibility.PRIVATE))
+			.id();
+		em.flush();
+		em.clear();
+
+		assertThat(service.get(bandId, ownerId).myRelation()).isEqualTo(com.bandive.bandive.band.MyRelation.MEMBER);
+		assertThatThrownBy(() -> service.get(bandId, strangerId)).isInstanceOf(NotFoundException.class);
+		assertThatThrownBy(() -> service.get(bandId, null)).isInstanceOf(NotFoundException.class);
+	}
+
+	@Test
+	void FOLLOWERS_밴드_myRelation_은_팔로우_상태를_반영한다() {
+		Long ownerId = em.persist(Fixtures.user("o")).getId();
+		User fan = em.persist(Fixtures.user("fan"));
+		Long bandId = service
+			.create(ownerId, new BandCreateRequest("팬클럽", null, com.bandive.bandive.band.BandVisibility.FOLLOWERS))
+			.id();
+		em.flush();
+
+		assertThat(service.get(bandId, fan.getId()).myRelation()).isEqualTo(com.bandive.bandive.band.MyRelation.NONE);
+
+		follows.save(com.bandive.bandive.follow.BandFollow.builder()
+			.band(bands.findById(bandId).orElseThrow())
+			.user(fan)
+			.status(com.bandive.bandive.follow.FollowStatus.PENDING)
+			.build());
+		em.flush();
+		em.clear();
+		assertThat(service.get(bandId, fan.getId()).myRelation())
+			.isEqualTo(com.bandive.bandive.band.MyRelation.PENDING);
+	}
+
+	@Test
+	void 공개범위_변경은_밴드에_반영된다() {
+		Long ownerId = em.persist(Fixtures.user("o")).getId();
+		Long bandId = service.create(ownerId, new BandCreateRequest("팀", null, null)).id();
+		em.flush();
+
+		BandResponse updated = service.updateVisibility(bandId, com.bandive.bandive.band.BandVisibility.FOLLOWERS);
+		assertThat(updated.visibility()).isEqualTo(com.bandive.bandive.band.BandVisibility.FOLLOWERS);
 	}
 
 	@Test
 	void 상세_조회는_멤버수를_포함한다() {
 		Long ownerId = em.persist(Fixtures.user("o")).getId();
-		Long bandId = service.create(ownerId, new BandCreateRequest("팀", null)).id();
+		Long bandId = service.create(ownerId, new BandCreateRequest("팀", null, null)).id();
 		User second = em.persist(Fixtures.user("m"));
 		bandMembers.save(Fixtures.member(bands.findById(bandId).orElseThrow(), second, BandRole.MEMBER));
 		em.flush();
 		em.clear();
 
-		assertThat(service.get(bandId).memberCount()).isEqualTo(2);
+		assertThat(service.get(bandId, ownerId).memberCount()).isEqualTo(2);
 	}
 
 	@Test
 	void 내_밴드_목록은_내가_속한_것만() {
 		Long meId = em.persist(Fixtures.user("me")).getId();
 		Long otherId = em.persist(Fixtures.user("other")).getId();
-		service.create(meId, new BandCreateRequest("내밴드", null));
-		service.create(otherId, new BandCreateRequest("남의밴드", null));
+		service.create(meId, new BandCreateRequest("내밴드", null, null));
+		service.create(otherId, new BandCreateRequest("남의밴드", null, null));
 		em.flush();
 		em.clear();
 
@@ -115,7 +165,7 @@ class BandServiceTest extends RepositoryTest {
 	@Test
 	void 정보_수정은_이름과_소개를_바꾼다() {
 		Long ownerId = em.persist(Fixtures.user("o")).getId();
-		Long bandId = service.create(ownerId, new BandCreateRequest("옛이름", "옛소개")).id();
+		Long bandId = service.create(ownerId, new BandCreateRequest("옛이름", "옛소개", null)).id();
 		em.flush();
 
 		BandResponse updated = service.update(bandId, new BandUpdateRequest("새이름", "새소개"));
@@ -127,7 +177,7 @@ class BandServiceTest extends RepositoryTest {
 	@Test
 	void 로고_업로드는_URL_을_저장하고_이전_파일을_지운다() {
 		Long ownerId = em.persist(Fixtures.user("o")).getId();
-		Long bandId = service.create(ownerId, new BandCreateRequest("팀", null)).id();
+		Long bandId = service.create(ownerId, new BandCreateRequest("팀", null, null)).id();
 		em.flush();
 
 		service.updateLogo(bandId, dummyFile());
@@ -142,7 +192,7 @@ class BandServiceTest extends RepositoryTest {
 	@Test
 	void 위임하면_역할이_뒤바뀐다() {
 		Long ownerId = em.persist(Fixtures.user("o")).getId();
-		Long bandId = service.create(ownerId, new BandCreateRequest("팀", null)).id();
+		Long bandId = service.create(ownerId, new BandCreateRequest("팀", null, null)).id();
 		User next = em.persist(Fixtures.user("n"));
 		bandMembers.save(Fixtures.member(bands.findById(bandId).orElseThrow(), next, BandRole.MEMBER));
 		em.flush();
@@ -160,7 +210,7 @@ class BandServiceTest extends RepositoryTest {
 	@Test
 	void 위임_대상이_멤버가_아니면_404() {
 		Long ownerId = em.persist(Fixtures.user("o")).getId();
-		Long bandId = service.create(ownerId, new BandCreateRequest("팀", null)).id();
+		Long bandId = service.create(ownerId, new BandCreateRequest("팀", null, null)).id();
 		em.flush();
 
 		assertThatThrownBy(() -> service.transferOwnership(bandId, ownerId, 999L))
@@ -170,7 +220,7 @@ class BandServiceTest extends RepositoryTest {
 	@Test
 	void 삭제하면_밴드와_하위_멤버_초대가_사라지고_파일_Redis_를_정리한다() {
 		Long ownerId = em.persist(Fixtures.user("o")).getId();
-		Long bandId = service.create(ownerId, new BandCreateRequest("팀", null)).id();
+		Long bandId = service.create(ownerId, new BandCreateRequest("팀", null, null)).id();
 		bands.findById(bandId).orElseThrow().changeLogo("http://localhost:8081/files/band-logo/x.png");
 		inviteCodes.save(InviteCode.builder().band(bands.findById(bandId).orElseThrow()).code("DELCODE1").build());
 		em.flush();

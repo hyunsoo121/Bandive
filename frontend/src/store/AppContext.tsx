@@ -11,6 +11,10 @@ import { useNavigate } from 'react-router-dom';
 import type {
   AttendanceStatus,
   Band,
+  BandVisibility,
+  Follower,
+  FollowingBand,
+  Guest,
   MediaItem,
   MediaKind,
   Member,
@@ -19,18 +23,34 @@ import type {
   ScheduleType,
   SessionShape,
   Song,
+  SongFolder,
   SourceType,
   User,
   Visibility,
 } from '../types';
+import { ApiError } from '../api/types';
 import * as authApi from '../api/auth';
 import * as bandApi from '../api/bands';
 import * as inviteApi from '../api/invites';
 import * as memberApi from '../api/members';
+import * as guestApi from '../api/guests';
+import * as followApi from '../api/follow';
 import * as songApi from '../api/songs';
+import * as songFolderApi from '../api/songFolders';
 import * as scheduleApi from '../api/schedules';
 import * as mediaApi from '../api/media';
-import { toBand, toMedia, toMember, toSchedule, toSong, toUser } from '../api/mappers';
+import {
+  toBand,
+  toFollower,
+  toFollowingBand,
+  toGuest,
+  toMedia,
+  toMember,
+  toSchedule,
+  toSong,
+  toSongFolder,
+  toUser,
+} from '../api/mappers';
 import { ATT_TO_EN, byDateAsc } from '../lib/schedule';
 
 export interface NewSongInput {
@@ -40,6 +60,8 @@ export interface NewSongInput {
   sourceType: SourceType;
   /** SEARCH 일 때 검색 결과의 트랙 식별자 (백엔드 필수) */
   externalTrackId?: string | null;
+  /** SEARCH 일 때 앨범 커버 URL */
+  artworkUrl?: string | null;
   memo: string;
   referenceVideoUrl: string;
   sessions: SessionShape;
@@ -48,10 +70,23 @@ export interface NewSongInput {
 export interface NewMediaInput {
   bandId: string;
   url: string;
+  /** 사용자가 붙인 제목 (선택) */
+  title: string;
   kind: MediaKind;
   visibility: Visibility;
   /** 연결할 일정 id. 없으면 null */
   scheduleId: string | null;
+  /** 연결할 합주곡 id. 없으면 null */
+  songId: string | null;
+}
+
+export interface EditMediaInput {
+  url: string;
+  title: string;
+  kind: MediaKind;
+  visibility: Visibility;
+  scheduleId: string | null;
+  songId: string | null;
 }
 
 export interface NewScheduleInput {
@@ -62,7 +97,7 @@ export interface NewScheduleInput {
   location: string;
 }
 
-/** 현재 밴드의 초대 코드 (밴드장이 발급/재발급한 뒤에만 채워진다 — 조회 전용 API 가 없어서). */
+/** 현재 밴드의 초대 코드 (관리자가 발급/재발급한 뒤에만 채워진다 — 조회 전용 API 가 없어서). */
 export interface InviteInfo {
   code: string;
   url: string;
@@ -80,6 +115,8 @@ interface AppState {
   currentBandId: string | null;
   /** 현재 밴드 상세 (GET /api/bands/{id}). 로딩 중이거나 없으면 null */
   currentBand: Band | null;
+  /** 밴드 표지는 봤지만 콘텐츠는 게이트됨 (FOLLOWERS 밴드에 팔로우 안 함) — 화면은 RestrictedBandView */
+  bandRestricted: boolean;
   /** 세션 복구(첫 refresh) 진행 중 */
   bootLoading: boolean;
   /** 현재 밴드 상세/멤버/콘텐츠 로딩 중 */
@@ -92,15 +129,20 @@ interface AppState {
   switcherOpen: boolean;
   loginOpen: boolean;
   createOpen: boolean;
+  profileOpen: boolean;
 
   /** 현재 밴드 곡 (GET /api/bands/{id}/songs) */
   songs: Song[];
+  /** 현재 밴드 곡 폴더 (GET /api/bands/{id}/song-folders), status·position 순 */
+  songFolders: SongFolder[];
   /** 현재 밴드 일정 (GET /api/bands/{id}/schedules), dateTime 오름차순 */
   schedules: ScheduleEvent[];
   /** 현재 밴드 영상 (GET /api/bands/{id}/media) */
   media: MediaItem[];
   /** 현재 밴드 멤버 (GET /api/bands/{id}/members) */
   members: Member[];
+  /** 현재 밴드 게스트 멤버 (GET /api/bands/{id}/guests), 이름순 */
+  guests: Guest[];
   /** 현재 밴드 초대 코드 (발급 후에만) */
   invite: InviteInfo | null;
 
@@ -108,38 +150,136 @@ interface AppState {
   setDevRole: (role: Role | null) => void;
   /** 카카오 로그인 시작 (페이지 이동) */
   login: () => void;
+  /** 이메일 로그인 — 성공 시 세션 반영 + 로그인 모달 닫힘 */
+  emailLogin: (email: string, password: string) => Promise<void>;
+  /** 이메일 회원가입 — 성공 시 바로 로그인 상태 */
+  signup: (email: string, password: string, nickname: string) => Promise<void>;
   logout: () => void;
-  /** 밴드 생성 → 내 밴드에 추가하고 해당 밴드로 이동 */
-  createBand: (name: string) => Promise<void>;
+  /** 내 닉네임 수정 (PATCH /api/auth/me) */
+  updateProfile: (nickname: string, bio: string) => Promise<void>;
+  /** 프로필 사진 업로드/교체 */
+  uploadAvatar: (file: File) => Promise<void>;
+  /** 프로필 사진 제거 */
+  removeAvatar: () => Promise<void>;
+  /** 비밀번호 변경 (이메일 로그인 계정만) */
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  /** 밴드 생성 → 내 밴드에 추가하고 해당 밴드로 이동. visibility 생략 시 PUBLIC */
+  createBand: (name: string, visibility?: BandVisibility) => Promise<void>;
   /** 초대 코드로 가입 → 가입한 밴드 반환 */
   joinByInvite: (code: string) => Promise<Band>;
+  /** 밴드 이름·소개 수정 (관리자) */
+  updateBand: (name: string, description: string | null) => Promise<void>;
+  /** 밴드 공개범위 변경 (관리자) */
+  updateBandVisibility: (visibility: BandVisibility) => Promise<void>;
+  /** 이 밴드에 팔로우 요청 (FOLLOWERS 밴드, 로그인 필요) → myRelation PENDING */
+  requestFollow: () => Promise<void>;
+  /** 팔로우 요청 취소 / 언팔로우 → myRelation NONE */
+  cancelFollow: () => Promise<void>;
+  /** 현재 밴드의 승인 대기 팔로워 (관리자만 채워짐) */
+  pendingFollowers: Follower[];
+  /** 현재 밴드의 승인된 팔로워 (관리자만 채워짐) */
+  approvedFollowers: Follower[];
+  /** 팔로워 목록(대기 + 승인) 다시 불러오기 (관리자) */
+  refreshFollowers: () => Promise<void>;
+  /** 팔로우 요청 승인 (관리자) → 대기 → 승인 목록으로 이동 */
+  approveFollower: (userId: string) => Promise<void>;
+  /** 팔로우 요청 거절 (관리자) */
+  rejectFollower: (userId: string) => Promise<void>;
+  /** 승인된 팔로워 내보내기 (관리자) */
+  removeFollower: (userId: string) => Promise<void>;
+  /** 내가 팔로우한 밴드 (탐색 > 팔로잉). 로그인 유저만 */
+  following: FollowingBand[];
+  followingLoading: boolean;
+  /** 내 팔로잉 목록 다시 불러오기 */
+  refreshFollowing: () => Promise<void>;
+  /** 팔로우 취소 / 언팔로우 (밴드 지정) → following 목록에서 제거 */
+  unfollowBand: (bandId: string) => Promise<void>;
+  /** 관리자 위임 (관리자) */
+  transferOwnership: (userId: string) => Promise<void>;
+  /** 밴드 삭제 (관리자) → 홈으로 */
+  deleteBand: () => Promise<void>;
+  /** 밴드 탈퇴 (일반 멤버) → 홈으로. 관리자는 불가(위임/삭제 먼저) */
+  leaveBand: () => Promise<void>;
+  /** 밴드 로고 이미지 업로드 (관리자) */
+  uploadBandLogo: (file: File) => Promise<void>;
+  /** 밴드 배너 이미지 업로드 (관리자) */
+  uploadBandBanner: (file: File) => Promise<void>;
 
   /** 투표 토글 (POST/DELETE /api/songs/{id}/vote) */
   voteSong: (songId: string) => Promise<void>;
   /** 위시리스트 → 합주곡 승격 (PATCH /api/songs/{id}/confirm) */
   promoteSong: (songId: string) => Promise<void>;
-  /** 파트 슬롯 배정/해제 (PUT /api/songs/{id}/parts/{partId}/assign) */
-  assignPart: (songId: string, slotKey: string, memberName: string) => Promise<void>;
+  /**
+   * 파트 슬롯 배정/해제 (PUT /api/songs/{id}/parts/{partId}/assign).
+   * 실멤버는 `{ userId }`, 게스트는 `{ guestId }`, 해제는 null.
+   */
+  assignPart: (
+    songId: string,
+    slotKey: string,
+    assignee: { userId: string } | { guestId: string } | null,
+  ) => Promise<void>;
   /** 곡 추가 (POST /api/bands/{id}/songs) */
   addSong: (input: NewSongInput) => Promise<void>;
-  /** 곡 삭제 (밴드장) */
+  /** 곡 삭제 (관리자) */
   removeSong: (songId: string) => Promise<void>;
+  /** 곡을 폴더로 이동 (멤버 누구나). folderId null = 미분류. 대상 그룹 맨 끝으로 */
+  moveSongToFolder: (songId: string, folderId: string | null) => Promise<void>;
+  /** 한 그룹(status × 폴더/미분류) 안 곡 순서 재지정 (멤버 누구나) */
+  reorderSongs: (
+    status: Song['status'],
+    folderId: string | null,
+    songIds: string[],
+  ) => Promise<void>;
+  /** 곡 폴더 생성 (관리자) */
+  createSongFolder: (name: string, status: Song['status']) => Promise<void>;
+  /** 곡 폴더 이름 변경 (관리자) */
+  renameSongFolder: (folderId: string, name: string) => Promise<void>;
+  /** 곡 폴더 삭제 (관리자) — 소속 곡은 미분류로 */
+  removeSongFolder: (folderId: string) => Promise<void>;
+  /** 한 status 안에서 폴더 순서 재지정 (관리자) */
+  reorderSongFolders: (status: Song['status'], folderIds: string[]) => Promise<void>;
 
   /** 일정 등록 (POST /api/bands/{id}/schedules) */
   addSchedule: (input: NewScheduleInput) => Promise<void>;
-  /** 일정 삭제 (밴드장) */
+  /** 일정 삭제 (관리자) */
   removeSchedule: (scheduleId: string) => Promise<void>;
   /** 내 참석 여부 등록/변경 (POST /api/schedules/{id}/attendance) */
   setAttendance: (scheduleId: string, status: AttendanceStatus) => Promise<void>;
+  /** 관리자가 특정 멤버의 참석 여부를 대신 등록/변경 */
+  setMemberAttendance: (
+    scheduleId: string,
+    userId: string,
+    status: AttendanceStatus,
+  ) => Promise<void>;
+  /** 관리자가 게스트를 일정에 추가 (이미 있으면 그대로). 게스트는 항상 참석 */
+  setGuestAttendance: (scheduleId: string, guestId: string) => Promise<void>;
+  /** 관리자가 게스트를 일정에서 제외 */
+  clearGuestAttendance: (scheduleId: string, guestId: string) => Promise<void>;
 
   /** 영상 URL 첨부 (POST /api/bands/{id}/media) */
   addMedia: (input: NewMediaInput) => Promise<void>;
-  /** 영상 삭제 (등록자 본인 또는 밴드장) */
+  /** 영상 수정 (PATCH /api/media/{id}) — 등록자 본인 또는 관리자 */
+  editMedia: (mediaId: string, input: EditMediaInput) => Promise<void>;
+  /** 영상 삭제 (등록자 본인 또는 관리자) */
   removeMedia: (mediaId: string) => Promise<void>;
+  /** 영상 좋아요 토글 (로그인) — 현재 상태 기준으로 like/unlike */
+  likeMedia: (mediaId: string) => Promise<void>;
 
-  /** 멤버 추방 (밴드장) — userId */
+  /** 멤버 추방 (관리자) — userId */
   kickMember: (userId: string) => Promise<void>;
-  /** 초대 코드 발급/재발급 (밴드장) */
+  /** 멤버 세션(파트) 전체 교체. 본인 또는 관리자 */
+  setMemberParts: (userId: string, parts: string[]) => Promise<void>;
+  /** 게스트 등록 (관리자). 생성된 게스트 반환 */
+  addGuest: (name: string) => Promise<Guest>;
+  /** 게스트 이름 수정 (관리자) */
+  renameGuest: (guestId: string, name: string) => Promise<void>;
+  /** 게스트 세션 설정 (관리자). null·빈 값이면 미지정 */
+  setGuestSession: (guestId: string, session: string | null) => Promise<void>;
+  /** 게스트 삭제 (관리자) — 세션 배정·출결에서도 빠진다 */
+  removeGuest: (guestId: string) => Promise<void>;
+  /** 밴드 리더 지정/해제 (관리자). null = 리더 없음 */
+  setBandLeader: (userId: string | null) => Promise<void>;
+  /** 초대 코드 발급/재발급 (관리자) */
   issueInviteCode: () => Promise<void>;
 
   openSwitcher: () => void;
@@ -148,6 +288,8 @@ interface AppState {
   closeLogin: () => void;
   openCreate: () => void;
   closeCreate: () => void;
+  openProfile: () => void;
+  closeProfile: () => void;
 }
 
 const AppContext = createContext<AppState | null>(null);
@@ -161,19 +303,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [bands, setBands] = useState<Band[]>([]);
   const [currentBandId, setCurrentBandIdState] = useState<string | null>(null);
   const [currentBand, setCurrentBand] = useState<Band | null>(null);
+  /** 밴드 표지는 봤지만 콘텐츠는 게이트됨 (FOLLOWERS 밴드에 팔로우 안 함). */
+  const [bandRestricted, setBandRestricted] = useState(false);
+  const [pendingFollowers, setPendingFollowers] = useState<Follower[]>([]);
+  const [approvedFollowers, setApprovedFollowers] = useState<Follower[]>([]);
+  const [following, setFollowing] = useState<FollowingBand[]>([]);
+  const [followingLoading, setFollowingLoading] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
+  const [guests, setGuests] = useState<Guest[]>([]);
   const [invite, setInvite] = useState<InviteInfo | null>(null);
   const [bootLoading, setBootLoading] = useState(true);
   const [bandLoading, setBandLoading] = useState(false);
   const [devRole, setDevRole] = useState<Role | null>(null);
 
   const [songs, setSongs] = useState<Song[]>([]);
+  const [songFolders, setSongFolders] = useState<SongFolder[]>([]);
   const [schedules, setSchedules] = useState<ScheduleEvent[]>([]);
   const [media, setMedia] = useState<MediaItem[]>([]);
 
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   // 세션 복구: refresh 쿠키로 access 재발급 → 내 정보 + 내 밴드
   useEffect(() => {
@@ -203,36 +354,63 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setCurrentBand(null);
       setMembers([]);
       setSongs([]);
+      setSongFolders([]);
       setSchedules([]);
       setMedia([]);
       return;
     }
     let alive = true;
     setBandLoading(true);
+    setBandRestricted(false);
+    setPendingFollowers([]);
+    setApprovedFollowers([]);
     setInvite(null);
+    const clearContent = () => {
+      setMembers([]);
+      setGuests([]);
+      setSongs([]);
+      setSongFolders([]);
+      setSchedules([]);
+      setMedia([]);
+    };
     (async () => {
+      // 1) 표지 먼저 — PRIVATE 비멤버면 404 → "없는 밴드" 처리
+      let bandDto;
       try {
-        const [band, mem, songList, schedList, mediaList] = await Promise.all([
-          bandApi.getBand(currentBandId),
+        bandDto = await bandApi.getBand(currentBandId);
+      } catch {
+        if (alive) {
+          setCurrentBand(null);
+          clearContent();
+          setBandLoading(false);
+        }
+        return;
+      }
+      if (!alive) return;
+      setCurrentBand(toBand(bandDto));
+
+      // 2) 콘텐츠 — FOLLOWERS 밴드에 팔로우 안 했으면 403 CONTENT_RESTRICTED
+      try {
+        const [mem, guestList, songList, folderList, schedList, mediaList] = await Promise.all([
           memberApi.listMembers(currentBandId),
+          guestApi.listGuests(currentBandId),
           songApi.listSongs(currentBandId),
+          songFolderApi.listFolders(currentBandId),
           scheduleApi.listSchedules(currentBandId),
           mediaApi.listMedia(currentBandId),
         ]);
         if (!alive) return;
-        setCurrentBand(toBand(band));
+        setBandRestricted(false);
         setMembers(mem.map((m) => toMember(m, currentBandId)));
+        setGuests(guestList.map(toGuest));
         setSongs(songList.map(toSong));
+        setSongFolders(folderList.map(toSongFolder));
         setSchedules(sortSchedules(schedList.map(toSchedule)));
         setMedia(mediaList.map(toMedia));
-      } catch {
-        if (alive) {
-          setCurrentBand(null);
-          setMembers([]);
-          setSongs([]);
-          setSchedules([]);
-          setMedia([]);
-        }
+      } catch (e) {
+        if (!alive) return;
+        setBandRestricted(e instanceof ApiError && e.code === 'CONTENT_RESTRICTED');
+        clearContent();
       } finally {
         if (alive) setBandLoading(false);
       }
@@ -258,6 +436,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
     authApi.startKakaoLogin();
   }, []);
 
+  // 이메일 로그인/가입 성공 후 공통: 내 정보 + 내 밴드를 불러와 세션에 반영하고 모달을 닫는다.
+  const finishAuth = useCallback(async () => {
+    const [me, mine] = await Promise.all([authApi.fetchMe(), bandApi.getMyBands()]);
+    setUser(toUser(me));
+    setBands(mine.map(toBand));
+    setDevRole(null);
+    setLoginOpen(false);
+  }, []);
+
+  const emailLogin = useCallback(
+    async (email: string, password: string) => {
+      await authApi.loginWithEmail(email.trim(), password);
+      await finishAuth();
+    },
+    [finishAuth],
+  );
+
+  const signup = useCallback(
+    async (email: string, password: string, nickname: string) => {
+      await authApi.signupWithEmail(email.trim(), password, nickname.trim());
+      await finishAuth();
+    },
+    [finishAuth],
+  );
+
   const logout = useCallback(async () => {
     await authApi.logout();
     setUser(null);
@@ -267,11 +470,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [navigate]);
 
   const createBand = useCallback(
-    async (name: string) => {
+    async (name: string, visibility?: BandVisibility) => {
       const trimmed = name.trim();
       if (!trimmed) return;
-      const dto = await bandApi.createBand(trimmed);
-      const band = toBand({ ...dto, role: 'OWNER' });
+      const dto = await bandApi.createBand(trimmed, null, visibility);
+      const band = toBand(dto); // 생성 응답에 role: 'OWNER' 포함됨
       setBands((prev) => [...prev, band]);
       setCreateOpen(false);
       setSwitcherOpen(false);
@@ -282,10 +485,206 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const joinByInvite = useCallback(async (code: string) => {
     const dto = await inviteApi.joinByCode(code);
-    const band = toBand({ ...dto, role: 'MEMBER' });
+    const band = toBand(dto); // 가입 응답에 role: 'MEMBER' 포함됨
     setBands((prev) => (prev.some((b) => b.id === band.id) ? prev : [...prev, band]));
     return band;
   }, []);
+
+  const applyBandUpdate = useCallback((band: Band) => {
+    setCurrentBand(band);
+    setBands((prev) => prev.map((b) => (b.id === band.id ? band : b)));
+  }, []);
+
+  const uploadBandLogo = useCallback(
+    async (file: File) => {
+      if (!currentBandId) return;
+      applyBandUpdate(toBand(await bandApi.uploadLogo(currentBandId, file)));
+    },
+    [currentBandId, applyBandUpdate],
+  );
+
+  const uploadBandBanner = useCallback(
+    async (file: File) => {
+      if (!currentBandId) return;
+      applyBandUpdate(toBand(await bandApi.uploadBanner(currentBandId, file)));
+    },
+    [currentBandId, applyBandUpdate],
+  );
+
+  const updateBand = useCallback(
+    async (name: string, description: string | null) => {
+      if (!currentBandId) return;
+      applyBandUpdate(toBand(await bandApi.updateBand(currentBandId, name.trim(), description)));
+    },
+    [currentBandId, applyBandUpdate],
+  );
+  const updateBandVisibility = useCallback(
+    async (visibility: BandVisibility) => {
+      if (!currentBandId) return;
+      applyBandUpdate(toBand(await bandApi.setBandVisibility(currentBandId, visibility)));
+    },
+    [currentBandId, applyBandUpdate],
+  );
+
+  const patchRelation = useCallback((relation: Band['myRelation']) => {
+    setCurrentBand((prev) => (prev ? { ...prev, myRelation: relation } : prev));
+  }, []);
+
+  const refreshFollowing = useCallback(async () => {
+    if (!user) {
+      setFollowing([]);
+      return;
+    }
+    setFollowingLoading(true);
+    try {
+      const list = await followApi.myFollowing();
+      setFollowing(list.map(toFollowingBand));
+    } catch {
+      setFollowing([]);
+    } finally {
+      setFollowingLoading(false);
+    }
+  }, [user]);
+
+  // 로그인 상태가 되면 내 팔로잉 목록 로드, 로그아웃되면 비움
+  useEffect(() => {
+    if (user) void refreshFollowing();
+    else setFollowing([]);
+  }, [user, refreshFollowing]);
+
+  const requestFollow = useCallback(async () => {
+    if (!currentBandId) return;
+    await followApi.requestFollow(currentBandId);
+    patchRelation('PENDING');
+    void refreshFollowing();
+  }, [currentBandId, patchRelation, refreshFollowing]);
+
+  const cancelFollow = useCallback(async () => {
+    if (!currentBandId) return;
+    await followApi.cancelFollow(currentBandId);
+    patchRelation('NONE');
+    setFollowing((prev) => prev.filter((f) => f.bandId !== currentBandId));
+  }, [currentBandId, patchRelation]);
+
+  const unfollowBand = useCallback(
+    async (bandId: string) => {
+      await followApi.cancelFollow(bandId);
+      setFollowing((prev) => prev.filter((f) => f.bandId !== bandId));
+      if (bandId === currentBandId) patchRelation('NONE');
+    },
+    [currentBandId, patchRelation],
+  );
+
+  const refreshFollowers = useCallback(async () => {
+    if (!currentBandId) {
+      setPendingFollowers([]);
+      setApprovedFollowers([]);
+      return;
+    }
+    try {
+      const list = (await followApi.listFollowers(currentBandId)).map(toFollower);
+      setPendingFollowers(list.filter((f) => f.status === 'PENDING'));
+      setApprovedFollowers(list.filter((f) => f.status === 'APPROVED'));
+    } catch {
+      setPendingFollowers([]);
+      setApprovedFollowers([]);
+    }
+  }, [currentBandId]);
+
+  const bumpFollowerCount = useCallback((delta: number) => {
+    setCurrentBand((prev) =>
+      prev ? { ...prev, followerCount: Math.max(0, prev.followerCount + delta) } : prev,
+    );
+  }, []);
+
+  const approveFollower = useCallback(
+    async (userId: string) => {
+      if (!currentBandId) return;
+      await followApi.approveFollower(currentBandId, userId);
+      setPendingFollowers((prev) => {
+        const moved = prev.find((f) => f.userId === userId);
+        if (moved) {
+          setApprovedFollowers((cur) => [
+            ...cur,
+            { ...moved, status: 'APPROVED', decidedAt: new Date().toISOString() },
+          ]);
+        }
+        return prev.filter((f) => f.userId !== userId);
+      });
+      bumpFollowerCount(1);
+    },
+    [currentBandId, bumpFollowerCount],
+  );
+
+  const rejectFollower = useCallback(
+    async (userId: string) => {
+      if (!currentBandId) return;
+      await followApi.removeFollower(currentBandId, userId);
+      setPendingFollowers((prev) => prev.filter((f) => f.userId !== userId));
+    },
+    [currentBandId],
+  );
+
+  const removeFollower = useCallback(
+    async (userId: string) => {
+      if (!currentBandId) return;
+      await followApi.removeFollower(currentBandId, userId);
+      setApprovedFollowers((prev) => prev.filter((f) => f.userId !== userId));
+      bumpFollowerCount(-1);
+    },
+    [currentBandId, bumpFollowerCount],
+  );
+
+  const transferOwnership = useCallback(
+    async (userId: string) => {
+      if (!currentBandId) return;
+      await memberApi.transferOwnership(currentBandId, userId);
+      // 역할이 바뀌었으니 밴드/멤버를 다시 받아 반영
+      const [bandDto, memberDtos] = await Promise.all([
+        bandApi.getBand(currentBandId),
+        memberApi.listMembers(currentBandId),
+      ]);
+      applyBandUpdate(toBand(bandDto));
+      setMembers(memberDtos.map((m) => toMember(m, currentBandId)));
+    },
+    [currentBandId, applyBandUpdate],
+  );
+
+  const deleteBand = useCallback(async () => {
+    if (!currentBandId) return;
+    const gone = currentBandId;
+    await memberApi.deleteBand(gone);
+    setBands((prev) => prev.filter((b) => b.id !== gone));
+    setCurrentBandIdState(null);
+    navigate('/');
+  }, [currentBandId, navigate]);
+
+  const leaveBand = useCallback(async () => {
+    if (!currentBandId) return;
+    const gone = currentBandId;
+    await memberApi.leaveBand(gone);
+    setBands((prev) => prev.filter((b) => b.id !== gone));
+    setCurrentBandIdState(null);
+    navigate('/');
+  }, [currentBandId, navigate]);
+
+  const updateProfile = useCallback(async (nickname: string, bio: string) => {
+    setUser(toUser(await authApi.updateMe(nickname.trim(), bio.trim())));
+  }, []);
+
+  const uploadAvatar = useCallback(async (file: File) => {
+    setUser(toUser(await authApi.uploadAvatar(file)));
+  }, []);
+
+  const removeAvatar = useCallback(async () => {
+    setUser(toUser(await authApi.removeAvatar()));
+  }, []);
+
+  const changePassword = useCallback(
+    (currentPassword: string, newPassword: string) =>
+      authApi.changePassword(currentPassword, newPassword),
+    [],
+  );
 
   const kickMember = useCallback(
     async (userId: string) => {
@@ -300,6 +699,85 @@ export function AppProvider({ children }: { children: ReactNode }) {
           b.id === currentBandId ? { ...b, memberCount: Math.max(1, b.memberCount - 1) } : b,
         ),
       );
+    },
+    [currentBandId],
+  );
+
+  const setMemberParts = useCallback(
+    async (userId: string, parts: string[]) => {
+      if (!currentBandId) return;
+      const dto =
+        user && userId === user.id
+          ? await memberApi.updateMyParts(currentBandId, parts)
+          : await memberApi.updateMemberParts(currentBandId, userId, parts);
+      const fresh = toMember(dto, currentBandId);
+      setMembers((prev) => prev.map((m) => (m.id === userId ? fresh : m)));
+    },
+    [currentBandId, user],
+  );
+
+  const setBandLeader = useCallback(
+    async (userId: string | null) => {
+      if (!currentBandId) return;
+      const dtos = await memberApi.setLeader(currentBandId, userId);
+      setMembers(dtos.map((m) => toMember(m, currentBandId)));
+    },
+    [currentBandId],
+  );
+
+  const addGuest = useCallback(
+    async (name: string): Promise<Guest> => {
+      if (!currentBandId) throw new Error('밴드가 선택되지 않았습니다.');
+      const guest = toGuest(await guestApi.createGuest(currentBandId, name.trim()));
+      setGuests((prev) => [...prev, guest].sort((a, b) => a.name.localeCompare(b.name, 'ko')));
+      return guest;
+    },
+    [currentBandId],
+  );
+
+  const renameGuest = useCallback(
+    async (guestId: string, name: string) => {
+      if (!currentBandId) return;
+      const guest = toGuest(await guestApi.renameGuest(currentBandId, guestId, name.trim()));
+      setGuests((prev) =>
+        prev
+          .map((g) => (g.id === guestId ? guest : g))
+          .sort((a, b) => a.name.localeCompare(b.name, 'ko')),
+      );
+      // 배정·출결에 표시되는 이름도 갱신 필요
+      if (currentBandId) {
+        const [songList, schedList] = await Promise.all([
+          songApi.listSongs(currentBandId),
+          scheduleApi.listSchedules(currentBandId),
+        ]);
+        setSongs(songList.map(toSong));
+        setSchedules(sortSchedules(schedList.map(toSchedule)));
+      }
+    },
+    [currentBandId],
+  );
+
+  const setGuestSession = useCallback(
+    async (guestId: string, session: string | null) => {
+      if (!currentBandId) return;
+      const guest = toGuest(await guestApi.setGuestSession(currentBandId, guestId, session));
+      setGuests((prev) => prev.map((g) => (g.id === guestId ? guest : g)));
+    },
+    [currentBandId],
+  );
+
+  const removeGuest = useCallback(
+    async (guestId: string) => {
+      if (!currentBandId) return;
+      await guestApi.deleteGuest(currentBandId, guestId);
+      setGuests((prev) => prev.filter((g) => g.id !== guestId));
+      // 세션 배정 자동 해제 / 출결 행 삭제분을 반영
+      const [songList, schedList] = await Promise.all([
+        songApi.listSongs(currentBandId),
+        scheduleApi.listSchedules(currentBandId),
+      ]);
+      setSongs(songList.map(toSong));
+      setSchedules(sortSchedules(schedList.map(toSchedule)));
     },
     [currentBandId],
   );
@@ -340,7 +818,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const assignPart = useCallback(
-    async (songId: string, slotKey: string, memberName: string) => {
+    async (
+      songId: string,
+      slotKey: string,
+      assignee: { userId: string } | { guestId: string } | null,
+    ) => {
       const song = songs.find((s) => s.id === songId);
       if (!song) return;
       const hashAt = slotKey.lastIndexOf('#');
@@ -348,15 +830,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const partIndex = Number(slotKey.slice(hashAt + 1));
       const part = song.parts.find((p) => p.instrument === instrument && p.partIndex === partIndex);
       if (!part) return;
-      const userId = memberName ? (members.find((m) => m.name === memberName)?.id ?? null) : null;
       try {
-        const dto = await songApi.assignPart(songId, part.id, userId);
+        const dto = await songApi.assignPart(songId, part.id, assignee);
         setSongs((prev) => prev.map((s) => (s.id === songId ? toSong(dto) : s)));
       } catch (e) {
         console.error('파트 배정 실패', e);
       }
     },
-    [songs, members],
+    [songs],
   );
 
   const addSong = useCallback(async (input: NewSongInput) => {
@@ -368,6 +849,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       artist: input.artist.trim(),
       sourceType: input.sourceType,
       externalTrackId: input.externalTrackId ?? null,
+      artworkUrl: input.artworkUrl ?? null,
       memo: input.memo.trim(),
       referenceVideoUrl: input.referenceVideoUrl.trim(),
       sessions,
@@ -379,6 +861,76 @@ export function AppProvider({ children }: { children: ReactNode }) {
     await songApi.deleteSong(songId);
     setSongs((prev) => prev.filter((s) => s.id !== songId));
   }, []);
+
+  const moveSongToFolder = useCallback(async (songId: string, folderId: string | null) => {
+    const dto = await songApi.moveSongToFolder(songId, folderId);
+    setSongs((prev) => prev.map((s) => (s.id === songId ? toSong(dto) : s)));
+  }, []);
+
+  const reorderSongs = useCallback(
+    async (status: Song['status'], folderId: string | null, songIds: string[]) => {
+      if (!currentBandId) return;
+      // 낙관적 반영: 해당 그룹 곡들의 position 을 새 순서 인덱스로
+      const order = new Map(songIds.map((id, i) => [id, i]));
+      setSongs((prev) =>
+        prev.map((s) =>
+          s.bandId === currentBandId &&
+          s.status === status &&
+          (s.folderId ?? null) === folderId &&
+          order.has(s.id)
+            ? { ...s, position: order.get(s.id) ?? s.position }
+            : s,
+        ),
+      );
+      try {
+        await songApi.reorderSongs(currentBandId, status, folderId, songIds);
+      } catch (e) {
+        const fresh = await songApi.listSongs(currentBandId);
+        setSongs(fresh.map(toSong));
+        throw e;
+      }
+    },
+    [currentBandId],
+  );
+
+  const createSongFolder = useCallback(
+    async (name: string, status: Song['status']) => {
+      if (!currentBandId) return;
+      const dto = await songFolderApi.createFolder(currentBandId, name.trim(), status);
+      setSongFolders((prev) => [...prev, toSongFolder(dto)]);
+    },
+    [currentBandId],
+  );
+
+  const renameSongFolder = useCallback(async (folderId: string, name: string) => {
+    const dto = await songFolderApi.renameFolder(folderId, name.trim());
+    setSongFolders((prev) => prev.map((f) => (f.id === folderId ? toSongFolder(dto) : f)));
+  }, []);
+
+  const removeSongFolder = useCallback(async (folderId: string) => {
+    await songFolderApi.deleteFolder(folderId);
+    setSongFolders((prev) => prev.filter((f) => f.id !== folderId));
+    setSongs((prev) => prev.map((s) => (s.folderId === folderId ? { ...s, folderId: null } : s)));
+  }, []);
+
+  const reorderSongFolders = useCallback(
+    async (status: Song['status'], folderIds: string[]) => {
+      if (!currentBandId) return;
+      // 낙관적 반영 후 서버 응답으로 확정
+      setSongFolders((prev) => {
+        const order = new Map(folderIds.map((id, i) => [id, i]));
+        return prev.map((f) =>
+          f.status === status && order.has(f.id)
+            ? { ...f, position: order.get(f.id) ?? f.position }
+            : f,
+        );
+      });
+      const dtos = await songFolderApi.reorderFolders(currentBandId, status, folderIds);
+      const fresh = new Map(dtos.map((d) => [String(d.id), toSongFolder(d)]));
+      setSongFolders((prev) => prev.map((f) => fresh.get(f.id) ?? f));
+    },
+    [currentBandId],
+  );
 
   const addSchedule = useCallback(async (input: NewScheduleInput) => {
     const dto = await scheduleApi.createSchedule(input.bandId, {
@@ -403,6 +955,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const setMemberAttendance = useCallback(
+    async (scheduleId: string, userId: string, status: AttendanceStatus) => {
+      try {
+        const dto = await scheduleApi.setMemberAttendance(scheduleId, userId, ATT_TO_EN[status]);
+        setSchedules((prev) => prev.map((s) => (s.id === scheduleId ? toSchedule(dto) : s)));
+      } catch (e) {
+        console.error('멤버 출결 저장 실패', e);
+      }
+    },
+    [],
+  );
+
+  const setGuestAttendance = useCallback(async (scheduleId: string, guestId: string) => {
+    try {
+      const dto = await scheduleApi.setGuestAttendance(scheduleId, guestId);
+      setSchedules((prev) => prev.map((s) => (s.id === scheduleId ? toSchedule(dto) : s)));
+    } catch (e) {
+      console.error('게스트 추가 실패', e);
+    }
+  }, []);
+
+  const clearGuestAttendance = useCallback(async (scheduleId: string, guestId: string) => {
+    try {
+      const dto = await scheduleApi.clearGuestAttendance(scheduleId, guestId);
+      setSchedules((prev) => prev.map((s) => (s.id === scheduleId ? toSchedule(dto) : s)));
+    } catch (e) {
+      console.error('게스트 제외 실패', e);
+    }
+  }, []);
+
   // 일정에 연결된 영상이 바뀌면 그 일정의 mediaIds 도 다시 받아야 상세에 반영된다.
   const refreshSchedules = useCallback(async (bandId: string) => {
     const list = await scheduleApi.listSchedules(bandId);
@@ -413,14 +995,34 @@ export function AppProvider({ children }: { children: ReactNode }) {
     async (input: NewMediaInput) => {
       const dto = await mediaApi.addMedia(input.bandId, {
         externalUrl: input.url.trim(),
+        title: input.title.trim() || undefined,
         type: input.kind === '공연' ? 'PERFORMANCE' : 'REHEARSAL',
-        visibility: input.visibility === '링크 공개' ? 'LINK_PUBLIC' : 'MEMBERS_ONLY',
+        visibility: input.visibility === '전체공개' ? 'LINK_PUBLIC' : 'MEMBERS_ONLY',
         scheduleId: input.scheduleId ? Number(input.scheduleId) : null,
+        songId: input.songId ? Number(input.songId) : null,
       });
       setMedia((prev) => [toMedia(dto), ...prev]);
       if (input.scheduleId) await refreshSchedules(input.bandId);
     },
     [refreshSchedules],
+  );
+
+  const editMedia = useCallback(
+    async (mediaId: string, input: EditMediaInput) => {
+      const before = media.find((m) => m.id === mediaId)?.scheduleId ?? null;
+      const dto = await mediaApi.updateMedia(mediaId, {
+        externalUrl: input.url.trim(),
+        title: input.title.trim(), // 빈 문자열 → 백엔드에서 제목 제거
+        type: input.kind === '공연' ? 'PERFORMANCE' : 'REHEARSAL',
+        visibility: input.visibility === '전체공개' ? 'LINK_PUBLIC' : 'MEMBERS_ONLY',
+        scheduleId: input.scheduleId ? Number(input.scheduleId) : null,
+        songId: input.songId ? Number(input.songId) : null,
+      });
+      const next = toMedia(dto);
+      setMedia((prev) => prev.map((m) => (m.id === mediaId ? next : m)));
+      if ((before || next.scheduleId) && currentBandId) await refreshSchedules(currentBandId);
+    },
+    [media, currentBandId, refreshSchedules],
   );
 
   const removeMedia = useCallback(
@@ -433,40 +1035,108 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [media, currentBandId, refreshSchedules],
   );
 
+  const likeMedia = useCallback(
+    async (mediaId: string) => {
+      const item = media.find((m) => m.id === mediaId);
+      if (!item) return;
+      try {
+        const result = item.likedByMe
+          ? await mediaApi.unlikeMedia(mediaId)
+          : await mediaApi.likeMedia(mediaId);
+        setMedia((prev) =>
+          prev.map((m) =>
+            m.id === mediaId
+              ? { ...m, likeCount: result.likeCount, likedByMe: result.likedByMe }
+              : m,
+          ),
+        );
+      } catch (e) {
+        console.error('좋아요 처리 실패', e);
+      }
+    },
+    [media],
+  );
+
   const value: AppState = {
     user,
     bands,
     currentBandId,
     currentBand,
+    bandRestricted,
+    pendingFollowers,
+    approvedFollowers,
+    following,
+    followingLoading,
     bootLoading,
     bandLoading,
     role,
     devRole,
     songs,
+    songFolders,
     schedules,
     media,
     members,
+    guests,
     invite,
     switcherOpen,
     loginOpen,
     createOpen,
+    profileOpen,
     setCurrentBandId,
     setDevRole,
     login,
+    emailLogin,
+    signup,
     logout,
+    updateProfile,
+    uploadAvatar,
+    removeAvatar,
+    changePassword,
     createBand,
+    updateBandVisibility,
+    requestFollow,
+    cancelFollow,
+    unfollowBand,
+    refreshFollowers,
+    refreshFollowing,
+    approveFollower,
+    rejectFollower,
+    removeFollower,
     joinByInvite,
+    updateBand,
+    transferOwnership,
+    deleteBand,
+    leaveBand,
+    uploadBandLogo,
+    uploadBandBanner,
     voteSong,
     promoteSong,
     assignPart,
     addSong,
     removeSong,
+    moveSongToFolder,
+    reorderSongs,
+    createSongFolder,
+    renameSongFolder,
+    removeSongFolder,
+    reorderSongFolders,
     addSchedule,
     removeSchedule,
     setAttendance,
+    setMemberAttendance,
+    setGuestAttendance,
+    clearGuestAttendance,
     addMedia,
+    editMedia,
     removeMedia,
+    likeMedia,
     kickMember,
+    setMemberParts,
+    setBandLeader,
+    addGuest,
+    renameGuest,
+    setGuestSession,
+    removeGuest,
     issueInviteCode,
     openSwitcher: () => setSwitcherOpen(true),
     closeSwitcher: () => setSwitcherOpen(false),
@@ -477,6 +1147,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setSwitcherOpen(false);
     },
     closeCreate: () => setCreateOpen(false),
+    openProfile: () => {
+      setProfileOpen(true);
+      setSwitcherOpen(false);
+    },
+    closeProfile: () => setProfileOpen(false),
   };
 
   return <AppContext value={value}>{children}</AppContext>;

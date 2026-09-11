@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { searchTracks } from '../api/songs';
 import type { TrackSearchResultDto } from '../api/types';
-import { INSTRUMENTS, type Instrument } from '../types';
+import { INSTRUMENTS } from '../types';
 import { Modal } from './Modal';
 import './AddSongModal.css';
 
@@ -14,13 +14,7 @@ interface Props {
 
 type Mode = 'search' | 'manual';
 
-const DEFAULT_SESSIONS: Record<Instrument, number> = {
-  보컬: 1,
-  기타: 1,
-  베이스: 1,
-  드럼: 1,
-  건반: 0,
-};
+const DEFAULT_SESSIONS: Record<string, number> = { 보컬: 1, 기타: 1, 베이스: 1, 드럼: 1, 건반: 0 };
 
 export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
   const { addSong } = useApp();
@@ -30,9 +24,11 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
   const [results, setResults] = useState<TrackSearchResultDto[]>([]);
   const [searching, setSearching] = useState(false);
   const [pickedId, setPickedId] = useState<string | null>(null);
+  const [pickedArt, setPickedArt] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
-  const [sessions, setSessions] = useState<Record<Instrument, number>>(DEFAULT_SESSIONS);
+  const [sessions, setSessions] = useState<Record<string, number>>({ ...DEFAULT_SESSIONS });
+  const [newInst, setNewInst] = useState('');
   const [refUrl, setRefUrl] = useState('');
   const [memo, setMemo] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -40,7 +36,6 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
 
   const reqSeq = useRef(0);
 
-  // 검색어 디바운스 → GET /api/songs/search
   useEffect(() => {
     if (mode !== 'search') return;
     const query = q.trim();
@@ -68,12 +63,30 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
 
   const canSubmit = title.trim().length > 0 && !submitting;
 
-  const step = (inst: Instrument, delta: number) =>
-    setSessions((prev) => ({ ...prev, [inst]: Math.min(4, Math.max(0, prev[inst] + delta)) }));
+  const step = (inst: string, delta: number) =>
+    setSessions((prev) => ({
+      ...prev,
+      [inst]: Math.min(10, Math.max(0, (prev[inst] ?? 0) + delta)),
+    }));
+
+  const removeInst = (inst: string) =>
+    setSessions((prev) => {
+      const next = { ...prev };
+      delete next[inst];
+      return next;
+    });
+
+  const addInstrument = () => {
+    const name = newInst.trim().slice(0, 20);
+    if (!name) return;
+    setSessions((prev) => ({ ...prev, [name]: prev[name] ?? 1 }));
+    setNewInst('');
+  };
 
   const setManualField = (value: string, setter: (v: string) => void) => {
     setter(value);
     setPickedId(null);
+    setPickedArt(null);
   };
 
   const submit = async () => {
@@ -88,6 +101,7 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
         artist,
         sourceType: isSearch ? 'SEARCH' : 'MANUAL',
         externalTrackId: isSearch ? pickedId : null,
+        artworkUrl: isSearch ? pickedArt : null,
         memo,
         referenceVideoUrl: refUrl,
         sessions,
@@ -99,6 +113,8 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
       setSubmitting(false);
     }
   };
+
+  const isCustom = (inst: string) => !INSTRUMENTS.includes(inst as (typeof INSTRUMENTS)[number]);
 
   return (
     <Modal
@@ -136,6 +152,7 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
           onClick={() => {
             setMode('manual');
             setPickedId(null);
+            setPickedArt(null);
           }}
         >
           직접 입력
@@ -170,11 +187,21 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
                     className={`addsong__result${on ? ' is-on' : ''}`}
                     onClick={() => {
                       setPickedId(c.externalTrackId);
+                      setPickedArt(c.artworkUrl);
                       setTitle(c.title);
                       setArtist(c.artist);
                     }}
                   >
-                    <span className="addsong__result-art" />
+                    {c.artworkUrl ? (
+                      <img
+                        className="addsong__result-art"
+                        src={c.artworkUrl}
+                        alt=""
+                        loading="lazy"
+                      />
+                    ) : (
+                      <span className="addsong__result-art addsong__result-art--empty" />
+                    )}
                     <span className="stack" style={{ flex: 1, minWidth: 0 }}>
                       <strong style={{ fontSize: 13 }}>{c.title}</strong>
                       <span className="muted" style={{ fontSize: 11 }}>
@@ -228,7 +255,7 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
         style={{ gap: 8, borderTop: '2px solid var(--color-text)', paddingTop: 14 }}
       >
         <span className="kicker">세션 구성</span>
-        {INSTRUMENTS.map((inst) => (
+        {Object.keys(sessions).map((inst) => (
           <div key={inst} className="addsong__session">
             <span
               style={{
@@ -239,6 +266,16 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
             >
               {inst}
             </span>
+            {isCustom(inst) && (
+              <button
+                type="button"
+                className="addsong__step addsong__step--x"
+                onClick={() => removeInst(inst)}
+                aria-label={`${inst} 삭제`}
+              >
+                ✕
+              </button>
+            )}
             <button
               type="button"
               className="addsong__step"
@@ -258,6 +295,30 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
             </button>
           </div>
         ))}
+        <div className="addsong__session">
+          <input
+            className="input"
+            style={{ flex: 1, fontSize: 12, padding: '5px 8px' }}
+            value={newInst}
+            maxLength={20}
+            onChange={(e) => setNewInst(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addInstrument();
+              }
+            }}
+            placeholder="악기 직접 추가 (예: 실로폰)"
+          />
+          <button
+            type="button"
+            className="btn btn--sm"
+            onClick={addInstrument}
+            disabled={!newInst.trim()}
+          >
+            추가
+          </button>
+        </div>
       </div>
 
       <div className="field">

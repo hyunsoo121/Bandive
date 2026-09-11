@@ -26,6 +26,10 @@ public record ScheduleResponse(Long id, Long bandId, ScheduleType type, Instant 
 		AttendanceStatus myStatus = null;
 		List<AttendeeResponse> attendees = attendances.stream().map(AttendeeResponse::from).toList();
 		for (Attendance attendance : attendances) {
+			// counts·myStatus 는 실멤버 출결만. 게스트는 별도로 다룬다.
+			if (attendance.getGuest() != null) {
+				continue;
+			}
 			switch (attendance.getStatus()) {
 				case ATTENDING -> attending++;
 				case ABSENT -> absent++;

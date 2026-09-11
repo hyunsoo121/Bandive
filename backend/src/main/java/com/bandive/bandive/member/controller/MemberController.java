@@ -6,16 +6,20 @@ import jakarta.validation.Valid;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.bandive.bandive.auth.CurrentUser;
+import com.bandive.bandive.auth.UserPrincipal;
+import com.bandive.bandive.member.dto.LeaderRequest;
 import com.bandive.bandive.member.dto.MemberPartsRequest;
 import com.bandive.bandive.member.dto.MemberResponse;
 import com.bandive.bandive.member.service.MemberService;
@@ -31,8 +35,8 @@ public class MemberController {
 	}
 
 	@GetMapping
-	public List<MemberResponse> list(@PathVariable Long bandId) {
-		return memberService.list(bandId);
+	public List<MemberResponse> list(@PathVariable Long bandId, @AuthenticationPrincipal UserPrincipal principal) {
+		return memberService.list(bandId, principal != null ? principal.getId() : null);
 	}
 
 	/** 내 파트 설정/해제. literal "me" 라 아래 {userId} 패턴보다 우선 매칭된다. */
@@ -42,12 +46,20 @@ public class MemberController {
 		return memberService.updateMyParts(bandId, userId, request);
 	}
 
-	/** 밴드장이 특정 멤버의 파트 설정/해제. */
+	/** 관리자가 특정 멤버의 파트 설정/해제. */
 	@PatchMapping("/{userId}")
 	@PreAuthorize("@bandGuard.isOwner(#bandId)")
 	public MemberResponse updateMemberParts(@PathVariable Long bandId, @PathVariable Long userId,
 			@Valid @RequestBody MemberPartsRequest request) {
 		return memberService.updateMemberParts(bandId, userId, request);
+	}
+
+	/** 관리자가 밴드 리더를 지정/해제. {@code userId} 가 null 이면 리더 없음. */
+	@PutMapping("/leader")
+	@PreAuthorize("@bandGuard.isOwner(#bandId)")
+	public List<MemberResponse> assignLeader(@PathVariable Long bandId,
+			@RequestBody(required = false) LeaderRequest request) {
+		return memberService.assignLeader(bandId, request == null ? null : request.userId());
 	}
 
 	/** 탈퇴. */
@@ -57,7 +69,7 @@ public class MemberController {
 		memberService.leave(bandId, userId);
 	}
 
-	/** 추방 (밴드장). */
+	/** 추방 (관리자). */
 	@DeleteMapping("/{userId}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	@PreAuthorize("@bandGuard.isOwner(#bandId)")

@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import com.bandive.bandive.auth.UserPrincipal;
 import com.bandive.bandive.auth.jwt.JwtProvider;
 import com.bandive.bandive.band.dto.BandResponse;
+import com.bandive.bandive.member.BandRole;
 import com.bandive.bandive.band.service.BandService;
 import com.bandive.bandive.common.security.BandGuard;
 
@@ -44,7 +45,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(BandController.class)
 class BandControllerTest {
 
-	private static final BandResponse SAMPLE = new BandResponse(1L, "내 밴드", "소개", null, null, 1,
+	private static final BandResponse SAMPLE = new BandResponse(1L, "내 밴드", "소개", null, null, 1, 0,
+			com.bandive.bandive.band.BandVisibility.PUBLIC, BandRole.OWNER, com.bandive.bandive.band.MyRelation.MEMBER,
 			Instant.parse("2026-09-02T00:00:00Z"));
 
 	@Autowired
@@ -87,7 +89,7 @@ class BandControllerTest {
 
 	@Test
 	void 상세_조회는_비인증도_허용() throws Exception {
-		given(bandService.get(1L)).willReturn(SAMPLE);
+		given(bandService.get(1L, null)).willReturn(SAMPLE);
 
 		mvc.perform(get("/api/bands/1")).andExpect(status().isOk()).andExpect(jsonPath("$.name").value("내 밴드"));
 	}
@@ -102,7 +104,7 @@ class BandControllerTest {
 	}
 
 	@Test
-	void 밴드장이_아니면_수정_403() throws Exception {
+	void 관리자가_아니면_수정_403() throws Exception {
 		given(bandGuard.isOwner(1L)).willReturn(false);
 
 		mvc.perform(patch("/api/bands/1").with(asUser(7L))
@@ -113,7 +115,7 @@ class BandControllerTest {
 	}
 
 	@Test
-	void 밴드장이면_수정_성공() throws Exception {
+	void 관리자면_수정_성공() throws Exception {
 		given(bandGuard.isOwner(1L)).willReturn(true);
 		given(bandService.update(eq(1L), any())).willReturn(SAMPLE);
 
@@ -123,7 +125,7 @@ class BandControllerTest {
 	}
 
 	@Test
-	void 로고_업로드는_밴드장만() throws Exception {
+	void 로고_업로드는_관리자만() throws Exception {
 		given(bandGuard.isOwner(1L)).willReturn(true);
 		given(bandService.updateLogo(eq(1L), any())).willReturn(SAMPLE);
 
@@ -133,7 +135,7 @@ class BandControllerTest {
 	}
 
 	@Test
-	void 밴드장_위임은_204() throws Exception {
+	void 관리자_위임은_204() throws Exception {
 		given(bandGuard.isOwner(1L)).willReturn(true);
 
 		mvc.perform(put("/api/bands/1/owner").with(asUser(7L))
@@ -143,7 +145,7 @@ class BandControllerTest {
 	}
 
 	@Test
-	void 위임은_밴드장이_아니면_403() throws Exception {
+	void 위임은_관리자가_아니면_403() throws Exception {
 		given(bandGuard.isOwner(1L)).willReturn(false);
 
 		mvc.perform(put("/api/bands/1/owner").with(asUser(7L))
@@ -152,7 +154,7 @@ class BandControllerTest {
 	}
 
 	@Test
-	void 밴드_삭제는_밴드장이면_204() throws Exception {
+	void 밴드_삭제는_관리자면_204() throws Exception {
 		given(bandGuard.isOwner(1L)).willReturn(true);
 
 		mvc.perform(delete("/api/bands/1").with(asUser(7L))).andExpect(status().isNoContent());
@@ -160,7 +162,7 @@ class BandControllerTest {
 	}
 
 	@Test
-	void 밴드_삭제는_밴드장이_아니면_403() throws Exception {
+	void 밴드_삭제는_관리자가_아니면_403() throws Exception {
 		given(bandGuard.isOwner(1L)).willReturn(false);
 
 		mvc.perform(delete("/api/bands/1").with(asUser(7L))).andExpect(status().isForbidden());

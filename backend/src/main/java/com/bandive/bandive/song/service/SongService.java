@@ -16,6 +16,9 @@ import com.bandive.bandive.common.exception.ConflictException;
 import com.bandive.bandive.common.exception.ForbiddenException;
 import com.bandive.bandive.common.exception.NotFoundException;
 import com.bandive.bandive.common.exception.ValidationException;
+import com.bandive.bandive.common.security.BandAccessGuard;
+import com.bandive.bandive.guest.Guest;
+import com.bandive.bandive.guest.GuestRepository;
 import com.bandive.bandive.member.BandMember;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
@@ -29,9 +32,12 @@ import com.bandive.bandive.song.Vote;
 import com.bandive.bandive.song.VoteRepository;
 import com.bandive.bandive.song.dto.SongCreateRequest;
 import com.bandive.bandive.song.dto.SongCreateRequest.SessionSlot;
+import com.bandive.bandive.song.dto.SongOrderRequest;
 import com.bandive.bandive.song.dto.SongResponse;
 import com.bandive.bandive.song.dto.TrackSearchResult;
 import com.bandive.bandive.song.dto.VoteResult;
+import com.bandive.bandive.song.folder.SongFolder;
+import com.bandive.bandive.song.folder.SongFolderRepository;
 import com.bandive.bandive.user.User;
 import com.bandive.bandive.user.UserRepository;
 
@@ -49,30 +55,41 @@ public class SongService {
 
 	private final BandMemberRepository bandMembers;
 
+	private final GuestRepository guests;
+
 	private final UserRepository users;
+
+	private final SongFolderRepository folders;
 
 	private final MusicSearchService musicSearch;
 
+	private final BandAccessGuard bandAccess;
+
 	public SongService(SongRepository songs, SongPartRepository parts, VoteRepository votes, BandRepository bands,
-			BandMemberRepository bandMembers, UserRepository users, MusicSearchService musicSearch) {
+			BandMemberRepository bandMembers, GuestRepository guests, UserRepository users,
+			SongFolderRepository folders, MusicSearchService musicSearch, BandAccessGuard bandAccess) {
 		this.songs = songs;
 		this.parts = parts;
 		this.votes = votes;
 		this.bands = bands;
 		this.bandMembers = bandMembers;
+		this.guests = guests;
 		this.users = users;
+		this.folders = folders;
 		this.musicSearch = musicSearch;
+		this.bandAccess = bandAccess;
 	}
 
 	public List<TrackSearchResult> search(String query) {
 		return musicSearch.search(query);
 	}
 
-	/** 곡 목록. status null 이면 전체. currentUserId null(비회원) 이면 votedByMe 는 전부 false. */
+	/**
+	 * 곡 목록. status null 이면 전체. currentUserId null(비회원) 이면 votedByMe 는 전부 false. 밴드 공개범위
+	 * 게이트 적용.
+	 */
 	public List<SongResponse> list(Long bandId, SongStatus status, Long currentUserId) {
-		if (!bands.existsById(bandId)) {
-			throw new NotFoundException("BAND_NOT_FOUND", "밴드를 찾을 수 없습니다.");
-		}
+		bandAccess.requireCanViewContent(bandId, currentUserId);
 		List<Song> found = songs.findAllForBand(bandId, status);
 		if (found.isEmpty()) {
 			return List.of();
@@ -112,6 +129,7 @@ public class SongService {
 			.status(SongStatus.WISHLIST)
 			.sourceType(request.sourceType())
 			.externalTrackId(trimToNull(request.externalTrackId()))
+			.artworkUrl(trimToNull(request.artworkUrl()))
 			.memo(request.memo())
 			.referenceVideoUrl(trimToNull(request.referenceVideoUrl()))
 			.build();
@@ -123,6 +141,8 @@ public class SongService {
 				}
 			}
 		}
+		// 새 곡은 항상 WISHLIST·미분류 — 그 그룹 맨 끝에 놓는다.
+		song.moveToPosition(songs.countByBandIdAndStatusAndFolderIsNull(bandId, SongStatus.WISHLIST));
 		songs.save(song);
 		return SongResponse.from(song, 0L, false);
 	}
@@ -145,7 +165,7 @@ public class SongService {
 		return new VoteResult(votes.countBySongId(songId), false);
 	}
 
-	/** WISHLIST → CONFIRMED (밴드장). */
+	/** WISHLIST → CONFIRMED (관리자). */
 	@Transactional
 	public SongResponse confirm(Long songId, Long userId) {
 		Song song = findSongWithDetails(songId);
@@ -154,35 +174,93 @@ public class SongService {
 		return toResponse(song, userId);
 	}
 
-	/** 파트 배정/해제 (밴드 멤버 누구나). 곡이 CONFIRMED 여야 한다. */
+	/**
+	 * 파트 배정/해제 (밴드 멤버 누구나). 곡이 CONFIRMED 여야 한다. 실멤버(targetUserId)와 게스트(targetGuestId)는 최대
+	 * 하나.
+	 */
 	@Transactional
-	public SongResponse assignPart(Long songId, Long partId, Long actorUserId, Long targetUserId) {
+	public SongResponse assignPart(Long songId, Long partId, Long actorUserId, Long targetUserId, Long targetGuestId) {
 		Song song = findSongWithDetails(songId);
-		requireMember(song.getBand().getId(), actorUserId);
+		Long bandId = song.getBand().getId();
+		requireMember(bandId, actorUserId);
 		if (!song.isConfirmed()) {
 			throw new ConflictException("SONG_NOT_CONFIRMED", "확정된 합주곡만 파트를 배정할 수 있습니다.");
+		}
+		if (targetUserId != null && targetGuestId != null) {
+			throw new ValidationException("PART_ASSIGN_AMBIGUOUS", "멤버와 게스트를 동시에 배정할 수 없습니다.");
 		}
 
 		SongPart part = parts.findByIdAndSongId(partId, songId)
 			.orElseThrow(() -> new NotFoundException("PART_NOT_FOUND", "해당 파트를 찾을 수 없습니다."));
 
-		if (targetUserId == null) {
-			part.unassign();
-		}
-		else {
-			BandMember target = bandMembers.findByBandIdAndUserId(song.getBand().getId(), targetUserId)
+		if (targetUserId != null) {
+			BandMember target = bandMembers.findByBandIdAndUserId(bandId, targetUserId)
 				.orElseThrow(() -> new NotFoundException("MEMBER_NOT_FOUND", "배정 대상이 이 밴드의 멤버가 아닙니다."));
 			part.assignTo(target);
+		}
+		else if (targetGuestId != null) {
+			Guest target = guests.findByIdAndBandId(targetGuestId, bandId)
+				.orElseThrow(() -> new NotFoundException("GUEST_NOT_FOUND", "배정 대상 게스트를 찾을 수 없습니다."));
+			part.assignTo(target);
+		}
+		else {
+			part.unassign();
 		}
 		return toResponse(song, actorUserId);
 	}
 
-	/** 곡 삭제 (밴드장). song_parts·votes 는 cascade. */
+	/** 곡 삭제 (관리자). song_parts·votes 는 cascade. */
 	@Transactional
 	public void delete(Long songId, Long userId) {
 		Song song = findSong(songId);
 		requireOwner(song.getBand().getId(), userId);
 		songs.delete(song);
+	}
+
+	/** 곡을 폴더로 이동 (밴드 멤버 누구나). folderId 가 null 이면 미분류. 폴더는 곡과 같은 밴드·같은 status 여야 한다. */
+	@Transactional
+	public SongResponse moveToFolder(Long songId, Long userId, Long folderId) {
+		Song song = findSongWithDetails(songId);
+		Long bandId = song.getBand().getId();
+		requireMember(bandId, userId);
+		if (folderId == null) {
+			// 이미 미분류가 아니었으면 미분류 그룹 맨 끝으로.
+			int position = songs.countByBandIdAndStatusAndFolderIsNull(bandId, song.getStatus());
+			song.moveToFolder(null);
+			song.moveToPosition(position);
+		}
+		else {
+			SongFolder folder = folders.findById(folderId)
+				.orElseThrow(() -> new NotFoundException("FOLDER_NOT_FOUND", "폴더를 찾을 수 없습니다."));
+			if (!folder.getBand().getId().equals(bandId)) {
+				throw new ValidationException("FOLDER_BAND_MISMATCH", "다른 밴드의 폴더로는 옮길 수 없습니다.");
+			}
+			if (folder.getStatus() != song.getStatus()) {
+				throw new ValidationException("FOLDER_STATUS_MISMATCH", "위시리스트/합주곡 구분이 다른 폴더입니다.");
+			}
+			int position = songs.countByFolderId(folderId);
+			song.moveToFolder(folder);
+			song.moveToPosition(position);
+		}
+		return toResponse(song, userId);
+	}
+
+	/** 한 그룹(status × 폴더/미분류) 안에서 곡 순서를 통째로 다시 지정 (밴드 멤버 누구나). */
+	@Transactional
+	public void reorder(Long bandId, Long userId, SongOrderRequest request) {
+		requireMember(bandId, userId);
+		List<Song> current = (request.folderId() == null)
+				? songs.findByBandIdAndStatusAndFolderIsNullOrderByPositionAsc(bandId, request.status()) : songs
+					.findByBandIdAndStatusAndFolderIdOrderByPositionAsc(bandId, request.status(), request.folderId());
+		Set<Long> currentIds = current.stream().map(Song::getId).collect(HashSet::new, Set::add, Set::addAll);
+		if (currentIds.size() != request.songIds().size() || !currentIds.containsAll(request.songIds())) {
+			throw new ValidationException("SONG_ORDER_MISMATCH", "곡 순서 목록이 현재 그룹의 곡과 일치하지 않습니다.");
+		}
+		for (int i = 0; i < request.songIds().size(); i++) {
+			Long id = request.songIds().get(i);
+			int position = i;
+			current.stream().filter(s -> s.getId().equals(id)).findFirst().orElseThrow().moveToPosition(position);
+		}
 	}
 
 	private Song findSong(Long songId) {
@@ -209,7 +287,7 @@ public class SongService {
 		BandMember member = bandMembers.findByBandIdAndUserId(bandId, userId)
 			.orElseThrow(() -> new ForbiddenException("NOT_A_MEMBER", "이 밴드의 멤버가 아닙니다."));
 		if (member.getRole() != BandRole.OWNER) {
-			throw new ForbiddenException("NOT_BAND_OWNER", "밴드장만 할 수 있습니다.");
+			throw new ForbiddenException("NOT_BAND_OWNER", "관리자만 할 수 있습니다.");
 		}
 	}
 

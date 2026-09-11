@@ -1,0 +1,12 @@
+.dangerconfirm__go {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 700;
+}
+.dangerconfirm__go:disabled {
+  opacity: 0.45;
+}
+.dangerconfirm__go:not(:disabled):hover {
+  filter: brightness(0.92);
+}

@@ -86,7 +86,7 @@ public class InviteService {
 			.save(BandMember.builder().band(band).user(user).role(BandRole.MEMBER).joinedAt(Instant.now()).build());
 		inviteCode.incrementUsedCount();
 
-		return BandResponse.from(band, bandMembers.countByBandId(bandId));
+		return BandResponse.from(band, bandMembers.countByBandId(bandId), BandRole.MEMBER);
 	}
 
 	private Long resolveBandId(String code) {

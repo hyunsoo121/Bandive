@@ -65,4 +65,25 @@ public class ScheduleController {
 		return scheduleService.setAttendance(scheduleId, userId, request.status());
 	}
 
+	/** 관리자가 특정 멤버의 참석 여부를 대신 설정. */
+	@PostMapping("/api/schedules/{scheduleId}/attendance/{userId}")
+	public ScheduleResponse setMemberAttendance(@PathVariable Long scheduleId, @PathVariable Long userId,
+			@CurrentUser Long actorUserId, @Valid @RequestBody AttendanceRequest request) {
+		return scheduleService.setMemberAttendance(scheduleId, actorUserId, userId, request.status());
+	}
+
+	/** 관리자가 게스트를 일정에 추가. */
+	@PostMapping("/api/schedules/{scheduleId}/attendance/guests/{guestId}")
+	public ScheduleResponse setGuestAttendance(@PathVariable Long scheduleId, @PathVariable Long guestId,
+			@CurrentUser Long actorUserId) {
+		return scheduleService.setGuestAttendance(scheduleId, actorUserId, guestId);
+	}
+
+	/** 관리자가 게스트를 일정에서 제외. */
+	@DeleteMapping("/api/schedules/{scheduleId}/attendance/guests/{guestId}")
+	public ScheduleResponse removeGuestAttendance(@PathVariable Long scheduleId, @PathVariable Long guestId,
+			@CurrentUser Long actorUserId) {
+		return scheduleService.removeGuestAttendance(scheduleId, actorUserId, guestId);
+	}
+
 }

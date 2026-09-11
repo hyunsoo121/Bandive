@@ -47,7 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class SongControllerTest {
 
 	private static final SongResponse SONG = new SongResponse(5L, 1L, "곡", "아티스트", SongStatus.WISHLIST,
-			SongSourceType.MANUAL, null, "메모", null, 7L, "나", 3, true, List.of(),
+			SongSourceType.MANUAL, null, null, "메모", null, 7L, "나", 3, true, null, 0, List.of(),
 			Instant.parse("2026-09-02T00:00:00Z"));
 
 	@Autowired
@@ -69,7 +69,8 @@ class SongControllerTest {
 
 	@Test
 	void 음원_검색은_공개다() throws Exception {
-		given(songService.search("yes")).willReturn(List.of(new TrackSearchResult("stub:yes:1", "yes (샘플)", "아티스트")));
+		given(songService.search("yes"))
+			.willReturn(List.of(new TrackSearchResult("stub:yes:1", "yes (샘플)", "아티스트", null)));
 
 		mvc.perform(get("/api/songs/search").param("q", "yes"))
 			.andExpect(status().isOk())
@@ -119,6 +120,28 @@ class SongControllerTest {
 	}
 
 	@Test
+	void 참고영상_URL_이_http가_아니면_400() throws Exception {
+		given(bandGuard.isMember(1L)).willReturn(true);
+
+		mvc.perform(post("/api/bands/1/songs").with(asUser(7L))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"title\":\"곡\",\"sourceType\":\"MANUAL\",\"referenceVideoUrl\":\"javascript:alert(1)\"}"))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+	}
+
+	@Test
+	void 참고영상_URL_이_비어있으면_통과한다() throws Exception {
+		given(bandGuard.isMember(1L)).willReturn(true);
+		given(songService.add(eq(1L), eq(7L), any())).willReturn(SONG);
+
+		mvc.perform(post("/api/bands/1/songs").with(asUser(7L))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"title\":\"곡\",\"sourceType\":\"MANUAL\",\"referenceVideoUrl\":\"\",\"artworkUrl\":\"\"}"))
+			.andExpect(status().isCreated());
+	}
+
+	@Test
 	void 투표는_카운트를_돌려준다() throws Exception {
 		given(songService.vote(5L, 7L)).willReturn(new VoteResult(4, true));
 
@@ -146,7 +169,7 @@ class SongControllerTest {
 
 	@Test
 	void 파트_배정() throws Exception {
-		given(songService.assignPart(5L, 9L, 7L, 12L)).willReturn(SONG);
+		given(songService.assignPart(5L, 9L, 7L, 12L, null)).willReturn(SONG);
 
 		mvc.perform(put("/api/songs/5/parts/9/assign").with(asUser(7L))
 			.contentType(MediaType.APPLICATION_JSON)
@@ -154,9 +177,38 @@ class SongControllerTest {
 	}
 
 	@Test
+	void 파트_게스트_배정() throws Exception {
+		given(songService.assignPart(5L, 9L, 7L, null, 4L)).willReturn(SONG);
+
+		mvc.perform(put("/api/songs/5/parts/9/assign").with(asUser(7L))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"guestId\":4}")).andExpect(status().isOk());
+	}
+
+	@Test
 	void 곡_삭제는_204() throws Exception {
 		mvc.perform(delete("/api/songs/5").with(asUser(7L))).andExpect(status().isNoContent());
 		then(songService).should().delete(5L, 7L);
+	}
+
+	@Test
+	void 곡_순서_재지정은_멤버면_204() throws Exception {
+		given(bandGuard.isMember(1L)).willReturn(true);
+
+		mvc.perform(put("/api/bands/1/songs/order").with(asUser(7L))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"status\":\"WISHLIST\",\"folderId\":null,\"songIds\":[3,1,2]}"))
+			.andExpect(status().isNoContent());
+		then(songService).should().reorder(eq(1L), eq(7L), any());
+	}
+
+	@Test
+	void 곡_순서_재지정은_비멤버면_403() throws Exception {
+		given(bandGuard.isMember(1L)).willReturn(false);
+
+		mvc.perform(put("/api/bands/1/songs/order").with(asUser(7L))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"status\":\"WISHLIST\",\"songIds\":[3,1,2]}")).andExpect(status().isForbidden());
 	}
 
 	@TestConfiguration

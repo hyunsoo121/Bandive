@@ -3,6 +3,7 @@ package com.bandive.bandive.support;
 import java.time.Instant;
 
 import com.bandive.bandive.band.Band;
+import com.bandive.bandive.guest.Guest;
 import com.bandive.bandive.member.BandMember;
 import com.bandive.bandive.member.BandRole;
 import com.bandive.bandive.schedule.Schedule;
@@ -11,6 +12,7 @@ import com.bandive.bandive.song.Song;
 import com.bandive.bandive.song.SongPart;
 import com.bandive.bandive.song.SongSourceType;
 import com.bandive.bandive.song.SongStatus;
+import com.bandive.bandive.user.AuthProvider;
 import com.bandive.bandive.user.User;
 
 /**
@@ -22,15 +24,28 @@ public final class Fixtures {
 	}
 
 	public static User user(String kakaoId) {
-		return User.builder().kakaoId(kakaoId).nickname("nick-" + kakaoId).email(kakaoId + "@example.com").build();
+		return User.builder()
+			.kakaoId(kakaoId)
+			.nickname("nick-" + kakaoId)
+			.email(kakaoId + "@example.com")
+			.provider(AuthProvider.KAKAO)
+			.build();
 	}
 
 	public static Band band(String name) {
-		return Band.builder().name(name).build();
+		return band(name, com.bandive.bandive.band.BandVisibility.PUBLIC);
+	}
+
+	public static Band band(String name, com.bandive.bandive.band.BandVisibility visibility) {
+		return Band.builder().name(name).visibility(visibility).build();
 	}
 
 	public static BandMember member(Band band, User user, BandRole role) {
 		return BandMember.builder().band(band).user(user).role(role).joinedAt(Instant.now()).build();
+	}
+
+	public static Guest guest(Band band, String name) {
+		return Guest.builder().band(band).name(name).build();
 	}
 
 	public static Song song(Band band, User addedBy, SongStatus status) {

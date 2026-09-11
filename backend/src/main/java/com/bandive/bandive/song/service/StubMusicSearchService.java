@@ -17,9 +17,9 @@ public class StubMusicSearchService implements MusicSearchService {
 			return List.of();
 		}
 		String q = query.trim();
-		return List.of(new TrackSearchResult("stub:" + q + ":1", q + " (샘플 트랙 1)", "샘플 아티스트 A"),
-				new TrackSearchResult("stub:" + q + ":2", q + " (샘플 트랙 2)", "샘플 아티스트 B"),
-				new TrackSearchResult("stub:" + q + ":3", q + " (커버)", "샘플 밴드"));
+		return List.of(new TrackSearchResult("stub:" + q + ":1", q + " (샘플 트랙 1)", "샘플 아티스트 A", null),
+				new TrackSearchResult("stub:" + q + ":2", q + " (샘플 트랙 2)", "샘플 아티스트 B", null),
+				new TrackSearchResult("stub:" + q + ":3", q + " (커버)", "샘플 밴드", null));
 	}
 
 }

@@ -34,6 +34,9 @@ class MemberServiceTest extends RepositoryTest {
 	private BandMemberRepository bandMembers;
 
 	@Autowired
+	private com.bandive.bandive.follow.BandFollowRepository follows;
+
+	@Autowired
 	private TestEntityManager em;
 
 	private MemberService service;
@@ -42,7 +45,8 @@ class MemberServiceTest extends RepositoryTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new MemberService(bands, bandMembers);
+		service = new MemberService(bands, bandMembers,
+				new com.bandive.bandive.common.security.BandAccessGuard(bands, bandMembers, follows));
 		band = em.persist(Fixtures.band("A"));
 	}
 
@@ -60,7 +64,7 @@ class MemberServiceTest extends RepositoryTest {
 		em.flush();
 		em.clear();
 
-		List<MemberResponse> members = service.list(band.getId());
+		List<MemberResponse> members = service.list(band.getId(), null);
 
 		assertThat(members).extracting(MemberResponse::nickname)
 			.containsExactly("nick-owner", "nick-early", "nick-late");
@@ -68,7 +72,7 @@ class MemberServiceTest extends RepositoryTest {
 
 	@Test
 	void 없는_밴드_목록은_404() {
-		assertThatThrownBy(() -> service.list(999L)).isInstanceOf(NotFoundException.class);
+		assertThatThrownBy(() -> service.list(999L, null)).isInstanceOf(NotFoundException.class);
 	}
 
 	@Test
@@ -93,7 +97,7 @@ class MemberServiceTest extends RepositoryTest {
 	}
 
 	@Test
-	void 밴드장이_남의_파트를_설정한다() {
+	void 관리자가_남의_파트를_설정한다() {
 		join("owner", BandRole.OWNER, "2026-09-01T00:00:00Z");
 		BandMember target = join("m", BandRole.MEMBER, "2026-09-02T00:00:00Z");
 		em.flush();
@@ -102,6 +106,46 @@ class MemberServiceTest extends RepositoryTest {
 				new MemberPartsRequest(List.of("BASS")));
 
 		assertThat(updated.parts()).containsExactly("BASS");
+	}
+
+	@Test
+	void 리더를_지정하고_재지정하면_이전_리더는_해제된다() {
+		join("owner", BandRole.OWNER, "2026-09-01T00:00:00Z");
+		BandMember a = join("a", BandRole.MEMBER, "2026-09-02T00:00:00Z");
+		BandMember b = join("b", BandRole.MEMBER, "2026-09-03T00:00:00Z");
+		em.flush();
+		em.clear();
+
+		service.assignLeader(band.getId(), a.getUser().getId());
+		em.flush();
+		em.clear();
+		assertThat(leadersOf()).containsExactly(a.getUser().getId());
+
+		// 다른 멤버로 재지정 → 이전 리더 해제, 밴드당 1명 유지
+		service.assignLeader(band.getId(), b.getUser().getId());
+		em.flush();
+		em.clear();
+		assertThat(leadersOf()).containsExactly(b.getUser().getId());
+
+		// null 이면 리더 없음
+		service.assignLeader(band.getId(), null);
+		em.flush();
+		em.clear();
+		assertThat(leadersOf()).isEmpty();
+	}
+
+	@Test
+	void 없는_멤버를_리더로_지정하면_404() {
+		assertThatThrownBy(() -> service.assignLeader(band.getId(), 999L)).isInstanceOf(NotFoundException.class)
+			.satisfies(ex -> assertThat(((NotFoundException) ex).getCode()).isEqualTo("MEMBER_NOT_FOUND"));
+	}
+
+	private List<Long> leadersOf() {
+		return bandMembers.findAllByBandId(band.getId())
+			.stream()
+			.filter(BandMember::isLeader)
+			.map(m -> m.getUser().getId())
+			.toList();
 	}
 
 	@Test
@@ -118,7 +162,7 @@ class MemberServiceTest extends RepositoryTest {
 	}
 
 	@Test
-	void 밴드장은_추방할_수_없다_409() {
+	void 관리자는_추방할_수_없다_409() {
 		BandMember owner = join("owner", BandRole.OWNER, "2026-09-01T00:00:00Z");
 		em.flush();
 
@@ -147,7 +191,7 @@ class MemberServiceTest extends RepositoryTest {
 	}
 
 	@Test
-	void 밴드장은_탈퇴할_수_없다_409() {
+	void 관리자는_탈퇴할_수_없다_409() {
 		BandMember owner = join("owner", BandRole.OWNER, "2026-09-01T00:00:00Z");
 		em.flush();
 

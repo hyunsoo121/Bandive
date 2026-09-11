@@ -23,7 +23,17 @@
   width: 34px;
   height: 34px;
   flex: none;
+  object-fit: cover;
+  border: 1px solid var(--color-neutral-300);
+}
+.addsong__result-art--empty {
   background: repeating-linear-gradient(135deg, #9b9797 0 7px, #bab6b6 7px 14px);
+  border: 0;
+}
+.addsong__step--x {
+  border-color: var(--color-neutral-400);
+  color: var(--color-neutral-600);
+  font-size: 11px;
 }
 
 .addsong__session {

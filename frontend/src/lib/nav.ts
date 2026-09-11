@@ -36,3 +36,15 @@ export const NAV_ITEMS: NavItem[] = [
     d2: 'M4 21c0-4 3.6-6 8-6s8 2 8 6',
   },
 ];
+
+/** 탐색 — 밴드 스코프 밖(절대경로). 데스크탑 사이드바 + 모바일 하단탭 공통. */
+export const EXPLORE_NAV = {
+  key: 'explore',
+  label: '탐색',
+  to: '/explore',
+  d1: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18',
+  d2: 'm15 9-2 5-5 2 2-5z',
+} as const;
+
+/** 모바일 하단 탭 (5개): 홈·곡·일정·영상·탐색. 멤버/설정은 홈에서 관리. */
+export const TAB_KEYS = ['home', 'songs', 'schedule', 'media'] as const;

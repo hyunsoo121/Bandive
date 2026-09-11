@@ -50,6 +50,12 @@ class ScheduleServiceTest extends RepositoryTest {
 	private BandMemberRepository bandMembers;
 
 	@Autowired
+	private com.bandive.bandive.follow.BandFollowRepository follows;
+
+	@Autowired
+	private com.bandive.bandive.guest.GuestRepository guests;
+
+	@Autowired
 	private com.bandive.bandive.user.UserRepository users;
 
 	@Autowired
@@ -68,7 +74,8 @@ class ScheduleServiceTest extends RepositoryTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new ScheduleService(schedules, attendances, media, bands, bandMembers, users);
+		service = new ScheduleService(schedules, attendances, media, bands, bandMembers, guests, users,
+				new com.bandive.bandive.common.security.BandAccessGuard(bands, bandMembers, follows));
 		band = em.persist(Fixtures.band("A"));
 		ownerId = joinMember("owner", BandRole.OWNER);
 		memberId = joinMember("member", BandRole.MEMBER);
@@ -148,7 +155,7 @@ class ScheduleServiceTest extends RepositoryTest {
 	}
 
 	@Test
-	void 밴드장은_일정을_삭제하고_출결도_함께_사라진다() {
+	void 관리자는_일정을_삭제하고_출결도_함께_사라진다() {
 		Long scheduleId = service.create(band.getId(), ownerId, req()).id();
 		service.setAttendance(scheduleId, memberId, AttendanceStatus.ATTENDING);
 		em.flush();
@@ -183,6 +190,95 @@ class ScheduleServiceTest extends RepositoryTest {
 
 		assertThat(attendances.findAllByScheduleId(scheduleId)).hasSize(1);
 		assertThat(afterChange.myStatus()).isEqualTo(AttendanceStatus.ABSENT);
+	}
+
+	@Test
+	void 관리자는_다른_멤버의_출결을_대신_설정한다() {
+		Long scheduleId = service.create(band.getId(), ownerId, req()).id();
+		service.setAttendance(scheduleId, memberId, AttendanceStatus.UNDECIDED);
+		em.flush();
+		em.clear();
+
+		service.setMemberAttendance(scheduleId, ownerId, memberId, AttendanceStatus.ABSENT);
+		em.flush();
+		em.clear();
+
+		assertThat(attendances.findByScheduleIdAndUserId(scheduleId, memberId).orElseThrow().getStatus())
+			.isEqualTo(AttendanceStatus.ABSENT);
+		assertThat(attendances.findAllByScheduleId(scheduleId)).hasSize(1); // upsert, 중복
+																			// 안 생김
+	}
+
+	@Test
+	void 일반_멤버는_남의_출결을_설정할_수_없다_403() {
+		Long scheduleId = service.create(band.getId(), ownerId, req()).id();
+		em.flush();
+
+		assertThatThrownBy(() -> service.setMemberAttendance(scheduleId, memberId, ownerId, AttendanceStatus.ATTENDING))
+			.isInstanceOf(ForbiddenException.class)
+			.satisfies(ex -> assertThat(((ForbiddenException) ex).getCode()).isEqualTo("NOT_BAND_OWNER"));
+	}
+
+	@Test
+	void 대상이_멤버가_아니면_404() {
+		Long scheduleId = service.create(band.getId(), ownerId, req()).id();
+		em.flush();
+
+		assertThatThrownBy(() -> service.setMemberAttendance(scheduleId, ownerId, 999_999L, AttendanceStatus.ATTENDING))
+			.isInstanceOf(NotFoundException.class)
+			.satisfies(ex -> assertThat(((NotFoundException) ex).getCode()).isEqualTo("MEMBER_NOT_FOUND"));
+	}
+
+	// ── 게스트 참석 ───────────────────────────────────────
+
+	@Test
+	void 관리자는_게스트를_일정에_추가하고_제외한다() {
+		Long scheduleId = service.create(band.getId(), ownerId, req()).id();
+		Long guestId = em.persist(Fixtures.guest(band, "세션 드럼")).getId();
+		service.setAttendance(scheduleId, memberId, AttendanceStatus.ATTENDING);
+		em.flush();
+		em.clear();
+
+		ScheduleResponse set = service.setGuestAttendance(scheduleId, ownerId, guestId);
+		assertThat(set.attendees()).filteredOn(a -> a.guestId() != null)
+			.singleElement()
+			.satisfies(a -> assertThat(a.guestId()).isEqualTo(guestId),
+					a -> assertThat(a.nickname()).isEqualTo("세션 드럼"), a -> assertThat(a.userId()).isNull(),
+					a -> assertThat(a.status()).isEqualTo(AttendanceStatus.ATTENDING));
+		// 게스트는 멤버 참석 집계에 포함되지 않는다
+		assertThat(set.counts().attending()).isEqualTo(1);
+
+		// 이미 있으면 중복 생성 안 함
+		service.setGuestAttendance(scheduleId, ownerId, guestId);
+		em.flush();
+		em.clear();
+		assertThat(attendances.findAllByScheduleId(scheduleId)).hasSize(2);
+
+		ScheduleResponse removed = service.removeGuestAttendance(scheduleId, ownerId, guestId);
+		assertThat(removed.attendees()).filteredOn(a -> a.guestId() != null).isEmpty();
+	}
+
+	@Test
+	void 일반_멤버는_게스트를_일정에_추가할_수_없다_403() {
+		Long scheduleId = service.create(band.getId(), ownerId, req()).id();
+		Long guestId = em.persist(Fixtures.guest(band, "세션")).getId();
+		em.flush();
+
+		assertThatThrownBy(() -> service.setGuestAttendance(scheduleId, memberId, guestId))
+			.isInstanceOf(ForbiddenException.class)
+			.satisfies(ex -> assertThat(((ForbiddenException) ex).getCode()).isEqualTo("NOT_BAND_OWNER"));
+	}
+
+	@Test
+	void 다른_밴드_게스트는_404() {
+		Long scheduleId = service.create(band.getId(), ownerId, req()).id();
+		Band other = em.persist(Fixtures.band("B"));
+		Long strayGuestId = em.persist(Fixtures.guest(other, "남")).getId();
+		em.flush();
+
+		assertThatThrownBy(() -> service.setGuestAttendance(scheduleId, ownerId, strayGuestId))
+			.isInstanceOf(NotFoundException.class)
+			.satisfies(ex -> assertThat(((NotFoundException) ex).getCode()).isEqualTo("GUEST_NOT_FOUND"));
 	}
 
 	@Test

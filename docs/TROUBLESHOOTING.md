@@ -341,12 +341,12 @@ CGLIB 프록시가 생기는데 부모의 `final` setter 를 못 감싼다는 **
 
 ### 초대 코드가 멤버 화면에 안 보인다
 
-**증상.** 밴드장인데 멤버 탭에 초대 코드가 없음.
+**증상.** 관리자인데 멤버 탭에 초대 코드가 없음.
 
 **원인.** 버그 아님. 초대 코드 **조회** API 가 없다 (`POST` 발급/재발급만 있음). 발급을 눌러야 표시된다.
 `POST` 를 다시 부르면 이전 코드는 폐기되므로 자동 호출하지 않는 것.
 
-### 밴드장인데 밴드 전환 시트에 "사용자" 로 표시된다
+### 관리자인데 밴드 전환 시트에 "사용자" 로 표시된다
 
 **원인.** `GET /api/bands/my` 응답에 아직 role 필드가 없다. 현재 밴드 화면의 권한 판정은
 멤버 목록에서 내 역할을 찾아 정확히 하지만, 내 밴드 **목록**(스위처)에는 역할 정보가 없어 전부 'member' fallback.
@@ -357,7 +357,7 @@ CGLIB 프록시가 생기는데 부모의 `final` setter 를 못 감싼다는 **
 
 **원인.** `GET /api/songs/search` 가 스텁 모드다. `app.music.provider` 기본값이 `stub`
 (`StubMusicSearchService` — 쿼리를 3건으로 echo). 실 검색을 켜려면 `backend/.env` 에 **한 줄** `MUSIC_PROVIDER=itunes`
-(Apple iTunes Search API — 인증·API 키 불필요. 선택: `MUSIC_COUNTRY=KR`). 응답 형태(`TrackSearchResult`)는
+(Apple iTunes Search API — 인증·API 키 불필요. `MUSIC_COUNTRY` 기본 `US`, 아래 항목 참고). 응답 형태(`TrackSearchResult`)는
 두 모드가 동일해서 프론트는 그대로 동작한다. 외부 장애(타임아웃·4xx·5xx·깨진 본문)는 `ItunesMusicSearchService` 가
 삼켜서 빈 목록으로 준다(500 대신 결과 없음).
 결과를 **클릭해서 골라야** `sourceType=SEARCH` +
@@ -376,6 +376,31 @@ Premium** 일 때만 200 으로 준다. 무료 계정이 만든 앱은 토큰만
 `MUSIC_PROVIDER=itunes` 한 줄. iTunes 는 `Content-Type: text/javascript` 로 JSON 을 주므로 `ItunesMusicSearchService`
 가 문자열로 받아 `ObjectMapper` 로 파싱한다. 다른 무인증 후보로 Deezer(`api.deezer.com/search`) 도 있음.
 (Spotify 로 가려면 앱 소유 계정을 Premium 으로 만들고 `MusicSearchService` 구현체만 되돌리면 됨.)
+
+### iTunes 실 검색을 켰는데 무슨 단어를 쳐도 결과가 0건이다
+
+**증상.** `MUSIC_PROVIDER=itunes` 인데 `GET /api/songs/search?q=coldplay` 가 `[]`. 스텁도 아니고
+타임아웃도 아님(백엔드 로그에 "iTunes 검색 실패" 도 안 뜸). `curl "https://itunes.apple.com/search?term=coldplay"`
+는 결과가 나온다.
+
+**원인.** `MUSIC_COUNTRY=KR` 이었다. KR iTunes 스토어는 Search API `entity=song` 조합에 대해 **항상 빈 배열**을
+준다 (`entity=song&country=KR` → `resultCount:0`, `entity=song&country=US` → 정상, `entity=musicTrack&country=KR`
+→ 정상). 2026-09-03 확인.
+
+**해결 (2026-09-03, feature/10).** `MUSIC_COUNTRY` 기본값을 `US` 로 바꿨다 (`MusicProperties`,
+`application.yaml`, `.env.example`). US 카탈로그는 한글 검색어("아이유 좋은날" → `Good Day` by IU)도 정상
+매칭된다.
+
+### 검색 결과 제목이 영문("Good Day")으로 나온다 — 한글로 보고 싶다
+
+**배경.** 위 항목대로 검색은 US 스토어로 하는데, US 스토어는 곡 제목/가수를 영문·로마자로 준다
+("좋은 날"→"Good Day", "잔나비"→"JANNABI"). KR 스토어로 검색하면 한글이지만 `entity=song` 이 죽어서 결과가 안 나온다.
+
+**해결 (2026-09-06, feature/10).** `ItunesMusicSearchService` 가 2단계로 동작한다: ① `country=US` 로 검색 →
+② 그 trackId 들을 `lookup?id=<전부>&country=KR` **1회** 호출해 현지화된 제목/가수로 치환. KR 스토어는 *검색*은
+죽었어도 *lookup* 은 살아 있어서 "Good Day" → "좋은 날 / 아이유", "For Lovers Who Hesitate" →
+"주저하는 연인들을 위해 / 잔나비" 로 바뀐다. KR 스토어에 없는 곡(예: Coldplay)이나 lookup 실패 시엔 US 값을 그대로 쓴다.
+앨범아트 URL 은 두 스토어가 동일. 끄려면 `MUSIC_LOCALIZE_COUNTRY=` (빈 값).
 
 ### 영상 카드/일정 리스트에 "제목"이 안 뜬다
 
@@ -415,3 +440,42 @@ UI 는 `CONFIRMED` 곡에서만 select 를 보여주므로 보통은 안 나지�
 **해결 (2026-09-03, feature/8).** `addMedia`(`scheduleId` 있을 때) / `removeMedia`(지우는 영상이 일정에 연결돼
 있었을 때) 후 `scheduleApi.listSchedules` 로 `schedules` 를 다시 받는다 (`refreshSchedules` 헬퍼).
 백엔드는 처음부터 `ScheduleResponse.media` 를 정상으로 내려주고 있었음 — 순수 클라 상태 동기화 버그였다.
+
+## 보안 점검 (배포 전, 2026-09-08)
+
+배포 전 URL 첨부·쿼리 관련 보안 훑기. 결과 요약과 고친 것.
+
+### SQL 인젝션 — 없음
+
+전 저장소가 Spring Data JPA. `@Query` 는 전부 JPQL + 네임드 파라미터(`:bandId`),
+문자열 결합 쿼리·`nativeQuery` 0건. 파생 쿼리(`findByBandIdAndStatus…`)도 바인딩.
+raw SQL 은 Flyway 마이그레이션(개발자 작성 정적 스크립트)뿐.
+
+### `javascript:` URL 저장형 XSS — 곡 `referenceVideoUrl` / `artworkUrl` (고침)
+
+**문제.** `MediaCreateRequest`/`MediaUpdateRequest.externalUrl` 은 `@Pattern("^https?://.+")` 로
+막혀 있었으나, `SongCreateRequest.referenceVideoUrl`·`artworkUrl` 은 `@Size` 만 있었다.
+프론트는 이 값을 `<a href={song.referenceVideoUrl}>` / `<img src={song.artworkUrl}>` 로
+그대로 렌더하는데, **React 는 `href`/`src` 속성값을 sanitize 하지 않는다.** 따라서
+`referenceVideoUrl` 에 `javascript:alert(1)` 을 저장해 두면 그 링크를 클릭한 사람 브라우저에서
+스크립트가 실행된다 (곡은 비회원도 GET 으로 봄 → 영향 범위 넓음).
+
+**고침 (2026-09-08, feature/10).** `SongCreateRequest` 의 두 필드에 `@Pattern(regexp = "^(https?://.+)?$")`
+추가 — `http(s)://` 로 시작하는 값 또는 빈 문자열만 허용, `javascript:`·`data:`·`file:` 등은 400.
+빈 문자열을 허용해야 하는 이유: 프론트가 "참고 영상 없음" 일 때 `""` 를 보냄(`AddSongModal`). 곡 수정
+API 는 없어서 생성 DTO 만 손보면 됨. 테스트 `SongControllerTest.참고영상_URL_이_http가_아니면_400`,
+`…비어있으면_통과한다` 추가.
+
+### 나머지 (문제 아님 / 배포 시 처리)
+
+- **XSS 전반**: `dangerouslySetInnerHTML`·`innerHTML`·`eval` 미사용, React 자동 이스케이프.
+  외부 링크는 전부 `target="_blank" rel="noreferrer"` (reverse tabnabbing 안전).
+- **SSRF**: 백엔드가 요청하는 외부 호스트는 `itunes.apple.com` 고정 하나. media/reference URL 을
+  서버가 fetch 하는 코드 없음. `MediaThumbnail` 은 정규식으로 `[A-Za-z0-9_-]` id 만 캡처해
+  `img.youtube.com`/`drive.google.com` 고정 도메인 문자열을 조립(요청은 브라우저 `<img>`).
+- **파일 업로드(로고/배너)**: `LocalStorageService` — MIME 화이트리스트(png/jpg/webp/gif, **SVG 제외**),
+  UUID 파일명, path-traversal 가드(`dir.startsWith(root)`), 5MB 제한. `Content-Type` 은 클라 신고값이라
+  스푸핑 가능하나 `.png` 확장자로만 서빙 + `X-Content-Type-Options: nosniff`(Security 기본값)라 HTML 실행 불가.
+- **인가**: `@bandGuard` 멤버/관리자 체크 + media `visibility` 필터(비회원·비멤버는 `LINK_PUBLIC` 만).
+- **배포 시 숙제**: ① 크로스도메인이면 refresh 쿠키 `SameSite=None; Secure` → CSRF 재검토(현재 `Strict`),
+  ② `/api/auth/login` 브루트포스·`/api/songs/search` 남용 rate limiting, ③ 프론트 정적 서빙 측 CSP 헤더.

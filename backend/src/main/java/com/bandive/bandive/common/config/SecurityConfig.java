@@ -10,6 +10,8 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
@@ -24,13 +26,18 @@ import com.bandive.bandive.common.security.RestAuthenticationEntryPoint;
 
 /**
  * 인증: 카카오 oauth2Login (세션 대신 쿠키에 authorization request). 인가: 공개 GET / 그 외 인증. API 는
- * STATELESS + Bearer JWT. 밴드장 전용은 메서드 단위 {@code @PreAuthorize}.
+ * STATELESS + Bearer JWT. 관리자 전용은 메서드 단위 {@code @PreAuthorize}.
  */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 @EnableConfigurationProperties(AuthProperties.class)
 public class SecurityConfig {
+
+	@Bean
+	PasswordEncoder passwordEncoder() {
+		return new BCryptPasswordEncoder();
+	}
 
 	@Bean
 	SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter,
@@ -49,9 +56,10 @@ public class SecurityConfig {
 				.permitAll()
 				.requestMatchers("/oauth2/**", "/login/**", "/files/**")
 				.permitAll()
-				.requestMatchers(HttpMethod.POST, "/api/auth/refresh", "/api/auth/logout")
+				.requestMatchers(HttpMethod.POST, "/api/auth/refresh", "/api/auth/logout", "/api/auth/signup",
+						"/api/auth/login")
 				.permitAll()
-				.requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/bands/my")
+				.requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/bands/my", "/api/me/following")
 				.authenticated()
 				.requestMatchers(HttpMethod.GET, "/api/**")
 				.permitAll()

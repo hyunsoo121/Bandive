@@ -27,7 +27,8 @@ class ItunesMusicSearchServiceTest {
 
 	private static final String RESPONSE_JSON = """
 			{"resultCount":3,"results":[
-			  {"trackId":409076748,"trackName":"좋은 날","artistName":"아이유","kind":"song"},
+			  {"trackId":409076748,"trackName":"좋은 날","artistName":"아이유","kind":"song",
+			   "artworkUrl100":"https://is1.mzstatic.com/x/100x100bb.jpg"},
 			  {"trackId":1441164805,"trackName":"Yesterday","artistName":"The Beatles"},
 			  {"trackId":null,"trackName":"이름만 있고 id 없음","artistName":"X"}
 			]}""";
@@ -40,7 +41,8 @@ class ItunesMusicSearchServiceTest {
 	void setUp() {
 		RestClient.Builder builder = RestClient.builder().baseUrl("https://itunes.apple.com");
 		this.server = MockRestServiceServer.bindTo(builder).build();
-		this.service = new ItunesMusicSearchService(new MusicProperties("itunes", 8, "KR"), builder.build(),
+		// 현지화 lookup 은 아래 별도 테스트에서 검증 — 여기선 꺼서(빈 값) /search 매핑에만 집중한다.
+		this.service = new ItunesMusicSearchService(new MusicProperties("itunes", 8, "US", ""), builder.build(),
 				JsonMapper.builder().build());
 	}
 
@@ -51,15 +53,67 @@ class ItunesMusicSearchServiceTest {
 			.andExpect(queryParam("term", "IU"))
 			.andExpect(queryParam("entity", "song"))
 			.andExpect(queryParam("limit", "8"))
-			.andExpect(queryParam("country", "KR"))
+			.andExpect(queryParam("country", "US"))
 			.andRespond(withSuccess(RESPONSE_JSON, ITUNES_CT));
 
 		// 응답 본문에 한글 트랙명이 섞여 있어도 그대로 매핑된다. id 없는 항목은 버린다.
 		var results = this.service.search("IU");
 
-		assertThat(results).containsExactly(new TrackSearchResult("409076748", "좋은 날", "아이유"),
-				new TrackSearchResult("1441164805", "Yesterday", "The Beatles"));
+		assertThat(results).containsExactly(
+				new TrackSearchResult("409076748", "좋은 날", "아이유", "https://is1.mzstatic.com/x/600x600bb.jpg"),
+				new TrackSearchResult("1441164805", "Yesterday", "The Beatles", null));
 		this.server.verify();
+	}
+
+	@Test
+	void US_로_검색하고_KR_lookup_으로_제목을_현지화한다() {
+		RestClient.Builder builder = RestClient.builder().baseUrl("https://itunes.apple.com");
+		MockRestServiceServer localServer = MockRestServiceServer.bindTo(builder).build();
+		ItunesMusicSearchService localized = new ItunesMusicSearchService(new MusicProperties("itunes", 8, "US", "KR"),
+				builder.build(), JsonMapper.builder().build());
+
+		String usSearch = """
+				{"resultCount":2,"results":[
+				  {"trackId":409076748,"trackName":"Good Day","artistName":"IU",
+				   "artworkUrl100":"https://is1.mzstatic.com/x/100x100bb.jpg"},
+				  {"trackId":693573510,"trackName":"Yellow","artistName":"Coldplay"}
+				]}""";
+		// KR 스토어엔 IU 곡만 있고 Coldplay 는 없다 → Coldplay 는 US 값을 그대로 유지한다.
+		String krLookup = """
+				{"resultCount":1,"results":[
+				  {"trackId":409076748,"trackName":"좋은 날","artistName":"아이유"}
+				]}""";
+
+		localServer.expect(requestTo(Matchers.startsWith("https://itunes.apple.com/search")))
+			.andExpect(queryParam("country", "US"))
+			.andRespond(withSuccess(usSearch, ITUNES_CT));
+		localServer.expect(requestTo(Matchers.startsWith("https://itunes.apple.com/lookup")))
+			.andExpect(queryParam("country", "KR"))
+			.andExpect(queryParam("id", Matchers.containsString("409076748")))
+			.andRespond(withSuccess(krLookup, ITUNES_CT));
+
+		assertThat(localized.search("IU good day")).containsExactly(
+				new TrackSearchResult("409076748", "좋은 날", "아이유", "https://is1.mzstatic.com/x/600x600bb.jpg"),
+				new TrackSearchResult("693573510", "Yellow", "Coldplay", null));
+		localServer.verify();
+	}
+
+	@Test
+	void 현지화_lookup_이_실패해도_검색_결과는_그대로_준다() {
+		RestClient.Builder builder = RestClient.builder().baseUrl("https://itunes.apple.com");
+		MockRestServiceServer localServer = MockRestServiceServer.bindTo(builder).build();
+		ItunesMusicSearchService localized = new ItunesMusicSearchService(new MusicProperties("itunes", 8, "US", "KR"),
+				builder.build(), JsonMapper.builder().build());
+
+		localServer.expect(requestTo(Matchers.startsWith("https://itunes.apple.com/search")))
+			.andRespond(withSuccess(RESPONSE_JSON, ITUNES_CT));
+		localServer.expect(requestTo(Matchers.startsWith("https://itunes.apple.com/lookup")))
+			.andRespond(withServerError());
+
+		assertThat(localized.search("IU")).containsExactly(
+				new TrackSearchResult("409076748", "좋은 날", "아이유", "https://is1.mzstatic.com/x/600x600bb.jpg"),
+				new TrackSearchResult("1441164805", "Yesterday", "The Beatles", null));
+		localServer.verify();
 	}
 
 	@Test
