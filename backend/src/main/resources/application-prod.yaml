@@ -11,6 +11,10 @@ spring:
   jpa:
     show-sql: false
 
+# 로컬은 다른 프로젝트와의 포트 충돌 회피용 8081 — 운영 호스트엔 그런 충돌이 없으니 표준 포트로 복구
+server:
+  port: ${SERVER_PORT:8080}
+
 management:
   endpoint:
     health:
