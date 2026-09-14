@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 # 운영 배포용 이미지. 정적 빌드 산출물 + Caddy(TLS 종료·SPA 서빙·백엔드 리버스프록시)를 한 이미지로.
-# GitHub Actions 에서 buildx 로 linux/arm64 (Graviton) 빌드.
+# GitHub Actions 에서 buildx 로 linux/amd64 빌드 (EC2 t3 계열, x86_64).
 
 # ── 빌드 스테이지 ──
 FROM node:22-alpine AS build

@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# 운영 배포용 이미지. GitHub Actions 에서 buildx 로 linux/arm64 (Graviton) 빌드.
+# 운영 배포용 이미지. GitHub Actions 에서 buildx 로 linux/amd64 빌드 (EC2 t3 계열, x86_64).
 
 # ── 빌드 스테이지 ──
 FROM eclipse-temurin:21-jdk-jammy AS build

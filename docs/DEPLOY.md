@@ -6,7 +6,7 @@
 ## 아키텍처
 
 ```
-Route53(A레코드) → Elastic IP → EC2 Spot(persistent, interrupt=stop, t4g.small, ap-northeast-2)
+Route53(A레코드) → Elastic IP → EC2 Spot(persistent, interrupt=stop, t3.micro, us-east-1)
                                     └─ docker compose (모두 restart: unless-stopped)
                                         ├─ web(Caddy)   — TLS 자동발급 + SPA 정적서빙 + /api 등 backend 프록시
                                         ├─ backend      — Spring Boot
@@ -25,8 +25,8 @@ Route53(A레코드) → Elastic IP → EC2 Spot(persistent, interrupt=stop, t4g.
 ### 1. ECR 리포지토리
 
 ```bash
-aws ecr create-repository --repository-name bandive-backend  --region ap-northeast-2
-aws ecr create-repository --repository-name bandive-frontend --region ap-northeast-2
+aws ecr create-repository --repository-name bandive-backend  --region us-east-1
+aws ecr create-repository --repository-name bandive-frontend --region us-east-1
 ```
 
 ### 2. GitHub Actions용 IAM 역할 (OIDC, 액세스키 없음)
@@ -62,15 +62,15 @@ URL `https://token.actions.githubusercontent.com`, 대상 `sts.amazonaws.com`). 
       "Sid": "EcrPush", "Effect": "Allow",
       "Action": ["ecr:BatchCheckLayerAvailability", "ecr:PutImage", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload"],
       "Resource": [
-        "arn:aws:ecr:ap-northeast-2:<ACCOUNT_ID>:repository/bandive-backend",
-        "arn:aws:ecr:ap-northeast-2:<ACCOUNT_ID>:repository/bandive-frontend"
+        "arn:aws:ecr:us-east-1:<ACCOUNT_ID>:repository/bandive-backend",
+        "arn:aws:ecr:us-east-1:<ACCOUNT_ID>:repository/bandive-frontend"
       ]
     },
     {
       "Sid": "SsmSend", "Effect": "Allow", "Action": "ssm:SendCommand",
       "Resource": [
-        "arn:aws:ec2:ap-northeast-2:<ACCOUNT_ID>:instance/<INSTANCE_ID>",
-        "arn:aws:ssm:ap-northeast-2::document/AWS-RunShellScript"
+        "arn:aws:ec2:us-east-1:<ACCOUNT_ID>:instance/<INSTANCE_ID>",
+        "arn:aws:ssm:us-east-1::document/AWS-RunShellScript"
       ]
     },
     { "Sid": "SsmResult", "Effect": "Allow", "Action": ["ssm:GetCommandInvocation", "ssm:ListCommandInvocations"], "Resource": "*" }
@@ -91,9 +91,9 @@ URL `https://token.actions.githubusercontent.com`, 대상 `sts.amazonaws.com`). 
 ### 4. EC2 Spot 인스턴스 launch
 
 콘솔 "인스턴스 시작":
-- AMI: **Amazon Linux 2023 (arm64)**
-- 인스턴스 유형: **t4g.small** (버벅이면 t4g.medium)
-- 키 페어: 없어도 됨 (SSH 안 씀)
+- AMI: **Amazon Linux 2023 (x86_64)**
+- 인스턴스 유형: **t3.micro** (RAM 1GB — 버벅이거나 OOM 나면 t3.small로 갈아타기)
+- 키 페어: 없어도 됨 (SSH 안 씀, SSM으로 접속)
 - 네트워크: 기본 VPC, 퍼블릭 서브넷
 - 보안 그룹: 인바운드 **80, 443** 만 (0.0.0.0/0). 22는 열지 않음
 - 스토리지: 루트 볼륨 gp3 20GB, **"종료 시 삭제" 체크 해제**
@@ -108,11 +108,19 @@ systemctl enable --now docker
 usermod -aG docker ec2-user
 
 mkdir -p /usr/local/lib/docker/cli-plugins
-curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64 \
+curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
   -o /usr/local/lib/docker/cli-plugins/docker-compose
 chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
 mkdir -p /opt/bandive
+
+# t3.micro 는 RAM 1GB 뿐 — 넷(Caddy/backend/postgres/redis) 다 올리기엔 빠듯해서
+# 스왑 2GB 를 안전장치로 걸어둔다 (OOM killer 가 컨테이너 죽이는 것보단 느려도 낫다)
+fallocate -l 2G /swapfile
+chmod 600 /swapfile
+mkswap /swapfile
+swapon /swapfile
+echo '/swapfile none swap sw 0 0' >> /etc/fstab
 ```
 
 - 고급 세부 정보 → 구매 옵션: **스팟 인스턴스 요청** 체크 → 요청 유형 **지속적(Persistent)**,
@@ -132,7 +140,7 @@ mkdir -p /opt/bandive && cd /opt/bandive
 #  - docker-compose.prod.yml  (레포 루트의 파일 그대로)
 #  - .env                     (.env.prod.example 참고해서 실제 값 채운 것)
 
-aws ecr get-login-password --region ap-northeast-2 \
+aws ecr get-login-password --region us-east-1 \
   | docker login --username AWS --password-stdin "$(grep ECR_REGISTRY .env | cut -d= -f2)"
 
 docker compose -f docker-compose.prod.yml pull
