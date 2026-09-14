@@ -90,6 +90,37 @@
   align-items: center;
   gap: 10px;
 }
+.sidebar__me-open {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+  padding: 4px;
+  margin: -4px;
+  cursor: pointer;
+}
+.sidebar__me-open:disabled {
+  cursor: default;
+}
+.sidebar__me-open:not(:disabled):hover {
+  background: var(--color-neutral-100);
+}
+.sidebar__me-btn {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 9px;
+  border: 1px solid var(--color-neutral-400);
+  background: var(--color-bg);
+  color: var(--color-neutral-800);
+  cursor: pointer;
+}
+.sidebar__me-btn:hover {
+  border-color: var(--color-text);
+}
 
 .app__main {
   flex: 1;

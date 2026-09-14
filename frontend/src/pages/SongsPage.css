@@ -44,6 +44,119 @@
   color: var(--color-bg);
   border-color: var(--color-text);
 }
+.songs__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ─── 폴더 ─── */
+.folder {
+  margin-bottom: 10px;
+}
+.folder.is-dragging {
+  opacity: 0.6;
+}
+.folder__body.is-over {
+  background: var(--color-neutral-100);
+  outline: 2px dashed var(--color-neutral-400);
+  outline-offset: 2px;
+}
+.folder__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 2px solid var(--color-text);
+}
+.folder__handle {
+  border: none;
+  background: transparent;
+  cursor: grab;
+  font-size: 15px;
+  color: var(--color-neutral-600);
+  padding: 0 2px;
+  touch-action: none;
+}
+.folder__toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  flex: 1;
+  min-width: 0;
+}
+.folder__toggle:disabled {
+  cursor: default;
+}
+.folder__caret {
+  font-size: 11px;
+  width: 10px;
+  flex: none;
+  color: var(--color-neutral-600);
+}
+.folder__name {
+  font-family: var(--font-heading);
+  font-size: 14px;
+}
+.folder__collapsed {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 12px 0;
+  text-align: left;
+  font-size: 12px;
+  color: var(--color-neutral-600);
+  cursor: pointer;
+}
+.folder__collapsed:hover {
+  color: var(--color-text);
+}
+.folder__count {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-neutral-600);
+}
+.folder__actions {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+.folder__act {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border: 1px solid var(--color-neutral-400);
+  background: var(--color-bg);
+  cursor: pointer;
+}
+.folder__act--danger {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.folder__empty {
+  padding: 14px 0;
+  font-size: 12px;
+  color: var(--color-neutral-600);
+}
+.songrow__folder {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.songrow__folder-select {
+  font-size: 11px;
+  padding: 2px 6px;
+  border: 1px solid var(--color-neutral-400);
+  background: var(--color-bg);
+}
 
 /* ─── 리스트 ─── */
 .songs__list {
@@ -62,6 +175,27 @@
   display: flex;
   gap: 12px;
   align-items: flex-start;
+}
+.songrow.is-dragging {
+  opacity: 0.5;
+}
+.songrow__handle {
+  border: none;
+  background: transparent;
+  cursor: grab;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--color-neutral-500);
+  padding: 4px 0 0;
+  flex: none;
+  touch-action: none;
+}
+.songrow__handle:active {
+  cursor: grabbing;
+}
+.songs__draghint {
+  font-size: 13px;
+  color: var(--color-neutral-500);
 }
 .songrow__main {
   flex: 1;
@@ -96,6 +230,29 @@
 }
 .votebox__label {
   font-size: 9px;
+}
+
+/* 앨범 커버 (왼쪽). 곡마다 항상 있어서 검색곡/직접입력곡 레이아웃이 같다 — 없으면 음표 플레이스홀더. */
+.songrow__art {
+  width: 56px;
+  height: 56px;
+  flex: none;
+  border: 1px solid var(--color-neutral-300);
+  background: var(--color-neutral-100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.songrow__art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.songrow__art-fallback {
+  width: 26px;
+  height: 26px;
+  color: var(--color-neutral-500);
 }
 
 .songrow__no {
@@ -160,6 +317,75 @@
   gap: 12px;
   margin-top: 2px;
 }
+
+/* 연결된 영상 목록 */
+.songrow__media {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px;
+  border: 1px solid var(--color-neutral-300);
+  background: var(--color-bg);
+}
+.songrow__media:hover {
+  border-color: var(--color-text);
+}
+.songrow__media-thumb {
+  width: 64px;
+  height: 40px;
+  flex: none;
+  object-fit: cover;
+  border: 1px solid var(--color-neutral-300);
+}
+.songrow__media-thumb--empty {
+  background: repeating-linear-gradient(135deg, #9b9797 0 8px, #bab6b6 8px 16px);
+}
+
+/* 다른 밴드 합주 영상 */
+.songrow__covers-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.songrow__cover {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.songrow__cover-like {
+  flex: none;
+  font-size: 11px;
+  font-weight: 800;
+  font-family: var(--font-heading);
+  padding: 4px 8px;
+  border: 2px solid var(--color-text);
+  background: var(--color-bg);
+  color: var(--color-text);
+  cursor: pointer;
+}
+.songrow__cover-like.is-liked {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #fff;
+}
+.songrow__guest-add {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border: 1px solid var(--color-neutral-400);
+  background: var(--color-bg);
+  color: var(--color-neutral-800);
+  cursor: pointer;
+}
+.songrow__guest-add:hover {
+  border-color: var(--color-text);
+}
+
 .songrow__slots {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));

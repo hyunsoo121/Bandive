@@ -3,7 +3,7 @@ import { useApp } from '../store/AppContext';
 import './DevRoleBar.css';
 
 const ROLES: { key: Role; label: string }[] = [
-  { key: 'owner', label: '밴드장' },
+  { key: 'owner', label: '관리자' },
   { key: 'member', label: '사용자' },
   { key: 'guest', label: '비회원' },
 ];

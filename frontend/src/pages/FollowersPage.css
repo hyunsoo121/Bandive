@@ -1,0 +1,69 @@
+.followers {
+  padding-bottom: 40px;
+}
+
+.followers__head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 16px;
+  border-bottom: 2px solid var(--color-text);
+}
+.followers__head h2 {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 20px;
+}
+
+.followers__notice {
+  margin: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.followers__section {
+  margin: 16px;
+  padding: 12px;
+  border: 1px solid var(--color-neutral-300);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.followers__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.followers__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.followers__btn {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border: 1px solid var(--color-neutral-400);
+  background: var(--color-bg);
+  color: var(--color-neutral-800);
+  cursor: pointer;
+}
+.followers__btn:hover {
+  border-color: var(--color-text);
+}
+.followers__btn--ok {
+  border-color: var(--color-accent);
+  color: var(--color-accent-700);
+}
+
+.followers__error {
+  margin: 0 16px;
+  font-size: 12px;
+  color: var(--color-accent);
+}

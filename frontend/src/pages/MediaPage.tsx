@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { useGuard } from '../hooks/useGuard';
-import { schedulesOfBand } from '../mock/selectors';
-import type { MediaKind } from '../types';
+import { KIND_LABEL, toUi } from '../lib/schedule';
+import type { MediaItem, MediaKind } from '../types';
 import { Fab } from '../components/Fab';
 import { AddMediaModal } from '../components/AddMediaModal';
 import './MediaPage.css';
@@ -20,28 +20,32 @@ const stripe = (a: string, b: string) =>
   `repeating-linear-gradient(135deg, ${a} 0 12px, ${b} 12px 24px)`;
 
 export function MediaPage() {
-  const { currentBand, role, media: allMedia } = useApp();
+  const { currentBand, role, user, media: allMedia, schedules, removeMedia, likeMedia } = useApp();
   const guard = useGuard();
-  const bandId = currentBand.id;
   const isGuest = role === 'guest';
 
   const [filter, setFilter] = useState<Filter>('전체');
   const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState<MediaItem | null>(null);
 
-  const schedules = schedulesOfBand(bandId);
-  const scheduleByDay = new Map(schedules.map((s) => [s.day, s]));
+  if (!currentBand) return null;
+  const bandId = currentBand.id;
+
+  const scheduleById = new Map(schedules.map((s) => [s.id, s]));
 
   const bandMedia = allMedia.filter((m) => m.bandId === bandId);
   // 공개범위 적용: 비회원은 '멤버만' 영상 제외 (기획서 8.7)
-  const visible = bandMedia.filter((m) => !isGuest || m.visibility === '링크 공개');
+  const visible = bandMedia.filter((m) => !isGuest || m.visibility === '전체공개');
   const hiddenCount = bandMedia.length - visible.length;
   const list = visible.filter((m) => filter === '전체' || m.kind === filter);
+
+  const canManage = (m: MediaItem) =>
+    role === 'owner' || (user != null && m.uploadedByUserId === user.id);
 
   return (
     <div className="media">
       <header className="media__head">
         <h2>영상</h2>
-        <span className="media__badge">URL 첨부</span>
       </header>
 
       <div className="media__filters">
@@ -63,35 +67,108 @@ export function MediaPage() {
 
       <div className="media__grid">
         {list.map((m, i) => {
-          const ev = m.scheduleDay != null ? scheduleByDay.get(m.scheduleDay) : undefined;
+          const ev = m.scheduleId ? scheduleById.get(m.scheduleId) : undefined;
+          const evUi = ev ? toUi(ev) : null;
           const [a, b] = STRIPE_SHADES[i % STRIPE_SHADES.length];
           const memberOnly = m.visibility === '멤버만';
           return (
             <article key={m.id} className="media__card">
-              <div className="media__thumb" style={{ background: stripe(a, b) }}>
-                <span className="media__play" />
+              <a
+                className="media__thumb"
+                href={m.url}
+                target="_blank"
+                rel="noreferrer"
+                style={m.thumbnailUrl ? undefined : { background: stripe(a, b) }}
+              >
+                {m.thumbnailUrl && (
+                  <img className="media__thumb-img" src={m.thumbnailUrl} alt="" loading="lazy" />
+                )}
+                <span className="media__play" aria-hidden="true" />
                 <span className="media__kind">{m.kind}</span>
-              </div>
+                {m.platform === 'other' && <span className="media__warn">링크 아님</span>}
+              </a>
               <div className="media__card-body">
-                <strong className="media__title">{m.title}</strong>
+                <a
+                  className="media__title"
+                  href={m.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ wordBreak: 'break-all' }}
+                >
+                  {m.title}
+                </a>
                 <span className="muted" style={{ fontSize: 11 }}>
                   {m.source} · {m.date}
                 </span>
                 <span
                   className="media__link"
-                  style={{ color: ev ? 'var(--color-accent-700)' : 'var(--color-neutral-600)' }}
+                  style={{ color: evUi ? 'var(--color-accent-700)' : 'var(--color-neutral-600)' }}
                 >
-                  {ev ? `일정 · 8/${ev.day} ${ev.title}` : '연결된 일정 없음'}
+                  {evUi
+                    ? `일정 · ${evUi.month + 1}/${evUi.day} ${KIND_LABEL[evUi.type]}`
+                    : '연결된 일정 없음'}
                 </span>
-                <span
-                  className="media__scope"
-                  style={{
-                    background: memberOnly ? 'var(--color-neutral-200)' : 'var(--color-accent-200)',
-                    color: memberOnly ? 'var(--color-neutral-800)' : 'var(--color-accent-800)',
-                  }}
-                >
-                  {m.visibility}
-                </span>
+                {m.songTitle && (
+                  <span className="media__link" style={{ color: 'var(--color-accent-700)' }}>
+                    곡 · {m.songTitle}
+                  </span>
+                )}
+                <div className="media__card-foot">
+                  <span
+                    className="media__scope"
+                    style={{
+                      background: memberOnly
+                        ? 'var(--color-neutral-200)'
+                        : 'var(--color-accent-200)',
+                      color: memberOnly ? 'var(--color-neutral-800)' : 'var(--color-accent-800)',
+                    }}
+                  >
+                    {m.visibility}
+                  </span>
+                  <span className="media__foot-right">
+                    <button
+                      type="button"
+                      className={`media__like${m.likedByMe ? ' is-liked' : ''}`}
+                      onClick={guard(() => void likeMedia(m.id))}
+                      aria-pressed={m.likedByMe}
+                      title={m.likedByMe ? '좋아요 취소' : '좋아요'}
+                    >
+                      <svg
+                        className="media__like-icon"
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        fill={m.likedByMe ? 'currentColor' : 'none'}
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
+                      </svg>
+                      <span className="media__like-count">{m.likeCount}</span>
+                    </button>
+                    {canManage(m) && (
+                      <span className="media__actions">
+                        <button
+                          type="button"
+                          className="media__act"
+                          onClick={guard(() => setEditing(m))}
+                        >
+                          수정
+                        </button>
+                        <button
+                          type="button"
+                          className="media__act media__act--danger"
+                          onClick={guard(() => {
+                            if (confirm('이 영상을 삭제할까요?')) void removeMedia(m.id);
+                          })}
+                        >
+                          삭제
+                        </button>
+                      </span>
+                    )}
+                  </span>
+                </div>
               </div>
             </article>
           );
@@ -108,13 +185,18 @@ export function MediaPage() {
 
       <Fab label="＋ 영상 URL 첨부" onClick={guard(() => setAddOpen(true))} />
 
-      {addOpen && (
+      {(addOpen || editing) && (
         <AddMediaModal
           bandId={bandId}
           schedules={schedules}
-          onClose={() => setAddOpen(false)}
+          editing={editing ?? undefined}
+          onClose={() => {
+            setAddOpen(false);
+            setEditing(null);
+          }}
           onSubmitted={() => {
             setAddOpen(false);
+            setEditing(null);
             setFilter('전체');
           }}
         />

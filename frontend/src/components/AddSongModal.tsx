@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../store/AppContext';
-import { INSTRUMENTS, type Instrument } from '../types';
-import { SONG_CATALOG } from '../mock/data';
+import { searchTracks } from '../api/songs';
+import type { TrackSearchResultDto } from '../api/types';
+import { INSTRUMENTS } from '../types';
 import { Modal } from './Modal';
 import './AddSongModal.css';
 
@@ -13,51 +14,107 @@ interface Props {
 
 type Mode = 'search' | 'manual';
 
-const DEFAULT_SESSIONS: Record<Instrument, number> = {
-  보컬: 1,
-  기타: 1,
-  베이스: 1,
-  드럼: 1,
-  건반: 0,
-};
+const DEFAULT_SESSIONS: Record<string, number> = { 보컬: 1, 기타: 1, 베이스: 1, 드럼: 1, 건반: 0 };
 
 export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
   const { addSong } = useApp();
 
   const [mode, setMode] = useState<Mode>('search');
   const [q, setQ] = useState('');
-  const [pickedTitle, setPickedTitle] = useState<string | null>(null);
+  const [results, setResults] = useState<TrackSearchResultDto[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [pickedId, setPickedId] = useState<string | null>(null);
+  const [pickedArt, setPickedArt] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [artist, setArtist] = useState('');
-  const [sessions, setSessions] = useState<Record<Instrument, number>>(DEFAULT_SESSIONS);
+  const [sessions, setSessions] = useState<Record<string, number>>({ ...DEFAULT_SESSIONS });
+  const [newInst, setNewInst] = useState('');
   const [refUrl, setRefUrl] = useState('');
   const [memo, setMemo] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const query = q.trim().toLowerCase();
-  const results = (
-    query
-      ? SONG_CATALOG.filter((c) => `${c.title} ${c.artist}`.toLowerCase().includes(query))
-      : SONG_CATALOG
-  ).slice(0, 5);
+  const reqSeq = useRef(0);
 
-  const canSubmit = title.trim().length > 0 && artist.trim().length > 0;
+  useEffect(() => {
+    if (mode !== 'search') return;
+    const query = q.trim();
+    if (!query) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+    setSearching(true);
+    const seq = ++reqSeq.current;
+    const t = window.setTimeout(() => {
+      searchTracks(query)
+        .then((rows) => {
+          if (seq === reqSeq.current) setResults(rows);
+        })
+        .catch(() => {
+          if (seq === reqSeq.current) setResults([]);
+        })
+        .finally(() => {
+          if (seq === reqSeq.current) setSearching(false);
+        });
+    }, 300);
+    return () => window.clearTimeout(t);
+  }, [q, mode]);
 
-  const step = (inst: Instrument, delta: number) =>
-    setSessions((prev) => ({ ...prev, [inst]: Math.min(4, Math.max(0, prev[inst] + delta)) }));
+  const canSubmit = title.trim().length > 0 && !submitting;
 
-  const submit = () => {
-    if (!canSubmit) return;
-    addSong({
-      bandId,
-      title,
-      artist,
-      sourceType: mode === 'search' ? 'SEARCH' : 'MANUAL',
-      memo,
-      referenceVideoUrl: refUrl,
-      sessions,
+  const step = (inst: string, delta: number) =>
+    setSessions((prev) => ({
+      ...prev,
+      [inst]: Math.min(10, Math.max(0, (prev[inst] ?? 0) + delta)),
+    }));
+
+  const removeInst = (inst: string) =>
+    setSessions((prev) => {
+      const next = { ...prev };
+      delete next[inst];
+      return next;
     });
-    onSubmitted();
+
+  const addInstrument = () => {
+    const name = newInst.trim().slice(0, 20);
+    if (!name) return;
+    setSessions((prev) => ({ ...prev, [name]: prev[name] ?? 1 }));
+    setNewInst('');
   };
+
+  const setManualField = (value: string, setter: (v: string) => void) => {
+    setter(value);
+    setPickedId(null);
+    setPickedArt(null);
+  };
+
+  const submit = async () => {
+    if (!canSubmit) return;
+    const isSearch = mode === 'search' && pickedId != null;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await addSong({
+        bandId,
+        title,
+        artist,
+        sourceType: isSearch ? 'SEARCH' : 'MANUAL',
+        externalTrackId: isSearch ? pickedId : null,
+        artworkUrl: isSearch ? pickedArt : null,
+        memo,
+        referenceVideoUrl: refUrl,
+        sessions,
+      });
+      onSubmitted();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '곡을 등록하지 못했습니다.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const isCustom = (inst: string) => !INSTRUMENTS.includes(inst as (typeof INSTRUMENTS)[number]);
 
   return (
     <Modal
@@ -73,7 +130,7 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
             disabled={!canSubmit}
             onClick={submit}
           >
-            위시리스트에 등록
+            {submitting ? '등록 중…' : '위시리스트에 등록'}
           </button>
           <button type="button" className="btn" onClick={onClose}>
             취소
@@ -92,7 +149,11 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
         <button
           type="button"
           className={`seg__opt${mode === 'manual' ? ' seg__opt--on' : ''}`}
-          onClick={() => setMode('manual')}
+          onClick={() => {
+            setMode('manual');
+            setPickedId(null);
+            setPickedArt(null);
+          }}
         >
           직접 입력
         </button>
@@ -108,40 +169,56 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
             autoFocus
           />
           <span className="muted" style={{ fontSize: 10 }}>
-            외부 음원 API(Spotify 등) 검색 결과 · 목업 단계에선 샘플 카탈로그
+            외부 음원 API 검색 결과
           </span>
           <div className="addsong__results">
-            {results.map((c) => {
-              const on = pickedTitle === c.title;
-              return (
-                <button
-                  key={`${c.title}-${c.artist}`}
-                  type="button"
-                  className={`addsong__result${on ? ' is-on' : ''}`}
-                  onClick={() => {
-                    setPickedTitle(c.title);
-                    setTitle(c.title);
-                    setArtist(c.artist);
-                  }}
-                >
-                  <span className="addsong__result-art" />
-                  <span className="stack" style={{ flex: 1, minWidth: 0 }}>
-                    <strong style={{ fontSize: 13 }}>{c.title}</strong>
-                    <span className="muted" style={{ fontSize: 11 }}>
-                      {c.artist}
+            {searching && (
+              <span className="muted" style={{ fontSize: 12, padding: '8px 0' }}>
+                검색 중…
+              </span>
+            )}
+            {!searching &&
+              results.map((c) => {
+                const on = pickedId === c.externalTrackId;
+                return (
+                  <button
+                    key={c.externalTrackId}
+                    type="button"
+                    className={`addsong__result${on ? ' is-on' : ''}`}
+                    onClick={() => {
+                      setPickedId(c.externalTrackId);
+                      setPickedArt(c.artworkUrl);
+                      setTitle(c.title);
+                      setArtist(c.artist);
+                    }}
+                  >
+                    {c.artworkUrl ? (
+                      <img
+                        className="addsong__result-art"
+                        src={c.artworkUrl}
+                        alt=""
+                        loading="lazy"
+                      />
+                    ) : (
+                      <span className="addsong__result-art addsong__result-art--empty" />
+                    )}
+                    <span className="stack" style={{ flex: 1, minWidth: 0 }}>
+                      <strong style={{ fontSize: 13 }}>{c.title}</strong>
+                      <span className="muted" style={{ fontSize: 11 }}>
+                        {c.artist}
+                      </span>
                     </span>
-                  </span>
-                  {on && (
-                    <span
-                      style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-accent-700)' }}
-                    >
-                      선택됨
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-            {results.length === 0 && (
+                    {on && (
+                      <span
+                        style={{ fontSize: 10, fontWeight: 700, color: 'var(--color-accent-700)' }}
+                      >
+                        선택됨
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            {!searching && q.trim().length > 0 && results.length === 0 && (
               <span className="muted" style={{ fontSize: 12, padding: '8px 0' }}>
                 검색 결과가 없습니다. 직접 입력으로 등록해 주세요.
               </span>
@@ -156,7 +233,7 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
               id="song-title"
               className="input"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => setManualField(e.target.value, setTitle)}
               placeholder="예: ring ring ring"
             />
           </div>
@@ -166,7 +243,7 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
               id="song-artist"
               className="input"
               value={artist}
-              onChange={(e) => setArtist(e.target.value)}
+              onChange={(e) => setManualField(e.target.value, setArtist)}
               placeholder="예: 설"
             />
           </div>
@@ -178,7 +255,7 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
         style={{ gap: 8, borderTop: '2px solid var(--color-text)', paddingTop: 14 }}
       >
         <span className="kicker">세션 구성</span>
-        {INSTRUMENTS.map((inst) => (
+        {Object.keys(sessions).map((inst) => (
           <div key={inst} className="addsong__session">
             <span
               style={{
@@ -189,6 +266,16 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
             >
               {inst}
             </span>
+            {isCustom(inst) && (
+              <button
+                type="button"
+                className="addsong__step addsong__step--x"
+                onClick={() => removeInst(inst)}
+                aria-label={`${inst} 삭제`}
+              >
+                ✕
+              </button>
+            )}
             <button
               type="button"
               className="addsong__step"
@@ -208,6 +295,30 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
             </button>
           </div>
         ))}
+        <div className="addsong__session">
+          <input
+            className="input"
+            style={{ flex: 1, fontSize: 12, padding: '5px 8px' }}
+            value={newInst}
+            maxLength={20}
+            onChange={(e) => setNewInst(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                addInstrument();
+              }
+            }}
+            placeholder="악기 직접 추가 (예: 실로폰)"
+          />
+          <button
+            type="button"
+            className="btn btn--sm"
+            onClick={addInstrument}
+            disabled={!newInst.trim()}
+          >
+            추가
+          </button>
+        </div>
       </div>
 
       <div className="field">
@@ -230,6 +341,7 @@ export function AddSongModal({ bandId, onClose, onSubmitted }: Props) {
           placeholder="키, 편곡 방향, 준비물 등 (선택)"
         />
       </div>
+      {error && <span style={{ fontSize: 12, color: 'var(--color-accent)' }}>{error}</span>}
       <span className="muted" style={{ fontSize: 11 }}>
         등록하면 위시리스트에 올라가고, 파트 배정은 합주곡 승격 후에 지정합니다.
       </span>

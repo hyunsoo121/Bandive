@@ -1,21 +1,28 @@
 import { useState } from 'react';
 import { useApp } from '../store/AppContext';
+import type { BandVisibility } from '../types';
 import { Modal } from './Modal';
+import { VISIBILITY_LABEL, VISIBILITY_HINT, VISIBILITY_ORDER } from '../lib/bandVisibility';
 
-interface Props {
-  onCreated: (bandId: string) => void;
-}
-
-export function CreateBandModal({ onCreated }: Props) {
-  const { bands, createBand, closeCreate } = useApp();
+export function CreateBandModal() {
+  const { createBand, closeCreate } = useApp();
   const [name, setName] = useState('');
-  const canCreate = name.trim().length > 0;
+  const [visibility, setVisibility] = useState<BandVisibility>('PUBLIC');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const canCreate = name.trim().length > 0 && !submitting;
 
-  const submit = () => {
+  const submit = async () => {
     if (!canCreate) return;
-    createBand(name);
-    // createBand 가 새 id 를 n{len+1} 규칙으로 만든다
-    onCreated(`n${bands.length + 1}`);
+    setSubmitting(true);
+    setError(null);
+    try {
+      // createBand 가 밴드 생성 후 해당 밴드로 이동시키고 모달을 닫는다
+      await createBand(name, visibility);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : '밴드를 만들지 못했습니다.');
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -32,7 +39,7 @@ export function CreateBandModal({ onCreated }: Props) {
             disabled={!canCreate}
             onClick={submit}
           >
-            밴드 만들기
+            {submitting ? '만드는 중…' : '밴드 만들기'}
           </button>
           <button type="button" className="btn" onClick={closeCreate}>
             취소
@@ -52,6 +59,25 @@ export function CreateBandModal({ onCreated }: Props) {
         />
       </div>
 
+      <div className="field">
+        <label>공개범위</label>
+        <div className="seg">
+          {VISIBILITY_ORDER.map((v) => (
+            <button
+              key={v}
+              type="button"
+              className={`seg__opt${visibility === v ? ' seg__opt--on' : ''}`}
+              onClick={() => setVisibility(v)}
+            >
+              {VISIBILITY_LABEL[v]}
+            </button>
+          ))}
+        </div>
+        <span className="muted" style={{ fontSize: 11 }}>
+          {VISIBILITY_HINT[visibility]}
+        </span>
+      </div>
+
       <div style={{ display: 'flex', gap: 12 }}>
         <div className="field">
           <label>로고</label>
@@ -64,8 +90,9 @@ export function CreateBandModal({ onCreated }: Props) {
       </div>
 
       <p className="muted" style={{ fontSize: 11, margin: 0, lineHeight: 1.5 }}>
-        만들면 내가 밴드장이 되고, 초대 코드가 바로 발급됩니다.
+        만들면 내가 관리자가 됩니다. 로고·배너는 밴드 생성 후 설정할 수 있습니다.
       </p>
+      {error && <p style={{ fontSize: 12, margin: 0, color: 'var(--color-accent)' }}>{error}</p>}
     </Modal>
   );
 }

@@ -3,6 +3,11 @@ spring:
   jpa:
     show-sql: true
 
+app:
+  auth:
+    cookie:
+      secure: false   # http localhost 라 Secure 쿠키 불가
+
 logging:
   level:
     org.hibernate.SQL: debug

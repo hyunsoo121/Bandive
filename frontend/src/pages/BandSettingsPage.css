@@ -1,0 +1,95 @@
+.bandset {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 120px;
+}
+
+/* 다른 탭과 동일: 전체폭 헤더 바 + 가장자리까지 닿는 하단 보더 */
+.bandset__head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-bottom: 2px solid var(--color-text);
+}
+.bandset__head h2 {
+  font-size: 24px;
+  letter-spacing: -0.01em;
+}
+
+.bandset__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+}
+
+/* 확정 버튼 행 (위임 / 삭제) — 좁은 화면에서 줄바꿈 */
+.bandset__confirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.bandset__back {
+  border: 1px solid var(--color-neutral-400);
+  background: var(--color-bg);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 9px;
+  cursor: pointer;
+}
+
+.bandset__sec {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--color-neutral-300);
+}
+.bandset__sec--danger {
+  border-color: var(--color-accent);
+}
+
+.bandset__imgs {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.bandset__img {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.bandset__logo {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border: 1px solid var(--color-neutral-300);
+}
+.bandset__logo--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 22px;
+  background: var(--color-neutral-200);
+}
+.bandset__banner {
+  width: 200px;
+  height: 64px;
+  background-color: var(--color-neutral-200);
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--color-neutral-300);
+}
+
+.bandset__danger {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.bandset__danger:hover:not(:disabled) {
+  background: var(--color-accent);
+  color: #fff;
+}

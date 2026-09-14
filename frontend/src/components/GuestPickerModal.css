@@ -1,0 +1,58 @@
+.guestpick__label {
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--color-neutral-600);
+}
+
+.guestpick__add {
+  display: flex;
+  gap: 6px;
+}
+.guestpick__add .input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 세로 리스트 */
+.guestpick__list {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-neutral-300);
+}
+.guestpick__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--color-divider);
+  background: var(--color-bg);
+  cursor: pointer;
+  text-align: left;
+}
+.guestpick__row:last-child {
+  border-bottom: 0;
+}
+.guestpick__row:hover:not(:disabled) {
+  background: var(--color-neutral-100);
+}
+.guestpick__row:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.guestpick__row-name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.guestpick__row-session {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  background: var(--color-neutral-200);
+  color: var(--color-neutral-800);
+}

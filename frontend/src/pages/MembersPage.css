@@ -22,15 +22,49 @@
 }
 .members__row {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
   padding: 13px 0;
   border-bottom: 1px solid var(--color-divider);
+}
+.members__row-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.members__profile-btn {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  flex: none;
+  line-height: 0;
+}
+.members__name-btn {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+.members__name-btn:hover {
+  text-decoration: underline;
 }
 .members__role {
   font-size: 10px;
   font-weight: 700;
   padding: 3px 7px;
+}
+.members__leader {
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 7px;
+  background: var(--color-text);
+  color: var(--color-bg);
 }
 .members__kick {
   font-size: 11px;
@@ -43,6 +77,107 @@
 }
 .members__kick:hover {
   background: var(--color-accent-100);
+}
+.members__leadbtn {
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid var(--color-neutral-400);
+  background: var(--color-bg);
+  color: var(--color-neutral-800);
+  padding: 5px 9px;
+  cursor: pointer;
+}
+.members__leadbtn.is-on {
+  border-color: var(--color-text);
+  background: var(--color-text);
+  color: var(--color-bg);
+}
+
+/* 세션(파트) — 행에서는 현재 값만 보여주고 편집은 모달 */
+.members__parts-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+.members__part-chip {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 7px;
+  background: var(--color-neutral-200);
+  color: var(--color-neutral-800);
+}
+.members__parts-edit {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border: 1px solid var(--color-neutral-400);
+  background: var(--color-bg);
+  color: var(--color-neutral-700);
+  cursor: pointer;
+}
+.members__parts-edit:hover {
+  border-color: var(--color-text);
+  color: var(--color-text);
+}
+
+/* ── 게스트 멤버 (접이식) ── */
+.members__guests {
+  margin: 16px 16px 0;
+  border: 1px solid var(--color-neutral-300);
+}
+.members__guests-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: var(--color-neutral-100);
+  border: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-neutral-800);
+  cursor: pointer;
+}
+.members__guests-chev {
+  font-size: 10px;
+  color: var(--color-neutral-600);
+}
+.members__guests-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--color-neutral-300);
+}
+.members__guest-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.members__guest-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.members__guest-btn {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border: 1px solid var(--color-neutral-400);
+  background: var(--color-bg);
+  color: var(--color-neutral-800);
+  cursor: pointer;
+}
+.members__guest-btn:hover {
+  border-color: var(--color-text);
+}
+.members__guest-btn--danger {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.members__guest-add {
+  align-self: flex-start;
 }
 
 .members__invite {
@@ -78,4 +213,25 @@
 .members__note {
   margin: 20px 16px 0;
   font-size: 12px;
+}
+
+.members__leave {
+  margin: 40px 16px 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--color-divider);
+  display: flex;
+  gap: 8px;
+}
+.members__leave--note {
+  display: block;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.members__leave-btn {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+.members__leave-btn:hover:not(:disabled) {
+  background: var(--color-accent);
+  color: #fff;
 }

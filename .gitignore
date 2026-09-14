@@ -16,6 +16,8 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+.env.prod
+!.env.prod.example
 *.pem
 
 # ── Node (frontend) ─────────────────────────────────────────
@@ -45,6 +47,9 @@ pnpm-debug.log*
 
 # ── Runtime ─────────────────────────────────────────────────
 dump.rdb
+
+# ── Local file uploads (dev) ────────────────────────────────
+backend/uploads/
 
 # ── Claude ──────────────────────────────────────────────────
 .claude/
