@@ -42,7 +42,7 @@ URL `https://token.actions.githubusercontent.com`, 대상 `sts.amazonaws.com`). 
   "Statement": [{
     "Effect": "Allow",
     "Principal": { "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com" },
-    "Action": "sts:AssumeRoleWithWebIdentity",
+    "Action": ["sts:AssumeRoleWithWebIdentity", "sts:TagSession"],
     "Condition": {
       "StringEquals": { "token.actions.githubusercontent.com:aud": "sts.amazonaws.com" },
       "StringLike": { "token.actions.githubusercontent.com:sub": "repo:<GH_OWNER>/<GH_REPO>:ref:refs/heads/main" }
@@ -50,6 +50,9 @@ URL `https://token.actions.githubusercontent.com`, 대상 `sts.amazonaws.com`). 
   }]
 }
 ```
+
+(`sts:TagSession` 빠뜨리면 `Not authorized to perform sts:AssumeRoleWithWebIdentity` 로 실패한다 —
+`aws-actions/configure-aws-credentials` 가 기본으로 세션 태그를 붙여서 assume하기 때문에 이것도 같이 허용해야 함.)
 
 권한 정책 (`<ACCOUNT_ID>`, `<INSTANCE_ID>` 치환 — 인스턴스는 3번에서 만든 뒤 채워도 됨):
 

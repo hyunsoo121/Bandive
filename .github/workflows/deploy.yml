@@ -26,6 +26,8 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+          # 세션 태그를 아예 안 보내서 신뢰 정책에 sts:TagSession 없어도 되게 함
+          role-skip-session-tagging: true
 
       - name: Login to ECR
         id: ecr

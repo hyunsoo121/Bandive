@@ -479,3 +479,77 @@ API 는 없어서 생성 DTO 만 손보면 됨. 테스트 `SongControllerTest.�
 - **인가**: `@bandGuard` 멤버/관리자 체크 + media `visibility` 필터(비회원·비멤버는 `LINK_PUBLIC` 만).
 - **배포 시 숙제**: ① 크로스도메인이면 refresh 쿠키 `SameSite=None; Secure` → CSRF 재검토(현재 `Strict`),
   ② `/api/auth/login` 브루트포스·`/api/songs/search` 남용 rate limiting, ③ 프론트 정적 서빙 측 CSP 헤더.
+
+---
+
+## Phase 7 (배포 — AWS EC2 Spot, 2026-09)
+
+`docs/DEPLOY.md` 가이드대로 콘솔에서 직접 설정하는 과정에서 실제로 겪은 문제들.
+
+### Caddyfile — `{$DOMAIN}` 이 비어있으면 "전역 옵션"으로 잘못 파싱됨
+
+**증상.** `caddy validate` 또는 컨테이너 기동 시 `unrecognized global option: encode` 에러로 죽음.
+
+**원인.** Caddyfile 맨 위 사이트 주소가 `{$DOMAIN} {` 인데, 환경변수 `DOMAIN` 이 안 들어온 상태(로컬 테스트 등)면
+주소가 빈 문자열이 되고, Caddy 는 `{ ... }` 만 남은 블록을 **사이트 블록이 아니라 전역 옵션 블록**으로 해석한다.
+그 안의 `encode`·`reverse_proxy` 같은 사이트 전용 지시어가 전역 옵션으로는 존재하지 않아 파싱 실패.
+
+**해결.** `{$DOMAIN:localhost}` 처럼 **기본값을 반드시 지정**해서 주소가 절대 비지 않게 함
+(`frontend/Caddyfile`). `docker run -e DOMAIN=example.com ... caddy validate` 로 값 있을 때만 테스트하면
+이 버그를 못 잡으니, 값 없이도 한 번 검증해볼 것.
+
+### EC2 Spot "지속적(persistent)" 요청 — 인스턴스 종료해도 계속 새로 생김
+
+**증상.** 콘솔에서 인스턴스를 종료해도 몇 분/며칠 뒤 보면 같은 이름의 인스턴스가 또 떠 있음. 여러 번
+반복하다 보니 관련 없는 t2.micro/t3.micro 인스턴스가 5~6개까지 쌓임.
+
+**원인.** Spot 요청을 **지속적(persistent)** 타입으로 만들면(중지된 EC2 처럼 리소스 요청이 "열린 채로" 남음),
+연결된 **인스턴스만 종료**해도 요청 자체는 `active` 상태로 남아있어 AWS 가 "아직 이 요청이 안 채워졌네" 하고
+**새 인스턴스를 다시 launch** 한다. 이게 Spot+persistent+stop 조합을 원하는 이유(회수돼도 안 죽고 재시작)와
+정확히 같은 메커니즘이라, 의도치 않게 종료할 때도 똑같이 발동한다.
+
+**해결.** 인스턴스를 완전히 없애려면 **EC2 → 스팟 요청(Spot Requests) 목록에서 해당 요청을 "취소(Cancel request)"
+먼저 하고, 그다음 인스턴스를 종료**해야 한다. 인스턴스 종료만으로는 절대 안 없어짐. 여러 개 쌓였으면
+Lulubot(무관한 다른 프로젝트) 것만 빼고 스팟 요청 목록에서 전부 취소 → 인스턴스 전부 종료 → 하나만 새로
+깔끔하게 재생성하는 게 뭐가 뭔지 추적하는 것보다 빠름.
+
+### EC2 인스턴스 아키텍처 — t2/t3 계열은 x86_64, Dockerfile 은 처음에 arm64로 짬
+
+**증상.** (배포 전 미리 잡음) 처음 `backend/Dockerfile`·`frontend/Dockerfile`·`deploy.yml` 을 Graviton(t4g,
+arm64) 기준으로 작성했는데, 실제로는 t2.micro → t3.micro(x86_64 계열)로 인스턴스를 만듦.
+
+**원인.** t2/t3 인스턴스 패밀리는 애초에 ARM 버전이 없음(x86_64 전용). arm64 이미지를 x86 인스턴스에서
+`docker compose pull && up` 하면 `exec format error` 로 컨테이너가 아예 안 뜬다.
+
+**해결.** `.github/workflows/deploy.yml` 의 `docker/build-push-action` `platforms` 를 `linux/arm64` →
+`linux/amd64` 로 변경. GitHub Actions 러너 자체가 amd64 라 오히려 QEMU 에뮬레이션 없이 네이티브 빌드가 돼서
+`docker/setup-qemu-action` 스텝도 제거 가능(더 빠름). Graviton(t4g)으로 가고 싶으면 반대로 인스턴스를 바꿔야지,
+이미지 쪽만 바꿔서 맞추면 안 됨 — 인스턴스 패밀리와 빌드 타깃 아키텍처는 항상 같이 확인.
+
+### 리전 불일치 — EC2/ECR 는 us-east-1인데 최초 설정은 ap-northeast-2 기준
+
+**증상.** (역시 배포 전 미리 잡음) `deploy.yml`/`docs/DEPLOY.md` 를 처음에 서울(`ap-northeast-2`) 기준으로
+작성했는데, 실제 콘솔에서 인스턴스를 만들 때(리전 선택 드롭다운을 안 바꿔서) `us-east-1`(버지니아)에 만들어짐.
+
+**해결.** ECR 리포지토리도 EC2 와 같은 리전에 있어야 하니, 전부 `us-east-1` 로 통일해서
+`deploy.yml`·`docs/DEPLOY.md`·IAM 정책의 리전 문자열을 일괄 치환. **AWS 콘솔은 리전이 세션마다 유지되니,
+콘솔 오른쪽 위 리전 표시를 리소스 만들기 전에 항상 먼저 확인.**
+
+### GitHub Actions OIDC — `Not authorized to perform sts:AssumeRoleWithWebIdentity`
+
+**증상.** IAM 신뢰 정책의 계정 ID·리전·저장소 이름·OIDC 공급자 ARN·오디언스(`sts.amazonaws.com`) 를 전부
+글자 단위로 대조해도 다 맞는데 계속 같은 에러로 실패. 로그에 `##[debug]7 role session tags are being used.`
+가 찍혀 있었음.
+
+**원인.** `aws-actions/configure-aws-credentials` 는 기본적으로 GitHub 컨텍스트 정보(리포지토리·액터·워크플로
+등)를 **세션 태그**로 붙여서 역할을 assume 한다. 신뢰 정책의 `Action` 이 `sts:AssumeRoleWithWebIdentity`
+하나만 허용하고 **`sts:TagSession`** 을 안 넣어두면, 세션 태그를 붙이는 이 결합 호출 전체가 거부되고 에러
+메시지는 (TagSession 이 아니라) `AssumeRoleWithWebIdentity` 를 못 한다고 뜬다 — 그래서 원인 파악이 헷갈림.
+
+**해결.** 신뢰 정책의 `Action` 을 배열로:
+```json
+"Action": ["sts:AssumeRoleWithWebIdentity", "sts:TagSession"]
+```
+`role-skip-session-tagging: true` 를 액션 입력에 주는 대안도 있음(세션 태그를 아예 안 붙임). `docs/DEPLOY.md`
+의 신뢰 정책 템플릿에도 반영함 — GitHub Actions + AWS OIDC 조합에서 이 액션 쓰면 기본으로 필요한 권한이니
+처음부터 넣고 시작할 것.
