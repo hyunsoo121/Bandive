@@ -538,18 +538,66 @@ arm64) 기준으로 작성했는데, 실제로는 t2.micro → t3.micro(x86_64 �
 ### GitHub Actions OIDC — `Not authorized to perform sts:AssumeRoleWithWebIdentity`
 
 **증상.** IAM 신뢰 정책의 계정 ID·리전·저장소 이름·OIDC 공급자 ARN·오디언스(`sts.amazonaws.com`) 를 전부
-글자 단위로 대조해도 다 맞는데 계속 같은 에러로 실패. 로그에 `##[debug]7 role session tags are being used.`
-가 찍혀 있었음.
+글자 단위로 대조해도 다 맞는데 계속 같은 에러로 실패. `sts:TagSession` 을 Action 에 추가하고
+`role-skip-session-tagging: true` 까지 워크플로에 넣어봐도 그대로 실패.
 
-**원인.** `aws-actions/configure-aws-credentials` 는 기본적으로 GitHub 컨텍스트 정보(리포지토리·액터·워크플로
-등)를 **세션 태그**로 붙여서 역할을 assume 한다. 신뢰 정책의 `Action` 이 `sts:AssumeRoleWithWebIdentity`
-하나만 허용하고 **`sts:TagSession`** 을 안 넣어두면, 세션 태그를 붙이는 이 결합 호출 전체가 거부되고 에러
-메시지는 (TagSession 이 아니라) `AssumeRoleWithWebIdentity` 를 못 한다고 뜬다 — 그래서 원인 파악이 헷갈림.
+**진짜 원인 (CloudTrail 로 확인).** IAM 신뢰 정책만 계속 들여다봐서는 못 찾았고, **CloudTrail → 이벤트 기록에서
+실패한 `AssumeRoleWithWebIdentity` 이벤트를 직접 열어보고서야** 알아냄. 이벤트의 `userIdentity.userName` 에
+실제 `sub` 클레임 값이 그대로 찍혀있는데:
 
-**해결.** 신뢰 정책의 `Action` 을 배열로:
-```json
-"Action": ["sts:AssumeRoleWithWebIdentity", "sts:TagSession"]
 ```
-`role-skip-session-tagging: true` 를 액션 입력에 주는 대안도 있음(세션 태그를 아예 안 붙임). `docs/DEPLOY.md`
-의 신뢰 정책 템플릿에도 반영함 — GitHub Actions + AWS OIDC 조합에서 이 액션 쓰면 기본으로 필요한 권한이니
-처음부터 넣고 시작할 것.
+repo:hyunsoo121@98306172/Bandive@1353175671:ref:refs/heads/main
+```
+
+owner/repo 이름 뒤에 **`@<숫자ID>`가 붙어있었다** — 신뢰 정책엔 `repo:hyunsoo121/Bandive:ref:...` 처럼
+이름만 넣어뒀으니 `StringLike` 조건이 글자 단위로 하나도 안 맞아서 거부됨. (GitHub 이 저장소 이름 변경/이전에도
+안전하도록 owner/repo 의 불변 숫자 ID 를 `sub` 클레임에 같이 실어 보내는 방식인 것으로 보임 — IAM 콘솔이나
+GitHub 저장소 설정 어디에도 이 값이 노출돼 있지 않아서, 신뢰 정책 문자열만 대조해서는 절대 못 찾는다.)
+
+`sts:TagSession` 누락 자체는 실제 원인이 아니었지만( 있어서 나쁠 건 없어 그대로 둠), 증상이 똑같이
+`AssumeRoleWithWebIdentity` 거부로 나와서 애먼 데를 먼저 팠음.
+
+**해결.** 신뢰 정책의 `sub` 조건 값을 CloudTrail 에서 확인한 **실제 값 그대로**(숫자 ID 포함) 사용:
+```json
+"StringLike": {
+  "token.actions.githubusercontent.com:sub": "repo:hyunsoo121@98306172/Bandive@1353175671:ref:refs/heads/main"
+}
+```
+이 숫자 ID는 저장소를 rename 해도 안 바뀌는 고유 ID라 하드코딩해도 안전함.
+
+**교훈.** OIDC 신뢰 정책이 "분명히 다 맞는데" 계속 거부되면, 문자열 대조로 시간 쓰지 말고 **바로 CloudTrail
+이벤트 기록에서 실패한 `AssumeRoleWithWebIdentity` 호출을 열어 `userIdentity.userName`(=실제 sub 값)을
+확인**할 것 — 신뢰 정책에 뭘 적어뒀는지가 아니라 GitHub 이 실제로 뭘 보내는지가 유일하게 신뢰할 수 있는 정보.
+
+### GitHub Actions → ECR push — `denied: ... ecr:BatchGetImage`
+
+**증상.** OIDC 인증은 통과했는데 `docker/build-push-action` 이미지 push 단계에서
+`failed to push ...: denied: ... not authorized to perform: ecr:BatchGetImage` 로 실패.
+
+**원인.** `docs/DEPLOY.md` 의 GitHub Actions IAM 역할 권한 정책에 `ecr:BatchCheckLayerAvailability` /
+`ecr:PutImage` / 레이어 업로드 3종만 넣고 **`ecr:BatchGetImage`**(기존 태그·매니페스트 존재 확인용)를
+빠뜨림 — push 자체엔 있어야 하는 권한인데 처음 작성할 때 누락.
+
+**해결.** 권한 정책 `EcrPush` 액션에 `ecr:BatchGetImage`, `ecr:GetDownloadUrlForLayer` 추가.
+`docs/DEPLOY.md` 템플릿에도 반영함.
+
+### 카카오 로그인 — "등록하지 않은 리다이렉트 URI" (실제로는 등록한 값인데 스킴이 다름)
+
+**증상.** 카카오 Redirect URI 에 `https://bandive.o-r.kr/login/oauth2/code/kakao` 를 정확히 등록해뒀는데도
+카카오가 "등록하지 않은 리다이렉트 URI" 라며 거부. 에러 메시지에 찍힌 실제 사용된 URI를 보면
+`http://bandive.o-r.kr/...` — **https 가 아니라 http.**
+
+**원인.** Caddy(TLS 종료) → backend 는 컨테이너 내부에서 평문 HTTP 로 통신한다. Spring Security 의
+`redirect-uri: "{baseUrl}/login/oauth2/code/kakao"` 는 `{baseUrl}` 을 **현재 서블릿 요청의 스킴/호스트**로
+채우는데, Spring Boot 는 기본적으로 리버스 프록시가 보내는 `X-Forwarded-Proto` 헤더를 신뢰하지 않는다.
+Caddy 는 이 헤더를 정상적으로 `https` 로 보내고 있었지만, 백엔드가 이를 무시하고 자신이 실제로 받은
+연결(Caddy 로부터의 내부 HTTP)을 기준으로 `http://...` 를 만들어버림.
+
+**해결.** `application-prod.yaml` 에 추가:
+```yaml
+server:
+  forward-headers-strategy: framework
+```
+이제 Spring 이 `X-Forwarded-Proto`/`-Host`/`-For` 헤더를 신뢰해서 원래 요청이 HTTPS 였음을 인식하고
+`{baseUrl}` 을 올바르게 `https://bandive.o-r.kr` 로 만든다. 리버스 프록시 뒤에 Spring Boot 를 두는 구성이면
+거의 항상 필요한 설정 — 로컬(프록시 없음)엔 영향 없어서 prod 프로파일에만 넣어도 충분.

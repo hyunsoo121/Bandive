@@ -54,6 +54,12 @@ URL `https://token.actions.githubusercontent.com`, 대상 `sts.amazonaws.com`). 
 (`sts:TagSession` 빠뜨리면 `Not authorized to perform sts:AssumeRoleWithWebIdentity` 로 실패한다 —
 `aws-actions/configure-aws-credentials` 가 기본으로 세션 태그를 붙여서 assume하기 때문에 이것도 같이 허용해야 함.)
 
+⚠️ **`sub` 값이 위 형식(`repo:<owner>/<repo>:ref:...`)과 실제로 안 맞을 수 있다** — 계정에 따라 GitHub 이
+owner/repo 뒤에 불변 숫자 ID를 붙여(`repo:<owner>@<owner_id>/<repo>@<repo_id>:ref:...`) 보내는 경우가 있음.
+`AssumeRoleWithWebIdentity` 가 이 조건 때문에 계속 거부되면, 신뢰 정책을 다시 들여다보지 말고
+**CloudTrail → 이벤트 기록에서 실패한 `AssumeRoleWithWebIdentity` 이벤트를 열어 `userIdentity.userName`
+(=GitHub 이 실제로 보낸 sub 값)을 그대로 복사해 조건에 넣을 것.** 상세: `docs/TROUBLESHOOTING.md` Phase 7.
+
 권한 정책 (`<ACCOUNT_ID>`, `<INSTANCE_ID>` 치환 — 인스턴스는 3번에서 만든 뒤 채워도 됨):
 
 ```json
@@ -63,7 +69,7 @@ URL `https://token.actions.githubusercontent.com`, 대상 `sts.amazonaws.com`). 
     { "Sid": "EcrAuth", "Effect": "Allow", "Action": "ecr:GetAuthorizationToken", "Resource": "*" },
     {
       "Sid": "EcrPush", "Effect": "Allow",
-      "Action": ["ecr:BatchCheckLayerAvailability", "ecr:PutImage", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload"],
+      "Action": ["ecr:BatchCheckLayerAvailability", "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer", "ecr:PutImage", "ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload"],
       "Resource": [
         "arn:aws:ecr:us-east-1:<ACCOUNT_ID>:repository/bandive-backend",
         "arn:aws:ecr:us-east-1:<ACCOUNT_ID>:repository/bandive-frontend"
