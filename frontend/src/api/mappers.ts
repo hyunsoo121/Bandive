@@ -9,6 +9,7 @@ import type {
   Guest,
   MediaItem,
   Member,
+  PublicFollower,
   ScheduleEvent,
   SessionShape,
   Song,
@@ -25,6 +26,7 @@ import type {
   MediaPlatformDto,
   MemberDto,
   MeDto,
+  PublicFollowerDto,
   ScheduleDto,
   SongDto,
   UserProfileDto,
@@ -98,6 +100,15 @@ export function toFollower(dto: FollowerDto): Follower {
     status: dto.status,
     requestedAt: dto.requestedAt,
     decidedAt: dto.decidedAt,
+  };
+}
+
+export function toPublicFollower(dto: PublicFollowerDto): PublicFollower {
+  return {
+    userId: String(dto.userId),
+    nickname: dto.nickname,
+    initial: initialOf(dto.nickname),
+    avatarUrl: dto.avatarUrl ? fileUrl(dto.avatarUrl) : null,
   };
 }
 

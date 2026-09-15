@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import { Avatar } from '../components/Avatar';
 import { VISIBILITY_LABEL } from '../lib/bandVisibility';
+import * as followApi from '../api/follow';
+import { toPublicFollower } from '../api/mappers';
+import type { PublicFollower } from '../types';
 import './FollowersPage.css';
 
-/** 팔로워 관리 — 관리자 전용. 홈의 "팔로워" 통계 / 사이드바 "팔로워" 에서 진입. */
+/**
+ * 팔로워. 관리자는 승인/거절 등 관리 기능 전부, 그 외(멤버·승인된 팔로워·PUBLIC 밴드 방문자)는 승인된 팔로워
+ * 목록만 읽기 전용으로 본다. 홈의 "팔로워" 통계 / 사이드바 "팔로워" 에서 진입.
+ */
 export function FollowersPage() {
   const {
     currentBand,
@@ -27,8 +33,26 @@ export function FollowersPage() {
     if (isOwner) void refreshFollowers();
   }, [isOwner, bandId, refreshFollowers]);
 
+  // 비관리자 — 승인된 팔로워만 공개 API 로 (이 화면에 왔다는 건 이미 콘텐츠 열람 권한이 있다는 뜻).
+  const [publicFollowers, setPublicFollowers] = useState<PublicFollower[] | null>(null);
+  useEffect(() => {
+    if (isOwner || !bandId) return;
+    let alive = true;
+    setPublicFollowers(null);
+    followApi
+      .listPublicFollowers(bandId)
+      .then((list) => {
+        if (alive) setPublicFollowers(list.map(toPublicFollower));
+      })
+      .catch(() => {
+        if (alive) setPublicFollowers([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [isOwner, bandId]);
+
   if (!currentBand) return null;
-  if (!isOwner) return <Navigate to={`/bands/${currentBand.id}`} replace />;
 
   const run = async (fn: () => Promise<unknown>, fail: string) => {
     setError(null);
@@ -38,6 +62,43 @@ export function FollowersPage() {
       setError(e instanceof Error ? e.message : fail);
     }
   };
+
+  if (!isOwner) {
+    return (
+      <div className="followers">
+        <header className="followers__head">
+          <h2>팔로워</h2>
+          <span className="muted" style={{ fontSize: 12 }}>
+            {publicFollowers === null ? '' : `${publicFollowers.length}명`}
+          </span>
+        </header>
+
+        <section className="followers__section">
+          {publicFollowers === null ? (
+            <span className="muted" style={{ fontSize: 12 }}>
+              불러오는 중…
+            </span>
+          ) : publicFollowers.length === 0 ? (
+            <span className="muted" style={{ fontSize: 12 }}>
+              아직 팔로워가 없습니다.
+            </span>
+          ) : (
+            publicFollowers.map((f) => (
+              <div key={f.userId} className="followers__row">
+                <Avatar
+                  label={f.initial}
+                  size={28}
+                  src={f.avatarUrl}
+                  color="var(--color-neutral-500)"
+                />
+                <span className="followers__name">{f.nickname}</span>
+              </div>
+            ))
+          )}
+        </section>
+      </div>
+    );
+  }
 
   // PRIVATE 만 팔로우 불가 — FOLLOWERS(승인제)·PUBLIC(즉시 승인) 은 둘 다 팔로우를 받는다.
   const notFollowable = currentBand.visibility === 'PRIVATE';

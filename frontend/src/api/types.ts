@@ -75,6 +75,13 @@ export interface FollowerDto {
   decidedAt: string | null;
 }
 
+/** GET /api/bands/{bandId}/followers/public — 승인된 팔로워만, 콘텐츠 열람 가능한 사람이면 누구나. */
+export interface PublicFollowerDto {
+  userId: number;
+  nickname: string;
+  avatarUrl: string | null;
+}
+
 /** GET /api/me/following — 내가 팔로우한 밴드 한 곳 */
 export interface FollowingBandDto {
   bandId: number;

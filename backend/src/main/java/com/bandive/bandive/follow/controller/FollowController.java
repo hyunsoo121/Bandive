@@ -18,6 +18,7 @@ import com.bandive.bandive.auth.UserPrincipal;
 import com.bandive.bandive.follow.FollowStatus;
 import com.bandive.bandive.follow.dto.FollowerResponse;
 import com.bandive.bandive.follow.dto.FollowingBandResponse;
+import com.bandive.bandive.follow.dto.PublicFollowerResponse;
 import com.bandive.bandive.follow.service.FollowService;
 
 @RestController
@@ -49,6 +50,13 @@ public class FollowController {
 			@RequestParam(name = "status", required = false) FollowStatus status,
 			@AuthenticationPrincipal UserPrincipal principal) {
 		return followService.listFollowers(bandId, principal != null ? principal.getId() : null, status);
+	}
+
+	/** 공개 팔로워 목록 (승인된 팔로워만) — 이 밴드 콘텐츠를 볼 수 있는 사람이면 누구나(비로그인 포함). */
+	@GetMapping("/api/bands/{bandId}/followers/public")
+	public List<PublicFollowerResponse> publicFollowers(@PathVariable Long bandId,
+			@AuthenticationPrincipal UserPrincipal principal) {
+		return followService.listPublicFollowers(bandId, principal != null ? principal.getId() : null);
 	}
 
 	/** 내가 팔로우한 밴드 목록 (요청 대기 + 승인). */

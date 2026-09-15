@@ -32,6 +32,14 @@ export interface Follower {
   decidedAt: string | null;
 }
 
+/** 누구나 볼 수 있는 팔로워 한 명 (승인된 팔로워만, 관리자용 타임스탬프 없이). */
+export interface PublicFollower {
+  userId: string;
+  nickname: string;
+  initial: string;
+  avatarUrl: string | null;
+}
+
 /** 내가 팔로우한 밴드 한 곳 (탐색 > 팔로잉 탭). */
 export interface FollowingBand {
   bandId: string;

@@ -152,7 +152,7 @@ export function HomePage() {
           <strong>{currentBand.memberCount}</strong>
           <span className="muted">멤버</span>
         </Link>
-        <Link className="home__stat" to={isOwner ? `${base}/followers` : `${base}/members`}>
+        <Link className="home__stat" to={`${base}/followers`}>
           <strong>{currentBand.followerCount}</strong>
           <span className="muted">팔로워</span>
         </Link>

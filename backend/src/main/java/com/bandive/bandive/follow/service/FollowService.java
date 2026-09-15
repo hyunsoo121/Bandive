@@ -12,11 +12,13 @@ import com.bandive.bandive.band.BandVisibility;
 import com.bandive.bandive.common.exception.ConflictException;
 import com.bandive.bandive.common.exception.ForbiddenException;
 import com.bandive.bandive.common.exception.NotFoundException;
+import com.bandive.bandive.common.security.BandAccessGuard;
 import com.bandive.bandive.follow.BandFollow;
 import com.bandive.bandive.follow.BandFollowRepository;
 import com.bandive.bandive.follow.FollowStatus;
 import com.bandive.bandive.follow.dto.FollowerResponse;
 import com.bandive.bandive.follow.dto.FollowingBandResponse;
+import com.bandive.bandive.follow.dto.PublicFollowerResponse;
 import com.bandive.bandive.member.BandMember;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
@@ -37,12 +39,15 @@ public class FollowService {
 
 	private final UserRepository users;
 
+	private final BandAccessGuard accessGuard;
+
 	public FollowService(BandFollowRepository follows, BandRepository bands, BandMemberRepository bandMembers,
-			UserRepository users) {
+			UserRepository users, BandAccessGuard accessGuard) {
 		this.follows = follows;
 		this.bands = bands;
 		this.bandMembers = bandMembers;
 		this.users = users;
+		this.accessGuard = accessGuard;
 	}
 
 	/**
@@ -80,6 +85,18 @@ public class FollowService {
 	public List<FollowerResponse> listFollowers(Long bandId, Long ownerId, FollowStatus status) {
 		requireOwner(bandId, ownerId);
 		return follows.findAllForBand(bandId, status).stream().map(FollowerResponse::from).toList();
+	}
+
+	/**
+	 * 공개 팔로워 목록 (승인된 팔로워만, 타임스탬프 등 관리자용 상세 없이). 이 밴드 콘텐츠를 볼 수 있는 사람이면 누구나 — PUBLIC 은 비로그인
+	 * 포함 전체, FOLLOWERS 는 멤버·승인된 팔로워, PRIVATE 은 밴드 자체가 비멤버에게 404 라 여기까지 안 옴.
+	 */
+	public List<PublicFollowerResponse> listPublicFollowers(Long bandId, Long viewerId) {
+		accessGuard.requireCanViewContent(bandId, viewerId);
+		return follows.findAllForBand(bandId, FollowStatus.APPROVED)
+			.stream()
+			.map(PublicFollowerResponse::from)
+			.toList();
 	}
 
 	/** 로그인 유저 본인이 팔로우한 밴드 목록 (요청 대기 + 승인 모두). */

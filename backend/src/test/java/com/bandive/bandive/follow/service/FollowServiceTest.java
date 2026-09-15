@@ -53,7 +53,8 @@ class FollowServiceTest extends RepositoryTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new FollowService(follows, bands, bandMembers, users);
+		service = new FollowService(follows, bands, bandMembers, users,
+				new BandAccessGuard(bands, bandMembers, follows));
 		band = em.persist(Fixtures.band("A", BandVisibility.FOLLOWERS));
 		User owner = em.persist(Fixtures.user("owner"));
 		em.persist(Fixtures.member(band, owner, BandRole.OWNER));
@@ -131,6 +132,44 @@ class FollowServiceTest extends RepositoryTest {
 		assertThatThrownBy(() -> service.approve(band.getId(), plainMemberId, outsiderId))
 			.isInstanceOf(ForbiddenException.class)
 			.satisfies(ex -> assertThat(((ForbiddenException) ex).getCode()).isEqualTo("NOT_BAND_OWNER"));
+	}
+
+	@Test
+	void 공개_팔로워_목록은_승인된_사람만_담고_콘텐츠_열람_가능해야_조회된다() {
+		service.request(band.getId(), outsiderId);
+		em.flush();
+		service.approve(band.getId(), ownerId, outsiderId);
+		em.flush();
+
+		Long pendingId = em.persist(Fixtures.user("pending")).getId();
+		service.request(band.getId(), pendingId);
+		em.flush();
+		em.clear();
+
+		// FOLLOWERS 밴드 콘텐츠를 볼 수 있는 사람(자기 자신, 승인된 팔로워) → 조회 가능, 대기중인 사람은 목록에서 제외
+		var list = service.listPublicFollowers(band.getId(), outsiderId);
+
+		assertThat(list).singleElement().satisfies(f -> assertThat(f.userId()).isEqualTo(outsiderId));
+	}
+
+	@Test
+	void FOLLOWERS_밴드는_콘텐츠_못보는_사람에게_공개_팔로워_목록도_403() {
+		assertThatThrownBy(() -> service.listPublicFollowers(band.getId(), outsiderId))
+			.isInstanceOf(ForbiddenException.class)
+			.satisfies(ex -> assertThat(((ForbiddenException) ex).getCode()).isEqualTo("CONTENT_RESTRICTED"));
+	}
+
+	@Test
+	void PUBLIC_밴드는_비로그인도_공개_팔로워_목록을_본다() {
+		band.changeVisibility(BandVisibility.PUBLIC);
+		em.flush();
+		service.request(band.getId(), outsiderId);
+		em.flush();
+		em.clear();
+
+		var list = service.listPublicFollowers(band.getId(), null);
+
+		assertThat(list).singleElement().satisfies(f -> assertThat(f.userId()).isEqualTo(outsiderId));
 	}
 
 	@Test
