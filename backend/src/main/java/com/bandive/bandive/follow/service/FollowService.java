@@ -1,5 +1,6 @@
 package com.bandive.bandive.follow.service;
 
+import java.time.Instant;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -44,11 +45,14 @@ public class FollowService {
 		this.users = users;
 	}
 
-	/** 팔로우 요청 (PENDING). FOLLOWERS 밴드만. 이미 요청/승인돼 있으면 그대로. */
+	/**
+	 * 팔로우 요청. PRIVATE 밴드만 불가. FOLLOWERS 는 관리자 승인이 필요해 PENDING, PUBLIC 은 콘텐츠가 이미 전체공개라 승인
+	 * 절차 없이 즉시 APPROVED (그냥 구독/북마크 개념). 이미 요청/승인돼 있으면 그대로.
+	 */
 	@Transactional
 	public void request(Long bandId, Long userId) {
 		Band band = bands.findById(bandId).orElseThrow(() -> new NotFoundException("BAND_NOT_FOUND", "밴드를 찾을 수 없습니다."));
-		if (band.getVisibility() != BandVisibility.FOLLOWERS) {
+		if (band.getVisibility() == BandVisibility.PRIVATE) {
 			throw new ConflictException("FOLLOW_NOT_AVAILABLE", "이 밴드는 팔로우를 받지 않습니다.");
 		}
 		if (bandMembers.existsByBandIdAndUserId(bandId, userId)) {
@@ -57,10 +61,12 @@ public class FollowService {
 		if (follows.findByBandIdAndUserId(bandId, userId).isPresent()) {
 			return;
 		}
+		boolean autoApprove = band.getVisibility() == BandVisibility.PUBLIC;
 		follows.save(BandFollow.builder()
 			.band(band)
 			.user(users.getReferenceById(userId))
-			.status(FollowStatus.PENDING)
+			.status(autoApprove ? FollowStatus.APPROVED : FollowStatus.PENDING)
+			.decidedAt(autoApprove ? Instant.now() : null)
 			.build());
 	}
 

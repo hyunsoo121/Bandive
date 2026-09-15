@@ -29,7 +29,7 @@ public class FollowController {
 		this.followService = followService;
 	}
 
-	/** 팔로우 요청 (FOLLOWERS 밴드만). */
+	/** 팔로우 요청 (PRIVATE 밴드만 불가). FOLLOWERS 는 승인 대기, PUBLIC 은 즉시 승인. */
 	@PostMapping("/api/bands/{bandId}/follow")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void follow(@PathVariable Long bandId, @CurrentUser Long userId) {

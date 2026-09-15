@@ -200,9 +200,11 @@ export function ExplorePage() {
             {VISIBILITY_LABEL[b.visibility]} · 멤버 {b.memberCount}명
           </span>
 
-          {b.visibility === 'FOLLOWERS' && rel !== 'MEMBER' && (
+          {(b.visibility === 'FOLLOWERS' || b.visibility === 'PUBLIC') && rel !== 'MEMBER' && (
             <div className="explore__bd-follow">
-              <p className="explore__muted">{VISIBILITY_HINT.FOLLOWERS}</p>
+              {b.visibility === 'FOLLOWERS' && rel !== 'FOLLOWER' && (
+                <p className="explore__muted">{VISIBILITY_HINT.FOLLOWERS}</p>
+              )}
               {rel === 'PENDING' ? (
                 <button
                   type="button"
@@ -212,6 +214,15 @@ export function ExplorePage() {
                 >
                   요청 대기 중 · 취소
                 </button>
+              ) : rel === 'FOLLOWER' ? (
+                <button
+                  type="button"
+                  className="btn btn--sm"
+                  disabled={followBusy}
+                  onClick={() => follow(b.id, true)}
+                >
+                  팔로잉 중 · 취소
+                </button>
               ) : (
                 <button
                   type="button"
@@ -219,7 +230,7 @@ export function ExplorePage() {
                   disabled={followBusy}
                   onClick={() => follow(b.id, false)}
                 >
-                  팔로우 요청
+                  {b.visibility === 'PUBLIC' ? '팔로우' : '팔로우 요청'}
                 </button>
               )}
             </div>

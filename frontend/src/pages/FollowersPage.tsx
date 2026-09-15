@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import { Avatar } from '../components/Avatar';
 import { VISIBILITY_LABEL } from '../lib/bandVisibility';
@@ -39,7 +39,8 @@ export function FollowersPage() {
     }
   };
 
-  const notFollowable = currentBand.visibility !== 'FOLLOWERS';
+  // PRIVATE 만 팔로우 불가 — FOLLOWERS(승인제)·PUBLIC(즉시 승인) 은 둘 다 팔로우를 받는다.
+  const notFollowable = currentBand.visibility === 'PRIVATE';
 
   return (
     <div className="followers">
@@ -55,17 +56,23 @@ export function FollowersPage() {
         <div className="followers__notice panel">
           <p style={{ fontSize: 12, margin: 0, lineHeight: 1.6 }}>
             지금 공개범위는 <strong>{VISIBILITY_LABEL[currentBand.visibility]}</strong> 라 팔로우를
-            받지 않습니다. 팔로워 공개로 바꾸면 다른 사용자가 팔로우를 요청할 수 있어요.
+            받지 않습니다. 팔로워 공개(승인 필요)나 전체공개(즉시 승인)로 바꾸면 다른 사용자가
+            팔로우할 수 있어요.
           </p>
-          <button
-            type="button"
-            className="btn btn--sm"
-            onClick={() =>
-              run(() => updateBandVisibility('FOLLOWERS'), '공개범위를 바꾸지 못했습니다.')
-            }
-          >
-            팔로워 공개로 전환
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              type="button"
+              className="btn btn--sm"
+              onClick={() =>
+                run(() => updateBandVisibility('FOLLOWERS'), '공개범위를 바꾸지 못했습니다.')
+              }
+            >
+              팔로워 공개로 전환
+            </button>
+            <Link className="btn btn--ghost btn--sm" to={`/bands/${currentBand.id}/settings`}>
+              밴드 설정에서 변경
+            </Link>
+          </div>
         </div>
       )}
 

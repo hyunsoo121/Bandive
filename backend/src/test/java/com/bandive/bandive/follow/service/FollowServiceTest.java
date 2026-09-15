@@ -10,6 +10,7 @@ import com.bandive.bandive.common.exception.ConflictException;
 import com.bandive.bandive.common.exception.ForbiddenException;
 import com.bandive.bandive.common.exception.NotFoundException;
 import com.bandive.bandive.common.security.BandAccessGuard;
+import com.bandive.bandive.follow.BandFollow;
 import com.bandive.bandive.follow.BandFollowRepository;
 import com.bandive.bandive.follow.FollowStatus;
 import com.bandive.bandive.member.BandMemberRepository;
@@ -71,12 +72,26 @@ class FollowServiceTest extends RepositoryTest {
 	}
 
 	@Test
-	void PUBLIC_밴드엔_요청_불가_409() {
-		band.changeVisibility(BandVisibility.PUBLIC);
+	void PRIVATE_밴드엔_요청_불가_409() {
+		band.changeVisibility(BandVisibility.PRIVATE);
 		em.flush();
 
 		assertThatThrownBy(() -> service.request(band.getId(), outsiderId)).isInstanceOf(ConflictException.class)
 			.satisfies(ex -> assertThat(((ConflictException) ex).getCode()).isEqualTo("FOLLOW_NOT_AVAILABLE"));
+	}
+
+	@Test
+	void PUBLIC_밴드는_요청하면_즉시_APPROVED_된다() {
+		band.changeVisibility(BandVisibility.PUBLIC);
+		em.flush();
+
+		service.request(band.getId(), outsiderId);
+		em.flush();
+		em.clear();
+
+		BandFollow follow = follows.findByBandIdAndUserId(band.getId(), outsiderId).orElseThrow();
+		assertThat(follow.getStatus()).isEqualTo(FollowStatus.APPROVED);
+		assertThat(follow.getDecidedAt()).isNotNull();
 	}
 
 	@Test
