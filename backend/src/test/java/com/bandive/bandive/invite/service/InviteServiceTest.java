@@ -12,6 +12,7 @@ import com.bandive.bandive.common.exception.ConflictException;
 import com.bandive.bandive.common.exception.NotFoundException;
 import com.bandive.bandive.invite.InviteCodeRepository;
 import com.bandive.bandive.invite.dto.InviteCodeResponse;
+import com.bandive.bandive.invite.dto.InvitePreviewResponse;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
 import com.bandive.bandive.support.IntegrationTest;
@@ -93,6 +94,23 @@ class InviteServiceTest extends IntegrationTest {
 			.extracting(member -> member.getRole())
 			.isEqualTo(BandRole.MEMBER);
 		assertThat(inviteCodes.findByCode(code).orElseThrow().getUsedCount()).isEqualTo(1);
+	}
+
+	@Test
+	void 미리보기는_가입_없이_밴드_요약을_준다() {
+		String code = inviteService.issue(bandId).code();
+
+		InvitePreviewResponse preview = inviteService.preview(code);
+
+		assertThat(preview.code()).isEqualTo(code);
+		assertThat(preview.bandId()).isEqualTo(bandId);
+		assertThat(preview.memberCount()).isEqualTo(1);
+		assertThat(bandMembers.findByBandIdAndUserId(bandId, ownerId)).isPresent();
+	}
+
+	@Test
+	void 없는_코드로_미리보기하면_404() {
+		assertThatThrownBy(() -> inviteService.preview("ZZZZ9999")).isInstanceOf(NotFoundException.class);
 	}
 
 	@Test

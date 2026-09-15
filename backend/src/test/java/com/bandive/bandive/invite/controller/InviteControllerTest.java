@@ -11,6 +11,7 @@ import com.bandive.bandive.band.dto.BandResponse;
 import com.bandive.bandive.member.BandRole;
 import com.bandive.bandive.common.security.BandGuard;
 import com.bandive.bandive.invite.dto.InviteCodeResponse;
+import com.bandive.bandive.invite.dto.InvitePreviewResponse;
 import com.bandive.bandive.invite.service.InviteService;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -30,6 +31,7 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -79,6 +81,17 @@ class InviteControllerTest {
 		mvc.perform(post("/api/bands/1/invite-codes").with(asUser(7L)))
 			.andExpect(status().isForbidden())
 			.andExpect(jsonPath("$.code").value("FORBIDDEN"));
+	}
+
+	@Test
+	void 미리보기는_비회원도_볼_수_있다() throws Exception {
+		given(inviteService.preview("ABCD2345"))
+			.willReturn(new InvitePreviewResponse("ABCD2345", 1L, "내 밴드", "소개", null, 3));
+
+		mvc.perform(get("/api/invite-codes/ABCD2345"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.bandName").value("내 밴드"))
+			.andExpect(jsonPath("$.memberCount").value(3));
 	}
 
 	@Test

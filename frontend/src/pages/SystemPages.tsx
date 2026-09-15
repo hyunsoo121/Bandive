@@ -1,8 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import { BrandMark } from '../components/BrandMark';
 import { CreateBandModal } from '../components/CreateBandModal';
+import { Avatar } from '../components/Avatar';
+import { fileUrl } from '../api/client';
+import * as inviteApi from '../api/invites';
+import type { InvitePreviewDto } from '../api/types';
 
 const PENDING_INVITE_KEY = 'bandive.pendingInvite';
 
@@ -76,7 +80,7 @@ export function OAuthSuccess() {
   const pending = sessionStorage.getItem(PENDING_INVITE_KEY);
   if (pending) {
     sessionStorage.removeItem(PENDING_INVITE_KEY);
-    return <Navigate to={`/invite/${pending}`} replace />;
+    return <Navigate to={`/join/${pending}`} replace />;
   }
   return <Navigate to={bands.length > 0 ? `/bands/${bands[0].id}` : '/'} replace />;
 }
@@ -93,31 +97,103 @@ export function OAuthFailure() {
   );
 }
 
-/** "/invite/:code" — 로그인 상태면 바로 가입, 아니면 로그인 후 이 링크로 되돌아온다. */
+/**
+ * "/invite/:code" — 카카오톡 등 공유 링크 그대로. 운영에선 Caddy 가 이 경로를 백엔드(OG 태그 HTML)로 먼저
+ * 보내니 SPA 까지 안 옴. 로컬 dev(프록시 없음)처럼 여기로 직접 떨어지는 경우의 안전망 — 바로 `/join/:code` 로.
+ */
+export function InviteShareRedirect() {
+  const { code } = useParams();
+  return <Navigate to={code ? `/join/${code}` : '/'} replace />;
+}
+
+/** "/join/:code" — 밴드 미리보기를 먼저 보여주고, "참여하기" 를 눌러야 가입한다 (오클릭 방지). */
 export function InviteJoin() {
   const { code } = useParams();
-  const { bootLoading, user, joinByInvite, openLogin } = useApp();
+  const { bootLoading, user, bands, joinByInvite, openLogin } = useApp();
   const navigate = useNavigate();
-  const ran = useRef(false);
-  const [error, setError] = useState<string | null>(null);
+
+  const [preview, setPreview] = useState<InvitePreviewDto | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(true);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (bootLoading || !user || !code || ran.current) return;
-    ran.current = true;
-    joinByInvite(code)
-      .then((band) => navigate(`/bands/${band.id}`, { replace: true }))
-      .catch((e: unknown) =>
-        setError(e instanceof Error ? e.message : '초대 코드로 가입하지 못했습니다.'),
-      );
-  }, [bootLoading, user, code, joinByInvite, navigate]);
+    if (!code) return;
+    let alive = true;
+    setPreviewLoading(true);
+    inviteApi
+      .previewInvite(code)
+      .then((dto) => {
+        if (alive) setPreview(dto);
+      })
+      .catch((e: unknown) => {
+        if (alive)
+          setPreviewError(e instanceof Error ? e.message : '유효하지 않은 초대 링크입니다.');
+      })
+      .finally(() => {
+        if (alive) setPreviewLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [code]);
 
-  if (bootLoading) return <FullscreenLoader label="세션 확인 중…" />;
+  if (bootLoading || previewLoading) return <FullscreenLoader label="불러오는 중…" />;
+
+  if (previewError || !preview) {
+    return (
+      <CenterBox>
+        <BrandMark size={32} />
+        <p className="muted">{previewError ?? '유효하지 않은 초대 링크입니다.'}</p>
+        <Link className="btn" to="/">
+          홈으로
+        </Link>
+      </CenterBox>
+    );
+  }
+
+  const alreadyMember = bands.some((b) => b.id === String(preview.bandId));
+
+  const previewCard = (
+    <div
+      className="panel"
+      style={{
+        padding: 24,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 10,
+        minWidth: 260,
+      }}
+    >
+      <Avatar
+        label={[...preview.bandName][0] ?? '밴'}
+        size={56}
+        src={preview.logoUrl ? fileUrl(preview.logoUrl) : null}
+        heading
+        color="var(--color-accent)"
+      />
+      <strong style={{ fontFamily: 'var(--font-heading)', fontSize: 18 }}>
+        {preview.bandName}
+      </strong>
+      {preview.description && (
+        <p className="muted" style={{ margin: 0, textAlign: 'center' }}>
+          {preview.description}
+        </p>
+      )}
+      <span className="muted" style={{ fontSize: 12 }}>
+        멤버 {preview.memberCount}명
+      </span>
+    </div>
+  );
 
   if (!user) {
     return (
       <CenterBox>
         <BrandMark size={32} />
-        <p className="muted">초대 링크로 참여하려면 로그인이 필요합니다.</p>
+        {previewCard}
         <button
           type="button"
           className="btn btn--primary"
@@ -127,23 +203,60 @@ export function InviteJoin() {
             openLogin();
           }}
         >
-          로그인 / 회원가입
+          로그인하고 참여하기
         </button>
       </CenterBox>
     );
   }
 
-  if (error) {
+  if (alreadyMember) {
     return (
       <CenterBox>
         <BrandMark size={32} />
-        <p className="muted">{error}</p>
-        <Link className="btn" to="/">
-          홈으로
-        </Link>
+        {previewCard}
+        <p className="muted">이미 이 밴드의 멤버입니다.</p>
+        <button
+          type="button"
+          className="btn btn--primary"
+          onClick={() => navigate(`/bands/${preview.bandId}`, { replace: true })}
+        >
+          밴드로 이동
+        </button>
       </CenterBox>
     );
   }
 
-  return <FullscreenLoader label="밴드에 참여하는 중…" />;
+  const handleJoin = async () => {
+    if (!code || joining) return;
+    setJoining(true);
+    setJoinError(null);
+    try {
+      const band = await joinByInvite(code);
+      navigate(`/bands/${band.id}`, { replace: true });
+    } catch (e) {
+      setJoinError(e instanceof Error ? e.message : '참여하지 못했습니다.');
+      setJoining(false);
+    }
+  };
+
+  return (
+    <CenterBox>
+      <BrandMark size={32} />
+      {previewCard}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button type="button" className="btn btn--primary" disabled={joining} onClick={handleJoin}>
+          {joining ? '참여하는 중…' : '참여하기'}
+        </button>
+        <button
+          type="button"
+          className="btn btn--ghost"
+          disabled={joining}
+          onClick={() => navigate('/')}
+        >
+          취소
+        </button>
+      </div>
+      {joinError && <p className="muted">{joinError}</p>}
+    </CenterBox>
+  );
 }

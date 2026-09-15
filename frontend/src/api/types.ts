@@ -123,6 +123,16 @@ export interface InviteCodeDto {
   usedCount: number;
 }
 
+/** GET /api/invite-codes/{code} — 가입 전 미리보기(공개, 비로그인도 조회 가능). */
+export interface InvitePreviewDto {
+  code: string;
+  bandId: number;
+  bandName: string;
+  description: string | null;
+  logoUrl: string | null;
+  memberCount: number;
+}
+
 export interface MeDto {
   id: number;
   nickname: string;

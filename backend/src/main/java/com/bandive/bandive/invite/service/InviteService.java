@@ -14,6 +14,7 @@ import com.bandive.bandive.common.exception.NotFoundException;
 import com.bandive.bandive.invite.InviteCode;
 import com.bandive.bandive.invite.InviteCodeRepository;
 import com.bandive.bandive.invite.dto.InviteCodeResponse;
+import com.bandive.bandive.invite.dto.InvitePreviewResponse;
 import com.bandive.bandive.member.BandMember;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
@@ -65,6 +66,15 @@ public class InviteService {
 		cache.put(code, bandId);
 
 		return InviteCodeResponse.from(saved, inviteUrl(code));
+	}
+
+	/** 초대 코드 미리보기 (공개, 가입 전). 코드가 없으면 404. */
+	public InvitePreviewResponse preview(String code) {
+		InviteCode inviteCode = inviteCodes.findByCode(code)
+			.orElseThrow(() -> new NotFoundException("INVITE_CODE_NOT_FOUND", "유효하지 않은 초대 코드입니다."));
+		Band band = inviteCode.getBand();
+		return new InvitePreviewResponse(code, band.getId(), band.getName(), band.getDescription(), band.getLogoUrl(),
+				bandMembers.countByBandId(band.getId()));
 	}
 
 	/** 코드로 가입 — MEMBER 로 등록. */
