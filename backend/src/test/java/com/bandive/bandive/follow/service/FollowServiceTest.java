@@ -15,6 +15,8 @@ import com.bandive.bandive.follow.BandFollowRepository;
 import com.bandive.bandive.follow.FollowStatus;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
+import com.bandive.bandive.notification.NotificationRepository;
+import com.bandive.bandive.notification.service.NotificationService;
 import com.bandive.bandive.support.Fixtures;
 import com.bandive.bandive.support.RepositoryTest;
 import com.bandive.bandive.user.User;
@@ -41,6 +43,9 @@ class FollowServiceTest extends RepositoryTest {
 	private UserRepository users;
 
 	@Autowired
+	private NotificationRepository notifications;
+
+	@Autowired
 	private TestEntityManager em;
 
 	private FollowService service;
@@ -54,7 +59,7 @@ class FollowServiceTest extends RepositoryTest {
 	@BeforeEach
 	void setUp() {
 		service = new FollowService(follows, bands, bandMembers, users,
-				new BandAccessGuard(bands, bandMembers, follows));
+				new BandAccessGuard(bands, bandMembers, follows), new NotificationService(notifications, bandMembers));
 		band = em.persist(Fixtures.band("A", BandVisibility.FOLLOWERS));
 		User owner = em.persist(Fixtures.user("owner"));
 		em.persist(Fixtures.member(band, owner, BandRole.OWNER));
@@ -93,6 +98,36 @@ class FollowServiceTest extends RepositoryTest {
 		BandFollow follow = follows.findByBandIdAndUserId(band.getId(), outsiderId).orElseThrow();
 		assertThat(follow.getStatus()).isEqualTo(FollowStatus.APPROVED);
 		assertThat(follow.getDecidedAt()).isNotNull();
+	}
+
+	@Test
+	void 팔로우_요청하면_관리자에게_알림이_간다() {
+		service.request(band.getId(), outsiderId);
+		em.flush();
+		em.clear();
+
+		assertThat(notifications.findRecentByRecipient(ownerId, org.springframework.data.domain.Limit.of(10)))
+			.singleElement()
+			.satisfies(n -> {
+				assertThat(n.getType()).isEqualTo(com.bandive.bandive.notification.NotificationType.FOLLOW_REQUESTED);
+				assertThat(n.getActor().getId()).isEqualTo(outsiderId);
+				assertThat(n.getBand().getId()).isEqualTo(band.getId());
+			});
+	}
+
+	@Test
+	void PUBLIC_밴드_즉시승인도_관리자에게_확인용_알림이_간다() {
+		band.changeVisibility(BandVisibility.PUBLIC);
+		em.flush();
+
+		service.request(band.getId(), outsiderId);
+		em.flush();
+		em.clear();
+
+		assertThat(notifications.findRecentByRecipient(ownerId, org.springframework.data.domain.Limit.of(10)))
+			.singleElement()
+			.satisfies(n -> assertThat(n.getType())
+				.isEqualTo(com.bandive.bandive.notification.NotificationType.FOLLOW_AUTO_APPROVED));
 	}
 
 	@Test

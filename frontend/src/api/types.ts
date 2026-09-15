@@ -140,6 +140,23 @@ export interface InvitePreviewDto {
   memberCount: number;
 }
 
+/* ── 알림 (Notification) ─────────────────────────────────────── */
+
+export type NotificationTypeDto =
+  'SCHEDULE_CREATED' | 'MEMBER_JOINED' | 'FOLLOW_REQUESTED' | 'FOLLOW_AUTO_APPROVED';
+
+/** actorId/actorNickname 은 이 알림을 유발한 사람 — FOLLOW_REQUESTED 승인/거절 대상과 동일 인물. */
+export interface NotificationDto {
+  id: number;
+  type: NotificationTypeDto;
+  bandId: number;
+  bandName: string;
+  actorId: number | null;
+  actorNickname: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
 export interface MeDto {
   id: number;
   nickname: string;

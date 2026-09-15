@@ -22,10 +22,14 @@ import com.bandive.bandive.follow.dto.PublicFollowerResponse;
 import com.bandive.bandive.member.BandMember;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
+import com.bandive.bandive.notification.NotificationType;
+import com.bandive.bandive.notification.service.NotificationService;
+import com.bandive.bandive.user.User;
 import com.bandive.bandive.user.UserRepository;
 
 /**
- * 승인제 팔로우. 요청/취소는 로그인 유저 본인이, 목록·승인·거절은 관리자가. 알림 시스템은 없다 (관리자가 멤버 페이지에서 요청 목록을 확인·처리).
+ * 승인제 팔로우. 요청/취소는 로그인 유저 본인이, 목록·승인·거절은 관리자가. 요청이 오면 관리자에게 알림(FOLLOWERS 는 승인/거절 액션 필요,
+ * PUBLIC 즉시승인은 확인용)이 간다.
  */
 @Service
 @Transactional(readOnly = true)
@@ -41,13 +45,16 @@ public class FollowService {
 
 	private final BandAccessGuard accessGuard;
 
+	private final NotificationService notificationService;
+
 	public FollowService(BandFollowRepository follows, BandRepository bands, BandMemberRepository bandMembers,
-			UserRepository users, BandAccessGuard accessGuard) {
+			UserRepository users, BandAccessGuard accessGuard, NotificationService notificationService) {
 		this.follows = follows;
 		this.bands = bands;
 		this.bandMembers = bandMembers;
 		this.users = users;
 		this.accessGuard = accessGuard;
+		this.notificationService = notificationService;
 	}
 
 	/**
@@ -67,12 +74,18 @@ public class FollowService {
 			return;
 		}
 		boolean autoApprove = band.getVisibility() == BandVisibility.PUBLIC;
+		User requester = users.getReferenceById(userId);
 		follows.save(BandFollow.builder()
 			.band(band)
-			.user(users.getReferenceById(userId))
+			.user(requester)
 			.status(autoApprove ? FollowStatus.APPROVED : FollowStatus.PENDING)
 			.decidedAt(autoApprove ? Instant.now() : null)
 			.build());
+
+		bandMembers.findByBandIdAndRole(bandId, BandRole.OWNER)
+			.ifPresent(owner -> notificationService.notifyUser(owner.getUser(), band,
+					autoApprove ? NotificationType.FOLLOW_AUTO_APPROVED : NotificationType.FOLLOW_REQUESTED,
+					requester));
 	}
 
 	/** 요청 취소 / 언팔로우 (행 삭제). 없으면 no-op. */

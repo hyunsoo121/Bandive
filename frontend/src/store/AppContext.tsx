@@ -18,6 +18,7 @@ import type {
   MediaItem,
   MediaKind,
   Member,
+  NotificationItem,
   Role,
   ScheduleEvent,
   ScheduleType,
@@ -35,6 +36,7 @@ import * as inviteApi from '../api/invites';
 import * as memberApi from '../api/members';
 import * as guestApi from '../api/guests';
 import * as followApi from '../api/follow';
+import * as notificationApi from '../api/notifications';
 import * as songApi from '../api/songs';
 import * as songFolderApi from '../api/songFolders';
 import * as scheduleApi from '../api/schedules';
@@ -46,6 +48,7 @@ import {
   toGuest,
   toMedia,
   toMember,
+  toNotificationItem,
   toSchedule,
   toSong,
   toSongFolder,
@@ -210,6 +213,16 @@ interface AppState {
   refreshFollowing: () => Promise<void>;
   /** 팔로우 취소 / 언팔로우 (밴드 지정) → following 목록에서 제거 */
   unfollowBand: (bandId: string) => Promise<void>;
+  /**
+   * 알림 (오른쪽 위 벨). 새로고침·재진입 시에만 갱신 — 폴링·실시간(웹소켓) 아직 없음. 로그인 유저만.
+   */
+  notifications: NotificationItem[];
+  notificationsLoading: boolean;
+  /** 알림 목록 다시 불러오기 (벨 열 때, 로그인 시) */
+  refreshNotifications: () => Promise<void>;
+  /** 알림 하나 읽음 처리 (낙관적 갱신) */
+  markNotificationRead: (id: string) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
   /** 관리자 위임 (관리자) */
   transferOwnership: (userId: string) => Promise<void>;
   /** 밴드 삭제 (관리자) → 홈으로 */
@@ -327,6 +340,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [approvedFollowers, setApprovedFollowers] = useState<Follower[]>([]);
   const [following, setFollowing] = useState<FollowingBand[]>([]);
   const [followingLoading, setFollowingLoading] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [invite, setInvite] = useState<InviteInfo | null>(null);
@@ -578,6 +593,50 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (user) void refreshFollowing();
     else setFollowing([]);
   }, [user, refreshFollowing]);
+
+  const refreshNotifications = useCallback(async () => {
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
+    setNotificationsLoading(true);
+    try {
+      const list = await notificationApi.listNotifications();
+      setNotifications(list.map(toNotificationItem));
+    } catch {
+      setNotifications([]);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }, [user]);
+
+  // 로그인 상태가 되면(또는 새로고침으로 세션 복구되면) 알림 로드, 로그아웃되면 비움.
+  // 실시간(웹소켓) 없이 새로고침/재진입 때만 갱신 — 벨을 열 때도 refreshNotifications 를 다시 부른다.
+  useEffect(() => {
+    if (user) void refreshNotifications();
+    else setNotifications([]);
+  }, [user, refreshNotifications]);
+
+  const markNotificationRead = useCallback(async (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id && !n.readAt ? { ...n, readAt: new Date().toISOString() } : n)),
+    );
+    try {
+      await notificationApi.markNotificationRead(id);
+    } catch {
+      /* 무시 — 다음에 refreshNotifications 하면 맞춰짐 */
+    }
+  }, []);
+
+  const markAllNotificationsRead = useCallback(async () => {
+    const now = new Date().toISOString();
+    setNotifications((prev) => prev.map((n) => (n.readAt ? n : { ...n, readAt: now })));
+    try {
+      await notificationApi.markAllNotificationsRead();
+    } catch {
+      /* 무시 */
+    }
+  }, []);
 
   const requestFollow = useCallback(async () => {
     if (!currentBandId) return;
@@ -1109,6 +1168,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     approvedFollowers,
     following,
     followingLoading,
+    notifications,
+    notificationsLoading,
     bootLoading,
     bandLoading,
     role,
@@ -1141,6 +1202,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     unfollowBand,
     refreshFollowers,
     refreshFollowing,
+    refreshNotifications,
+    markNotificationRead,
+    markAllNotificationsRead,
     approveFollower,
     rejectFollower,
     removeFollower,

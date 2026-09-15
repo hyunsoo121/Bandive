@@ -18,6 +18,8 @@ import com.bandive.bandive.invite.dto.InvitePreviewResponse;
 import com.bandive.bandive.member.BandMember;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
+import com.bandive.bandive.notification.NotificationType;
+import com.bandive.bandive.notification.service.NotificationService;
 import com.bandive.bandive.user.User;
 import com.bandive.bandive.user.UserRepository;
 
@@ -39,9 +41,11 @@ public class InviteService {
 
 	private final String frontendBaseUrl;
 
+	private final NotificationService notificationService;
+
 	public InviteService(InviteCodeRepository inviteCodes, InviteCodeGenerator generator, InviteCodeCache cache,
 			BandRepository bands, BandMemberRepository bandMembers, UserRepository users,
-			FrontendProperties frontendProperties) {
+			FrontendProperties frontendProperties, NotificationService notificationService) {
 		this.inviteCodes = inviteCodes;
 		this.generator = generator;
 		this.cache = cache;
@@ -49,6 +53,7 @@ public class InviteService {
 		this.bandMembers = bandMembers;
 		this.users = users;
 		this.frontendBaseUrl = trimTrailingSlash(frontendProperties.baseUrl());
+		this.notificationService = notificationService;
 	}
 
 	/** 밴드당 코드 1개. 이미 있으면 폐기하고 새로 발급. */
@@ -95,6 +100,7 @@ public class InviteService {
 		bandMembers
 			.save(BandMember.builder().band(band).user(user).role(BandRole.MEMBER).joinedAt(Instant.now()).build());
 		inviteCode.incrementUsedCount();
+		notificationService.notifyBandMembers(band, NotificationType.MEMBER_JOINED, user, userId);
 
 		return BandResponse.from(band, bandMembers.countByBandId(bandId), BandRole.MEMBER);
 	}

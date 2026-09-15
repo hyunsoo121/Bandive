@@ -15,6 +15,8 @@ import com.bandive.bandive.invite.dto.InviteCodeResponse;
 import com.bandive.bandive.invite.dto.InvitePreviewResponse;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
+import com.bandive.bandive.notification.NotificationRepository;
+import com.bandive.bandive.notification.NotificationType;
 import com.bandive.bandive.support.IntegrationTest;
 import com.bandive.bandive.user.User;
 import com.bandive.bandive.user.UserRepository;
@@ -44,6 +46,9 @@ class InviteServiceTest extends IntegrationTest {
 
 	@Autowired
 	private StringRedisTemplate redis;
+
+	@Autowired
+	private NotificationRepository notifications;
 
 	private Long ownerId;
 
@@ -94,6 +99,23 @@ class InviteServiceTest extends IntegrationTest {
 			.extracting(member -> member.getRole())
 			.isEqualTo(BandRole.MEMBER);
 		assertThat(inviteCodes.findByCode(code).orElseThrow().getUsedCount()).isEqualTo(1);
+	}
+
+	@Test
+	void 가입하면_기존_멤버들에게_알림이_가고_본인은_제외된다() {
+		String code = inviteService.issue(bandId).code();
+		Long joinerId = newUser();
+
+		inviteService.join(joinerId, code);
+
+		var ownerNotifications = notifications.findRecentByRecipient(ownerId,
+				org.springframework.data.domain.Limit.of(10));
+		assertThat(ownerNotifications).singleElement().satisfies(n -> {
+			assertThat(n.getType()).isEqualTo(NotificationType.MEMBER_JOINED);
+			assertThat(n.getActor().getId()).isEqualTo(joinerId);
+		});
+		assertThat(notifications.findRecentByRecipient(joinerId, org.springframework.data.domain.Limit.of(10)))
+			.isEmpty();
 	}
 
 	@Test

@@ -20,6 +20,8 @@ import com.bandive.bandive.media.MediaRepository;
 import com.bandive.bandive.member.BandMember;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
+import com.bandive.bandive.notification.NotificationType;
+import com.bandive.bandive.notification.service.NotificationService;
 import com.bandive.bandive.schedule.Attendance;
 import com.bandive.bandive.schedule.AttendanceRepository;
 import com.bandive.bandive.schedule.AttendanceStatus;
@@ -51,9 +53,11 @@ public class ScheduleService {
 
 	private final BandAccessGuard bandAccess;
 
+	private final NotificationService notificationService;
+
 	public ScheduleService(ScheduleRepository schedules, AttendanceRepository attendances, MediaRepository media,
 			BandRepository bands, BandMemberRepository bandMembers, GuestRepository guests, UserRepository users,
-			BandAccessGuard bandAccess) {
+			BandAccessGuard bandAccess, NotificationService notificationService) {
 		this.schedules = schedules;
 		this.attendances = attendances;
 		this.media = media;
@@ -62,6 +66,7 @@ public class ScheduleService {
 		this.guests = guests;
 		this.users = users;
 		this.bandAccess = bandAccess;
+		this.notificationService = notificationService;
 	}
 
 	public List<ScheduleResponse> list(Long bandId, Long currentUserId) {
@@ -101,6 +106,7 @@ public class ScheduleService {
 			.dateTime(request.dateTime())
 			.location(trimToNull(request.location()))
 			.build());
+		notificationService.notifyBandMembers(band, NotificationType.SCHEDULE_CREATED, creator, userId);
 		return ScheduleResponse.from(schedule, List.of(), List.of(), userId);
 	}
 

@@ -9,6 +9,7 @@ import type {
   Guest,
   MediaItem,
   Member,
+  NotificationItem,
   PublicFollower,
   ScheduleEvent,
   SessionShape,
@@ -26,6 +27,7 @@ import type {
   MediaPlatformDto,
   MemberDto,
   MeDto,
+  NotificationDto,
   PublicFollowerDto,
   ScheduleDto,
   SongDto,
@@ -109,6 +111,19 @@ export function toPublicFollower(dto: PublicFollowerDto): PublicFollower {
     nickname: dto.nickname,
     initial: initialOf(dto.nickname),
     avatarUrl: dto.avatarUrl ? fileUrl(dto.avatarUrl) : null,
+  };
+}
+
+export function toNotificationItem(dto: NotificationDto): NotificationItem {
+  return {
+    id: String(dto.id),
+    type: dto.type,
+    bandId: String(dto.bandId),
+    bandName: dto.bandName,
+    actorId: dto.actorId != null ? String(dto.actorId) : null,
+    actorNickname: dto.actorNickname,
+    readAt: dto.readAt,
+    createdAt: dto.createdAt,
   };
 }
 

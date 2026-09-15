@@ -40,6 +40,22 @@ export interface PublicFollower {
   avatarUrl: string | null;
 }
 
+export type NotificationType =
+  'SCHEDULE_CREATED' | 'MEMBER_JOINED' | 'FOLLOW_REQUESTED' | 'FOLLOW_AUTO_APPROVED';
+
+/** 알림 한 건. actorId/actorNickname 은 FOLLOW_REQUESTED 승인/거절 대상과 동일 인물. */
+export interface NotificationItem {
+  id: string;
+  type: NotificationType;
+  bandId: string;
+  bandName: string;
+  actorId: string | null;
+  actorNickname: string | null;
+  /** 읽음 시각. 안 읽었으면 null */
+  readAt: string | null;
+  createdAt: string;
+}
+
 /** 내가 팔로우한 밴드 한 곳 (탐색 > 팔로잉 탭). */
 export interface FollowingBand {
   bandId: string;
