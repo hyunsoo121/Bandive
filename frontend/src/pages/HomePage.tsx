@@ -1,8 +1,9 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import { useGuard } from '../hooks/useGuard';
 import { KIND_LABEL, nextSchedule, toUi } from '../lib/schedule';
+import { CropModal } from '../components/CropModal';
 import './HomePage.css';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -35,6 +36,9 @@ export function HomePage() {
   const guard = useGuard();
   const logoInput = useRef<HTMLInputElement>(null);
   const bannerInput = useRef<HTMLInputElement>(null);
+  const [cropTarget, setCropTarget] = useState<{ kind: 'logo' | 'banner'; file: File } | null>(
+    null,
+  );
 
   if (!currentBand) return null;
   const bandId = currentBand.id;
@@ -54,7 +58,7 @@ export function HomePage() {
   const base = `/bands/${bandId}`;
   const going = upcoming?.counts.attending ?? 0;
 
-  const onPick = (kind: 'logo' | 'banner') => async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onPick = (kind: 'logo' | 'banner') => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ''; // 같은 파일 다시 고를 수 있게
     if (!file) return;
@@ -63,8 +67,15 @@ export function HomePage() {
       alert(err);
       return;
     }
+    setCropTarget({ kind, file });
+  };
+
+  const submitCropped = async (cropped: File) => {
+    if (!cropTarget) return;
+    const { kind } = cropTarget;
+    setCropTarget(null);
     try {
-      await (kind === 'logo' ? uploadBandLogo(file) : uploadBandBanner(file));
+      await (kind === 'logo' ? uploadBandLogo(cropped) : uploadBandBanner(cropped));
     } catch {
       alert('업로드에 실패했습니다. 다시 시도해 주세요.');
     }
@@ -298,6 +309,16 @@ export function HomePage() {
           <div className="panel home__empty">등록된 영상이 없습니다.</div>
         )}
       </section>
+      {cropTarget && (
+        <CropModal
+          file={cropTarget.file}
+          aspect={cropTarget.kind === 'logo' ? 1 : 3}
+          circle={cropTarget.kind === 'logo'}
+          title={cropTarget.kind === 'logo' ? '로고 자르기' : '배너 자르기'}
+          onCancel={() => setCropTarget(null)}
+          onCropped={submitCropped}
+        />
+      )}
     </div>
   );
 }

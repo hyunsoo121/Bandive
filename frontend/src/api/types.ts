@@ -240,6 +240,20 @@ export interface SongCreateBody {
   referenceVideoUrl?: string;
   /** 악기별 필요 인원 → SongPart 슬롯 */
   sessions: { instrument: string; count: number }[];
+  /** 없으면 WISHLIST. CONFIRMED 로 바로 등록하려면 관리자여야 함(합주곡 탭에서 곧장 등록). */
+  status?: SongStatusDto;
+}
+
+/**
+ * 부분 수정 — 보낸 필드만 반영. sessions 는 null/미포함이면 세션 구성 미변경, 값이 있으면 그 목록이 곡의 전체 세션
+ * 구성이 된다(목록에 없는 악기는 0명 취급). 배정된 슬롯을 넘는 만큼 줄이면 서버가 거부한다.
+ */
+export interface SongUpdateBody {
+  title?: string;
+  artist?: string;
+  memo?: string;
+  referenceVideoUrl?: string;
+  sessions?: { instrument: string; count: number }[];
 }
 
 /* ── 일정 (Schedule) ─────────────────────────────────────────── */

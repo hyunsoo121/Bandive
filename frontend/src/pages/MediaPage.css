@@ -111,14 +111,13 @@
   background: var(--color-bg);
   padding: 3px 6px;
 }
-.media__warn {
+.media__other {
   position: absolute;
   top: 8px;
   right: 8px;
   font-size: 10px;
   font-weight: 700;
-  background: var(--color-accent);
-  color: #fff;
+  background: var(--color-bg);
   padding: 3px 6px;
 }
 .media__card-foot {

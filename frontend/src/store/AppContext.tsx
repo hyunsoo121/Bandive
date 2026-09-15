@@ -65,6 +65,17 @@ export interface NewSongInput {
   memo: string;
   referenceVideoUrl: string;
   sessions: SessionShape;
+  /** 없으면 WISHLIST. 'CONFIRMED' 로 바로 등록하려면 관리자여야 함(합주곡 탭에서 곧장 등록). */
+  status?: Song['status'];
+}
+
+/** 곡 부분 수정 — 제목/아티스트/메모/참고영상만(세션 구성은 바꾸지 않음). */
+export interface EditSongInput {
+  title: string;
+  artist: string;
+  memo: string;
+  referenceVideoUrl: string;
+  sessions: SessionShape;
 }
 
 export interface NewMediaInput {
@@ -163,8 +174,13 @@ interface AppState {
   removeAvatar: () => Promise<void>;
   /** 비밀번호 변경 (이메일 로그인 계정만) */
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
-  /** 밴드 생성 → 내 밴드에 추가하고 해당 밴드로 이동. visibility 생략 시 PUBLIC */
-  createBand: (name: string, visibility?: BandVisibility) => Promise<void>;
+  /** 밴드 생성 → 내 밴드에 추가하고 해당 밴드로 이동. visibility 생략 시 PUBLIC. logo/banner 는 선택 */
+  createBand: (
+    name: string,
+    visibility?: BandVisibility,
+    logoFile?: File | null,
+    bannerFile?: File | null,
+  ) => Promise<void>;
   /** 초대 코드로 가입 → 가입한 밴드 반환 */
   joinByInvite: (code: string) => Promise<Band>;
   /** 밴드 이름·소개 수정 (관리자) */
@@ -220,6 +236,8 @@ interface AppState {
   ) => Promise<void>;
   /** 곡 추가 (POST /api/bands/{id}/songs) */
   addSong: (input: NewSongInput) => Promise<void>;
+  /** 곡 부분 수정 (PATCH /api/songs/{id}) — 등록자 본인 또는 관리자. 위시리스트·합주곡 모두 가능 */
+  updateSong: (songId: string, input: EditSongInput) => Promise<void>;
   /** 곡 삭제 (관리자) */
   removeSong: (songId: string) => Promise<void>;
   /** 곡을 폴더로 이동 (멤버 누구나). folderId null = 미분류. 대상 그룹 맨 끝으로 */
@@ -470,11 +488,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [navigate]);
 
   const createBand = useCallback(
-    async (name: string, visibility?: BandVisibility) => {
+    async (
+      name: string,
+      visibility?: BandVisibility,
+      logoFile?: File | null,
+      bannerFile?: File | null,
+    ) => {
       const trimmed = name.trim();
       if (!trimmed) return;
       const dto = await bandApi.createBand(trimmed, null, visibility);
-      const band = toBand(dto); // 생성 응답에 role: 'OWNER' 포함됨
+      let band = toBand(dto); // 생성 응답에 role: 'OWNER' 포함됨
+      // 로고/배너는 생성 직후 곧바로(관리자 권한 필요 — 방금 생성한 본인) 업로드.
+      // uploadBandLogo/Banner 액션은 currentBandId 를 쓰는데 아직 이 밴드로 이동 전이라 여기선 직접 호출.
+      if (logoFile) band = toBand(await bandApi.uploadLogo(band.id, logoFile));
+      if (bannerFile) band = toBand(await bandApi.uploadBanner(band.id, bannerFile));
       setBands((prev) => [...prev, band]);
       setCreateOpen(false);
       setSwitcherOpen(false);
@@ -853,8 +880,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       memo: input.memo.trim(),
       referenceVideoUrl: input.referenceVideoUrl.trim(),
       sessions,
+      status: input.status,
     });
     setSongs((prev) => [...prev, toSong(dto)]);
+  }, []);
+
+  const updateSong = useCallback(async (songId: string, input: EditSongInput) => {
+    const sessions = Object.entries(input.sessions)
+      .filter(([, count]) => (count ?? 0) > 0)
+      .map(([instrument, count]) => ({ instrument, count: count as number }));
+    const dto = await songApi.updateSong(songId, {
+      title: input.title.trim(),
+      artist: input.artist.trim(),
+      memo: input.memo.trim(),
+      referenceVideoUrl: input.referenceVideoUrl.trim(),
+      sessions,
+    });
+    setSongs((prev) => prev.map((s) => (s.id === songId ? toSong(dto) : s)));
   }, []);
 
   const removeSong = useCallback(async (songId: string) => {
@@ -1113,6 +1155,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     promoteSong,
     assignPart,
     addSong,
+    updateSong,
     removeSong,
     moveSongToFolder,
     reorderSongs,

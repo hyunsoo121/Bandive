@@ -1,0 +1,29 @@
+.cropmodal__frame {
+  position: relative;
+  overflow: hidden;
+  margin: 0 auto;
+  border: 2px solid var(--color-text);
+  background: var(--color-neutral-200);
+  cursor: grab;
+  touch-action: none;
+}
+.cropmodal__frame:active {
+  cursor: grabbing;
+}
+.cropmodal__frame--circle {
+  border-radius: 50%;
+}
+.cropmodal__frame img {
+  position: absolute;
+  max-width: none;
+  user-select: none;
+  pointer-events: none;
+}
+.cropmodal__zoom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cropmodal__zoom input[type='range'] {
+  flex: 1;
+}

@@ -85,7 +85,7 @@ export function MediaPage() {
                 )}
                 <span className="media__play" aria-hidden="true" />
                 <span className="media__kind">{m.kind}</span>
-                {m.platform === 'other' && <span className="media__warn">링크 아님</span>}
+                {m.platform === 'other' && <span className="media__other">기타 링크</span>}
               </a>
               <div className="media__card-body">
                 <a

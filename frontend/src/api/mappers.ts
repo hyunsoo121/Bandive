@@ -165,6 +165,7 @@ export function toSong(dto: SongDto): Song {
     sourceType: dto.sourceType,
     externalTrackId: dto.externalTrackId ?? null,
     proposer: dto.addedByNickname,
+    addedByUserId: String(dto.addedByUserId),
     memo: dto.memo ?? '',
     referenceVideoUrl: dto.referenceVideoUrl ?? '',
     artworkUrl: dto.artworkUrl,

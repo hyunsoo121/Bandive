@@ -1,7 +1,11 @@
 package com.bandive.bandive.song.service;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,6 +38,7 @@ import com.bandive.bandive.song.dto.SongCreateRequest;
 import com.bandive.bandive.song.dto.SongCreateRequest.SessionSlot;
 import com.bandive.bandive.song.dto.SongOrderRequest;
 import com.bandive.bandive.song.dto.SongResponse;
+import com.bandive.bandive.song.dto.SongUpdateRequest;
 import com.bandive.bandive.song.dto.TrackSearchResult;
 import com.bandive.bandive.song.dto.VoteResult;
 import com.bandive.bandive.song.folder.SongFolder;
@@ -118,6 +123,12 @@ public class SongService {
 			throw new ValidationException("EXTERNAL_TRACK_ID_REQUIRED", "검색으로 추가하려면 트랙 식별자가 필요합니다.");
 		}
 
+		SongStatus status = request.status() != null ? request.status() : SongStatus.WISHLIST;
+		if (status == SongStatus.CONFIRMED) {
+			// 합주곡으로 바로 등록(승격 단계 생략)은 관리자만 — confirm() 과 동일한 권한.
+			requireOwner(bandId, userId);
+		}
+
 		User addedBy = users.findById(userId)
 			.orElseThrow(() -> new NotFoundException("USER_NOT_FOUND", "사용자를 찾을 수 없습니다."));
 
@@ -126,7 +137,7 @@ public class SongService {
 			.addedBy(addedBy)
 			.title(request.title().trim())
 			.artist(trimToNull(request.artist()))
-			.status(SongStatus.WISHLIST)
+			.status(status)
 			.sourceType(request.sourceType())
 			.externalTrackId(trimToNull(request.externalTrackId()))
 			.artworkUrl(trimToNull(request.artworkUrl()))
@@ -141,8 +152,8 @@ public class SongService {
 				}
 			}
 		}
-		// 새 곡은 항상 WISHLIST·미분류 — 그 그룹 맨 끝에 놓는다.
-		song.moveToPosition(songs.countByBandIdAndStatusAndFolderIsNull(bandId, SongStatus.WISHLIST));
+		// 새 곡은 항상 미분류 — 그 status 그룹 맨 끝에 놓는다.
+		song.moveToPosition(songs.countByBandIdAndStatusAndFolderIsNull(bandId, status));
 		songs.save(song);
 		return SongResponse.from(song, 0L, false);
 	}
@@ -207,6 +218,81 @@ public class SongService {
 			part.unassign();
 		}
 		return toResponse(song, actorUserId);
+	}
+
+	/**
+	 * 부분 수정 (제목/아티스트/메모/참고영상) — 등록자 본인 또는 관리자. 위시리스트·합주곡 상태 모두 가능. null 필드는 유지.
+	 */
+	@Transactional
+	public SongResponse update(Long songId, Long userId, SongUpdateRequest request) {
+		Song song = findSongWithDetails(songId);
+		requireProposerOrOwner(song, userId);
+
+		String title = request.title() != null ? request.title().trim() : song.getTitle();
+		if (title.isEmpty()) {
+			throw new ValidationException("TITLE_REQUIRED", "곡 제목은 필수입니다");
+		}
+		String artist = request.artist() != null ? trimToNull(request.artist()) : song.getArtist();
+		String memo = request.memo() != null ? request.memo() : song.getMemo();
+		String referenceVideoUrl = request.referenceVideoUrl() != null ? trimToNull(request.referenceVideoUrl())
+				: song.getReferenceVideoUrl();
+
+		song.updateDetails(title, artist, memo, referenceVideoUrl);
+		if (request.sessions() != null) {
+			applySessions(song, request.sessions());
+		}
+		return toResponse(song, userId);
+	}
+
+	/**
+	 * 세션 구성을 target 으로 맞춘다(등록 시와 같은 "전체 목록" 의미 — 목록에 없는 악기는 0). 인원이 늘면 빈 슬롯을 추가하고, 줄면 배정
+	 * 없는 슬롯부터 지운다. 줄이려는 만큼 배정 없는 슬롯이 없으면 거부.
+	 */
+	private void applySessions(Song song, List<SessionSlot> target) {
+		Map<String, Integer> targetCounts = new LinkedHashMap<>();
+		for (SessionSlot slot : target) {
+			String instrument = slot.instrument().trim();
+			targetCounts.merge(instrument, slot.count(), Integer::sum);
+		}
+
+		Map<String, List<SongPart>> existingByInstrument = new HashMap<>();
+		for (SongPart part : song.getParts()) {
+			existingByInstrument.computeIfAbsent(part.getInstrument(), k -> new ArrayList<>()).add(part);
+		}
+
+		Set<String> instruments = new LinkedHashSet<>();
+		instruments.addAll(existingByInstrument.keySet());
+		instruments.addAll(targetCounts.keySet());
+
+		List<SongPart> toRemove = new ArrayList<>();
+		for (String instrument : instruments) {
+			List<SongPart> existing = existingByInstrument.getOrDefault(instrument, List.of());
+			int currentCount = existing.size();
+			int targetCount = targetCounts.getOrDefault(instrument, 0);
+
+			if (targetCount < currentCount) {
+				int need = currentCount - targetCount;
+				List<SongPart> removable = existing.stream()
+					.filter(p -> !p.isAssigned())
+					.sorted(Comparator.comparing(SongPart::getPartIndex).reversed())
+					.limit(need)
+					.toList();
+				if (removable.size() < need) {
+					throw new ConflictException("SESSION_SLOT_ASSIGNED",
+							"'" + instrument + "' 에 이미 배정된 멤버가 있어 그만큼 줄일 수 없습니다. 먼저 배정을 해제해 주세요.");
+				}
+				toRemove.addAll(removable);
+			}
+			else if (targetCount > currentCount) {
+				int maxIndex = existing.stream().mapToInt(SongPart::getPartIndex).max().orElse(0);
+				for (int i = 1; i <= targetCount - currentCount; i++) {
+					song.addPart(SongPart.builder().instrument(instrument).partIndex(maxIndex + i).build());
+				}
+			}
+		}
+		if (!toRemove.isEmpty()) {
+			song.removeParts(toRemove);
+		}
 	}
 
 	/** 곡 삭제 (관리자). song_parts·votes 는 cascade. */
@@ -280,6 +366,12 @@ public class SongService {
 	private void requireMember(Long bandId, Long userId) {
 		if (!bandMembers.existsByBandIdAndUserId(bandId, userId)) {
 			throw new ForbiddenException("NOT_A_MEMBER", "이 밴드의 멤버가 아닙니다.");
+		}
+	}
+
+	private void requireProposerOrOwner(Song song, Long userId) {
+		if (!song.getAddedBy().getId().equals(userId)) {
+			requireOwner(song.getBand().getId(), userId);
 		}
 	}
 

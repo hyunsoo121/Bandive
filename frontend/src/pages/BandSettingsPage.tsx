@@ -3,6 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import type { BandVisibility } from '../types';
 import { VISIBILITY_LABEL, VISIBILITY_HINT, VISIBILITY_ORDER } from '../lib/bandVisibility';
+import { CropModal } from '../components/CropModal';
 import './BandSettingsPage.css';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -46,6 +47,10 @@ export function BandSettingsPage() {
   const [visBusy, setVisBusy] = useState(false);
   const [visMsg, setVisMsg] = useState<string | null>(null);
 
+  const [cropTarget, setCropTarget] = useState<{ kind: 'logo' | 'banner'; file: File } | null>(
+    null,
+  );
+
   if (!currentBand) return null;
   if (role !== 'owner') return <Navigate to={`/bands/${currentBand.id}`} replace />;
 
@@ -84,7 +89,7 @@ export function BandSettingsPage() {
     }
   };
 
-  const onPick = (kind: 'logo' | 'banner') => async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onPick = (kind: 'logo' | 'banner') => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = '';
     if (!file) return;
@@ -93,8 +98,15 @@ export function BandSettingsPage() {
       alert(err);
       return;
     }
+    setCropTarget({ kind, file });
+  };
+
+  const submitCropped = async (cropped: File) => {
+    if (!cropTarget) return;
+    const { kind } = cropTarget;
+    setCropTarget(null);
     try {
-      await (kind === 'logo' ? uploadBandLogo(file) : uploadBandBanner(file));
+      await (kind === 'logo' ? uploadBandLogo(cropped) : uploadBandBanner(cropped));
     } catch {
       alert('업로드에 실패했습니다. 다시 시도해 주세요.');
     }
@@ -357,6 +369,16 @@ export function BandSettingsPage() {
           )}
         </section>
       </div>
+      {cropTarget && (
+        <CropModal
+          file={cropTarget.file}
+          aspect={cropTarget.kind === 'logo' ? 1 : 3}
+          circle={cropTarget.kind === 'logo'}
+          title={cropTarget.kind === 'logo' ? '로고 자르기' : '배너 자르기'}
+          onCancel={() => setCropTarget(null)}
+          onCropped={submitCropped}
+        />
+      )}
     </div>
   );
 }

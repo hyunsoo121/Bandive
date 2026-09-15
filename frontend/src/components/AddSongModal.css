@@ -1,5 +1,8 @@
 .addsong__results {
   border-top: 1px solid var(--color-divider);
+  /* 결과가 많으면 이 목록만 스크롤 — 아래 세션 구성·참고영상 등 나머지 폼이 안 밀려나게. */
+  max-height: 240px;
+  overflow-y: auto;
 }
 .addsong__result {
   display: flex;
@@ -55,6 +58,11 @@
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
+}
+.addsong__step:disabled {
+  border-color: var(--color-neutral-300);
+  color: var(--color-neutral-400);
+  cursor: not-allowed;
 }
 .addsong__count {
   width: 22px;
