@@ -66,6 +66,19 @@
   display: flex;
   flex-direction: column;
 }
+/* 홈 "최근 영상"에서 넘어왔을 때 어떤 카드인지 잠깐 눈에 띄게. */
+.media__card.is-highlighted {
+  animation: media-highlight-flash 1.8s ease-out;
+}
+@keyframes media-highlight-flash {
+  0%,
+  35% {
+    box-shadow: 0 0 0 3px var(--color-accent);
+  }
+  100% {
+    box-shadow: 0 0 0 3px transparent;
+  }
+}
 .media__thumb {
   height: 124px;
   border-bottom: 2px solid var(--color-text);

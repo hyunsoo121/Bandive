@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import { useGuard } from '../hooks/useGuard';
 import { KIND_LABEL, toUi } from '../lib/schedule';
@@ -27,9 +28,40 @@ export function MediaPage() {
   const [filter, setFilter] = useState<Filter>('전체');
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<MediaItem | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [highlightId, setHighlightId] = useState<string | null>(null);
 
-  if (!currentBand) return null;
-  const bandId = currentBand.id;
+  const bandId = currentBand?.id;
+
+  // 홈 "최근 영상"에서 넘어온 경우 — 그 영상이 보이게 필터를 풀고 스크롤·하이라이트한다.
+  useEffect(() => {
+    const targetId = searchParams.get('video');
+    if (!targetId || !bandId) return;
+    const target = allMedia.find((m) => m.id === targetId && m.bandId === bandId);
+    if (!target) return;
+    setFilter('전체');
+    setHighlightId(target.id);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('video');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, allMedia, bandId, setSearchParams]);
+
+  useEffect(() => {
+    if (!highlightId) return;
+    document.getElementById(`media-${highlightId}`)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
+    const t = setTimeout(() => setHighlightId(null), 1800);
+    return () => clearTimeout(t);
+  }, [highlightId]);
+
+  if (!currentBand || !bandId) return null;
 
   const scheduleById = new Map(schedules.map((s) => [s.id, s]));
 
@@ -72,7 +104,11 @@ export function MediaPage() {
           const [a, b] = STRIPE_SHADES[i % STRIPE_SHADES.length];
           const memberOnly = m.visibility === '멤버만';
           return (
-            <article key={m.id} className="media__card">
+            <article
+              key={m.id}
+              id={`media-${m.id}`}
+              className={`media__card${highlightId === m.id ? ' is-highlighted' : ''}`}
+            >
               <a
                 className="media__thumb"
                 href={m.url}

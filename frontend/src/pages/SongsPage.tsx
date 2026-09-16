@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   DndContext,
   PointerSensor,
@@ -96,6 +97,8 @@ export function SongsPage() {
   const [editingSong, setEditingSong] = useState<Song | null>(null);
   const [proposerFilter, setProposerFilter] = useState<string | null>(null);
   const [proposerPickerOpen, setProposerPickerOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [highlightId, setHighlightId] = useState<string | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -124,6 +127,51 @@ export function SongsPage() {
       }
       return next;
     });
+
+  /** 접혀있으면 펼치기만 한다 (toggleCollapse 와 달리 이미 펼쳐진 폴더를 건드리지 않는다). */
+  const expandFolder = (id: string) =>
+    setCollapsed((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      try {
+        if (collapseKey) localStorage.setItem(collapseKey, JSON.stringify([...next]));
+      } catch {
+        /* localStorage 불가 — 이번 세션만 유지 */
+      }
+      return next;
+    });
+
+  // 홈 "최근 등록된 곡"에서 넘어온 경우 — 해당 탭·폴더를 펼치고 곡을 열어서 보여준다.
+  useEffect(() => {
+    const targetId = searchParams.get('song');
+    if (!targetId || !bandId) return;
+    const target = songs.find((s) => s.id === targetId && s.bandId === bandId);
+    if (!target) return;
+    setTab(target.status);
+    setOpenId(target.id);
+    if (target.folderId) expandFolder(target.folderId);
+    setHighlightId(target.id);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('song');
+        return next;
+      },
+      { replace: true },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, songs, bandId]);
+
+  useEffect(() => {
+    if (!highlightId) return;
+    document.getElementById(`song-${highlightId}`)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
+    const t = setTimeout(() => setHighlightId(null), 1800);
+    return () => clearTimeout(t);
+  }, [highlightId]);
 
   const isWish = tab === 'WISHLIST';
 
@@ -403,6 +451,7 @@ export function SongsPage() {
                 collapsed={g.folder ? collapsed.has(g.folder.id) : false}
                 folders={folders}
                 openId={openId}
+                highlightId={highlightId}
                 assignOptions={assignOptions}
                 mediaBySong={mediaBySong}
                 canAddGuest={isOwner}
@@ -540,6 +589,7 @@ interface GroupProps {
   collapsed: boolean;
   folders: SongFolder[];
   openId: string | null;
+  highlightId: string | null;
   assignOptions: AssignOption[];
   mediaBySong: Map<string, MediaItem[]>;
   canAddGuest: boolean;
@@ -564,6 +614,7 @@ function FolderGroup({
   collapsed,
   folders,
   openId,
+  highlightId,
   assignOptions,
   mediaBySong,
   canAddGuest,
@@ -680,6 +731,7 @@ function FolderGroup({
                 isGuest={isGuest}
                 dragEnabled={dragEnabled}
                 open={openId === song.id}
+                highlighted={highlightId === song.id}
                 assignOptions={assignOptions}
                 linkedMedia={mediaBySong.get(song.id) ?? []}
                 canAddGuest={canAddGuest}
@@ -710,6 +762,7 @@ interface RowProps {
   isGuest: boolean;
   dragEnabled: boolean;
   open: boolean;
+  highlighted: boolean;
   assignOptions: AssignOption[];
   linkedMedia: MediaItem[];
   canAddGuest: boolean;
@@ -731,6 +784,7 @@ function SongRow({
   isGuest,
   dragEnabled,
   open,
+  highlighted,
   assignOptions,
   linkedMedia,
   canAddGuest,
@@ -803,8 +857,9 @@ function SongRow({
   return (
     <article
       ref={sortable.setNodeRef}
+      id={`song-${song.id}`}
       style={style}
-      className={`songrow${sortable.isDragging ? ' is-dragging' : ''}`}
+      className={`songrow${sortable.isDragging ? ' is-dragging' : ''}${highlighted ? ' is-highlighted' : ''}`}
     >
       {dragEnabled && (
         <button

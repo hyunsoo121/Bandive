@@ -202,6 +202,19 @@
 .songrow.is-dragging {
   opacity: 0.5;
 }
+/* 홈 "최근 등록된 곡"에서 넘어왔을 때 어떤 곡인지 잠깐 눈에 띄게. */
+.songrow.is-highlighted {
+  animation: songrow-highlight-flash 1.8s ease-out;
+}
+@keyframes songrow-highlight-flash {
+  0%,
+  35% {
+    background: var(--color-accent-100);
+  }
+  100% {
+    background: transparent;
+  }
+}
 .songrow__handle {
   border: none;
   background: transparent;

@@ -277,7 +277,7 @@ export function HomePage() {
           {recentSongs.length > 0 ? (
             <div className="home__songlist">
               {recentSongs.map((s, i) => (
-                <div key={s.id} className="home__songrow">
+                <Link key={s.id} to={`${base}/songs?song=${s.id}`} className="home__songrow">
                   <span className="home__songno">{String(i + 1).padStart(2, '0')}</span>
                   <span className="stack" style={{ flex: 1 }}>
                     <strong style={{ fontSize: 14 }}>{s.title}</strong>
@@ -288,7 +288,7 @@ export function HomePage() {
                   <span className={`tag ${s.status === 'CONFIRMED' ? '' : 'tag--soft'}`}>
                     {s.status === 'CONFIRMED' ? '합주곡' : `위시 · ${s.votes}표`}
                   </span>
-                </div>
+                </Link>
               ))}
             </div>
           ) : (
@@ -311,7 +311,7 @@ export function HomePage() {
             {media.slice(0, 3).map((v, i) => {
               const [a, b] = STRIPE_SHADES[i % STRIPE_SHADES.length];
               return (
-                <div key={v.id} className="home__video">
+                <Link key={v.id} to={`${base}/media?video=${v.id}`} className="home__video">
                   <div className="home__video-thumb" style={{ background: stripe(a, b) }}>
                     {v.thumbnailUrl && (
                       <img
@@ -329,7 +329,7 @@ export function HomePage() {
                       {v.source} · {v.date}
                     </span>
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>
