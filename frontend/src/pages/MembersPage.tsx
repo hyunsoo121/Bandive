@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import { Avatar } from '../components/Avatar';
 import { PartsPickerModal } from '../components/PartsPickerModal';
@@ -6,7 +7,9 @@ import { DangerConfirmModal } from '../components/DangerConfirmModal';
 import { UserProfileModal } from '../components/UserProfileModal';
 import { PromptModal } from '../components/PromptModal';
 import { GuestSessionModal } from '../components/GuestSessionModal';
-import type { Guest, Member } from '../types';
+import * as followApi from '../api/follow';
+import { toPublicFollower } from '../api/mappers';
+import type { Guest, Member, PublicFollower } from '../types';
 import './MembersPage.css';
 
 const GUESTS_OPEN_KEY = 'bandive:members:guestsOpen';
@@ -34,12 +37,32 @@ export function MembersPage() {
   const [error, setError] = useState<string | null>(null);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [profileUserId, setProfileUserId] = useState<string | null>(null);
+  const [followers, setFollowers] = useState<PublicFollower[] | null>(null);
+
+  const bandId = currentBand?.id;
+  useEffect(() => {
+    if (!bandId) return;
+    let alive = true;
+    setFollowers(null);
+    followApi
+      .listPublicFollowers(bandId)
+      .then((list) => {
+        if (alive) setFollowers(list.map(toPublicFollower));
+      })
+      .catch(() => {
+        if (alive) setFollowers([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [bandId]);
 
   if (!currentBand) return null;
 
   const isOwner = role === 'owner';
   const isMember = role === 'member';
   const bandMembers = members.filter((m) => m.bandId === currentBand.id);
+  const basePath = `/bands/${currentBand.id}`;
 
   const runIssue = async () => {
     setIssuing(true);
@@ -124,6 +147,11 @@ export function MembersPage() {
           runGuest(() => setGuestSession(id, s), '세션을 저장하지 못했습니다.')
         }
         onRemove={(id) => runGuest(() => removeGuest(id), '게스트를 삭제하지 못했습니다.')}
+      />
+
+      <FollowerSection
+        followers={followers}
+        manageLink={isOwner ? `${basePath}/followers` : null}
       />
 
       {error && (
@@ -491,6 +519,58 @@ function GuestSection({
           onClose={() => setSessionFor(null)}
         />
       )}
+    </div>
+  );
+}
+
+/* ─────────────────────── 팔로워 (읽기 전용) ─────────────────────── */
+
+interface FollowerSectionProps {
+  followers: PublicFollower[] | null;
+  /** 관리자만 — 승인/거절 등 전체 관리는 별도 팔로워 페이지에서. null 이면 링크 숨김. */
+  manageLink: string | null;
+}
+
+/** 승인된 팔로워 목록 — 관리자뿐 아니라 멤버·팔로워 누구나 멤버 탭에서 볼 수 있다. */
+function FollowerSection({ followers, manageLink }: FollowerSectionProps) {
+  // 관리자도 아니고 팔로워도 없으면(아직 로딩 중일 때도 null 이라 숨기지 않는다) 굳이 안 보여준다.
+  if (followers !== null && followers.length === 0 && !manageLink) return null;
+
+  return (
+    <div className="members__guests">
+      <div className="members__guests-head" style={{ cursor: 'default' }}>
+        <span>팔로워 {followers === null ? '' : `${followers.length}명`}</span>
+        {manageLink && (
+          <Link to={manageLink} className="members__parts-edit">
+            관리
+          </Link>
+        )}
+      </div>
+      <div className="members__guests-body">
+        {followers === null ? (
+          <span className="muted" style={{ fontSize: 12 }}>
+            불러오는 중…
+          </span>
+        ) : followers.length === 0 ? (
+          <span className="muted" style={{ fontSize: 12 }}>
+            아직 팔로워가 없습니다.
+          </span>
+        ) : (
+          <div className="members__guest-list">
+            {followers.map((f) => (
+              <div key={f.userId} className="members__guest-row">
+                <Avatar
+                  label={f.initial}
+                  size={24}
+                  src={f.avatarUrl}
+                  color="var(--color-neutral-500)"
+                />
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{f.nickname}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
