@@ -3,6 +3,7 @@ import type {
   SongCreateBody,
   SongDto,
   SongStatusDto,
+  SongUpdateBody,
   TrackSearchResultDto,
   VoteResultDto,
 } from './types';
@@ -37,6 +38,12 @@ export const voteSong = (songId: string) => api.post<VoteResultDto>(`/api/songs/
 
 /** 투표 취소 (멱등). */
 export const unvoteSong = (songId: string) => api.del<VoteResultDto>(`/api/songs/${songId}/vote`);
+
+/**
+ * 부분 수정 (제목/아티스트/메모/참고영상) — 등록자 본인 또는 관리자. 위시리스트·합주곡 모두 가능. 보낸 필드만 반영.
+ */
+export const updateSong = (songId: string, body: SongUpdateBody) =>
+  api.patch<SongDto>(`/api/songs/${songId}`, body);
 
 /** WISHLIST → CONFIRMED 승격 (관리자). */
 export const confirmSong = (songId: string) => api.patch<SongDto>(`/api/songs/${songId}/confirm`);

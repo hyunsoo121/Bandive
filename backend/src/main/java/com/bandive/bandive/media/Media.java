@@ -68,6 +68,13 @@ public class Media extends BaseTimeEntity {
 	@Column(nullable = false, length = 20)
 	private MediaPlatform platform;
 
+	/**
+	 * 등록/수정 시점에 fetch 해 저장해둔 썸네일(구글 포토 등 og:image). null 이면 응답 시 {@link MediaThumbnail} 로
+	 * 즉석 계산(유튜브·드라이브).
+	 */
+	@Column(name = "thumbnail_url", length = 500)
+	private String thumbnailUrl;
+
 	@Enumerated(EnumType.STRING)
 	@Column(nullable = false, length = 20)
 	private MediaVisibility visibility;
@@ -81,10 +88,11 @@ public class Media extends BaseTimeEntity {
 	}
 
 	/** 부분 수정 후 서비스가 계산한 최종값으로 한 번에 갱신. */
-	public void edit(String externalUrl, MediaPlatform platform, MediaType type, MediaVisibility visibility,
-			String title, Schedule schedule, Song song) {
+	public void edit(String externalUrl, MediaPlatform platform, String thumbnailUrl, MediaType type,
+			MediaVisibility visibility, String title, Schedule schedule, Song song) {
 		this.externalUrl = externalUrl;
 		this.platform = platform;
+		this.thumbnailUrl = thumbnailUrl;
 		this.type = type;
 		this.visibility = visibility;
 		this.title = title;

@@ -26,6 +26,7 @@ import com.bandive.bandive.song.dto.SongCreateRequest;
 import com.bandive.bandive.song.dto.SongFolderAssignRequest;
 import com.bandive.bandive.song.dto.SongOrderRequest;
 import com.bandive.bandive.song.dto.SongResponse;
+import com.bandive.bandive.song.dto.SongUpdateRequest;
 import com.bandive.bandive.song.dto.TrackSearchResult;
 import com.bandive.bandive.song.dto.VoteResult;
 import com.bandive.bandive.song.service.SongService;
@@ -69,6 +70,13 @@ public class SongController {
 	@DeleteMapping("/api/songs/{songId}/vote")
 	public VoteResult unvote(@PathVariable Long songId, @CurrentUser Long userId) {
 		return songService.unvote(songId, userId);
+	}
+
+	/** 부분 수정 (제목/아티스트/메모/참고영상) — 등록자 본인 또는 관리자. 위시리스트·합주곡 모두 가능. */
+	@PatchMapping("/api/songs/{songId}")
+	public SongResponse update(@PathVariable Long songId, @CurrentUser Long userId,
+			@Valid @RequestBody SongUpdateRequest request) {
+		return songService.update(songId, userId, request);
 	}
 
 	@PatchMapping("/api/songs/{songId}/confirm")

@@ -9,6 +9,9 @@ import java.util.regex.Pattern;
  * <li>YouTube — 영상 id → {@code img.youtube.com/vi/{id}/hqdefault.jpg} (무인증)</li>
  * <li>Google Drive — 파일 id → {@code drive.google.com/thumbnail?id={id}&sz=w400} (공유 설정에
  * 따라 실패할 수 있음)</li>
+ * <li>Google Photos — URL 만으로는 계산 불가.
+ * {@link com.bandive.bandive.media.service.OgImageResolver} 로 등록/수정 시점에 fetch 해
+ * {@code Media.thumbnailUrl} 에 저장해둔 값을 쓴다(여기선 null)</li>
  * <li>그 외 — null</li>
  * </ul>
  */
@@ -30,7 +33,8 @@ public final class MediaThumbnail {
 		return switch (platform) {
 			case YOUTUBE -> youtube(url);
 			case GOOGLE_DRIVE -> drive(url);
-			case OTHER -> null;
+			// 구글 포토는 URL 만으로 계산 불가 — 등록 시점에 fetch 해 Media.thumbnailUrl 에 저장해둔 값을 쓴다.
+			case GOOGLE_PHOTOS, OTHER -> null;
 		};
 	}
 

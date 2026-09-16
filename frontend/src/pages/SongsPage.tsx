@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   DndContext,
   PointerSensor,
@@ -24,6 +25,7 @@ import type { ExploreVideoDto } from '../api/types';
 import type { MediaItem, Song, SongFolder } from '../types';
 import { Fab } from '../components/Fab';
 import { AddSongModal } from '../components/AddSongModal';
+import { Modal } from '../components/Modal';
 import { PromptModal } from '../components/PromptModal';
 import { GuestPickerModal } from '../components/GuestPickerModal';
 import './SongsPage.css';
@@ -92,6 +94,11 @@ export function SongsPage() {
   );
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [guestPickerOpen, setGuestPickerOpen] = useState(false);
+  const [editingSong, setEditingSong] = useState<Song | null>(null);
+  const [proposerFilter, setProposerFilter] = useState<string | null>(null);
+  const [proposerPickerOpen, setProposerPickerOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [highlightId, setHighlightId] = useState<string | null>(null);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
@@ -120,6 +127,51 @@ export function SongsPage() {
       }
       return next;
     });
+
+  /** 접혀있으면 펼치기만 한다 (toggleCollapse 와 달리 이미 펼쳐진 폴더를 건드리지 않는다). */
+  const expandFolder = (id: string) =>
+    setCollapsed((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      try {
+        if (collapseKey) localStorage.setItem(collapseKey, JSON.stringify([...next]));
+      } catch {
+        /* localStorage 불가 — 이번 세션만 유지 */
+      }
+      return next;
+    });
+
+  // 홈 "최근 등록된 곡"에서 넘어온 경우 — 해당 탭·폴더를 펼치고 곡을 열어서 보여준다.
+  useEffect(() => {
+    const targetId = searchParams.get('song');
+    if (!targetId || !bandId) return;
+    const target = songs.find((s) => s.id === targetId && s.bandId === bandId);
+    if (!target) return;
+    setTab(target.status);
+    setOpenId(target.id);
+    if (target.folderId) expandFolder(target.folderId);
+    setHighlightId(target.id);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('song');
+        return next;
+      },
+      { replace: true },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, songs, bandId]);
+
+  useEffect(() => {
+    if (!highlightId) return;
+    document.getElementById(`song-${highlightId}`)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    });
+    const t = setTimeout(() => setHighlightId(null), 1800);
+    return () => clearTimeout(t);
+  }, [highlightId]);
 
   const isWish = tab === 'WISHLIST';
 
@@ -155,10 +207,23 @@ export function SongsPage() {
     return map;
   }, [media, bandId]);
 
-  const tabSongs = useMemo(
+  const tabSongsAll = useMemo(
     () => songs.filter((s) => s.bandId === bandId && s.status === tab),
     [songs, bandId, tab],
   );
+  const tabSongs = useMemo(
+    () => tabSongsAll.filter((s) => !proposerFilter || s.addedByUserId === proposerFilter),
+    [tabSongsAll, proposerFilter],
+  );
+
+  /** 제안자 필터 선택지 — 이 밴드 멤버별로 현재 탭(위시/합주)에서 제안한 곡 수. */
+  const proposerCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const s of tabSongsAll) {
+      counts.set(s.addedByUserId, (counts.get(s.addedByUserId) ?? 0) + 1);
+    }
+    return counts;
+  }, [tabSongsAll]);
   const wishCount = useMemo(
     () => songs.filter((s) => s.bandId === bandId && s.status === 'WISHLIST').length,
     [songs, bandId],
@@ -185,7 +250,8 @@ export function SongsPage() {
     { key: UNFILED, folder: null, songs: sortSongs(tabSongs.filter((s) => s.folderId == null)) },
   ];
 
-  const dragEnabled = sort === 'manual' && !isGuest;
+  // 제안자로 걸러진 상태에서는 그룹의 일부만 보이므로 드래그 순서변경을 끈다(전체 순서와 안 맞아 서버가 거부함).
+  const dragEnabled = sort === 'manual' && !isGuest && !proposerFilter;
 
   if (!currentBand || !bandId) return null;
 
@@ -298,20 +364,46 @@ export function SongsPage() {
         </div>
 
         <div className="songs__toolbar">
-          <div className="songs__sort">
-            <span className="muted" style={{ fontSize: 11 }}>
-              정렬
-            </span>
-            {(['manual', 'votes', 'recent'] as SortKey[]).map((k) => (
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <div className="songs__sort">
+              <span className="muted" style={{ fontSize: 11 }}>
+                정렬
+              </span>
+              {(['manual', 'votes', 'recent'] as SortKey[]).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  className={`songs__sortchip${sort === k ? ' is-on' : ''}`}
+                  onClick={() => setSort(k)}
+                >
+                  {SORT_LABEL[k]}
+                </button>
+              ))}
+            </div>
+            <div className="songs__sort">
+              <span className="muted" style={{ fontSize: 11 }}>
+                제안자
+              </span>
               <button
-                key={k}
                 type="button"
-                className={`songs__sortchip${sort === k ? ' is-on' : ''}`}
-                onClick={() => setSort(k)}
+                className={`songs__sortchip${proposerFilter ? ' is-on' : ''}`}
+                onClick={() => setProposerPickerOpen(true)}
               >
-                {SORT_LABEL[k]}
+                {proposerFilter
+                  ? (members.find((m) => m.id === proposerFilter)?.name ?? '전체')
+                  : '전체'}
               </button>
-            ))}
+              {proposerFilter && (
+                <button
+                  type="button"
+                  className="songs__sortchip"
+                  aria-label="제안자 필터 해제"
+                  onClick={() => setProposerFilter(null)}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
           </div>
           {isOwner && (
             <button
@@ -324,7 +416,12 @@ export function SongsPage() {
           )}
         </div>
 
-        {sort !== 'manual' && !isGuest && (
+        {proposerFilter && !isGuest && (
+          <span className="muted" style={{ fontSize: 11 }}>
+            제안자로 걸러보는 중 — 순서를 바꾸려면 필터를 해제하세요.
+          </span>
+        )}
+        {!proposerFilter && sort !== 'manual' && !isGuest && (
           <span className="muted" style={{ fontSize: 11 }}>
             {SORT_LABEL[sort]} 보기 중 — 순서를 바꾸려면 ‘수동’을 선택하세요.
           </span>
@@ -354,6 +451,7 @@ export function SongsPage() {
                 collapsed={g.folder ? collapsed.has(g.folder.id) : false}
                 folders={folders}
                 openId={openId}
+                highlightId={highlightId}
                 assignOptions={assignOptions}
                 mediaBySong={mediaBySong}
                 canAddGuest={isOwner}
@@ -368,6 +466,7 @@ export function SongsPage() {
                 onAssign={(songId, slotKey, value) =>
                   void assignPart(songId, slotKey, parseAssignee(value))
                 }
+                onEditRequest={setEditingSong}
                 onAddGuestClick={() => setGuestPickerOpen(true)}
                 onMove={moveSongToFolder}
                 onRenameRequest={(f) => setPrompt({ mode: 'rename', folder: f })}
@@ -377,7 +476,11 @@ export function SongsPage() {
 
             {tabSongs.length === 0 && (
               <div className="songs__empty">
-                {isWish ? '아직 위시리스트에 곡이 없습니다.' : '아직 승격된 합주곡이 없습니다.'}
+                {proposerFilter
+                  ? '이 멤버가 제안한 곡이 없습니다.'
+                  : isWish
+                    ? '아직 위시리스트에 곡이 없습니다.'
+                    : '아직 승격된 합주곡이 없습니다.'}
               </div>
             )}
           </div>
@@ -389,12 +492,23 @@ export function SongsPage() {
       {addOpen && (
         <AddSongModal
           bandId={bandId}
+          defaultConfirmed={isOwner && tab === 'CONFIRMED'}
           onClose={() => setAddOpen(false)}
           onSubmitted={() => {
             setAddOpen(false);
-            setTab('WISHLIST');
+            // 합주곡으로 바로 등록했으면 합주곡 탭에 그대로, 아니면 위시리스트로.
+            setTab(isOwner && tab === 'CONFIRMED' ? 'CONFIRMED' : 'WISHLIST');
             setSort('manual');
           }}
+        />
+      )}
+
+      {editingSong && (
+        <AddSongModal
+          bandId={bandId}
+          editing={editingSong}
+          onClose={() => setEditingSong(null)}
+          onSubmitted={() => setEditingSong(null)}
         />
       )}
 
@@ -421,6 +535,45 @@ export function SongsPage() {
           onClose={() => setGuestPickerOpen(false)}
         />
       )}
+
+      {proposerPickerOpen && (
+        <Modal title="제안자별 보기" width={320} onClose={() => setProposerPickerOpen(false)}>
+          <div className="stack" style={{ gap: 4 }}>
+            <button
+              type="button"
+              className={`songs__proposer-row${proposerFilter === null ? ' is-on' : ''}`}
+              onClick={() => {
+                setProposerFilter(null);
+                setProposerPickerOpen(false);
+              }}
+            >
+              <span>전체</span>
+              <span className="muted">{tabSongsAll.length}곡</span>
+            </button>
+            {members
+              .filter((m) => m.bandId === bandId)
+              .sort(
+                (a, b) =>
+                  (proposerCounts.get(b.id) ?? 0) - (proposerCounts.get(a.id) ?? 0) ||
+                  a.name.localeCompare(b.name),
+              )
+              .map((m) => (
+                <button
+                  key={m.id}
+                  type="button"
+                  className={`songs__proposer-row${proposerFilter === m.id ? ' is-on' : ''}`}
+                  onClick={() => {
+                    setProposerFilter(m.id);
+                    setProposerPickerOpen(false);
+                  }}
+                >
+                  <span>{m.name}</span>
+                  <span className="muted">{proposerCounts.get(m.id) ?? 0}곡</span>
+                </button>
+              ))}
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -436,6 +589,7 @@ interface GroupProps {
   collapsed: boolean;
   folders: SongFolder[];
   openId: string | null;
+  highlightId: string | null;
   assignOptions: AssignOption[];
   mediaBySong: Map<string, MediaItem[]>;
   canAddGuest: boolean;
@@ -444,6 +598,7 @@ interface GroupProps {
   onVote: (id: string) => void;
   onPromote: (id: string) => void;
   onAssign: (songId: string, slotKey: string, value: string) => void;
+  onEditRequest: (song: Song) => void;
   onAddGuestClick: () => void;
   onMove: (songId: string, folderId: string | null) => void;
   onRenameRequest: (folder: SongFolder) => void;
@@ -459,6 +614,7 @@ function FolderGroup({
   collapsed,
   folders,
   openId,
+  highlightId,
   assignOptions,
   mediaBySong,
   canAddGuest,
@@ -467,6 +623,7 @@ function FolderGroup({
   onVote,
   onPromote,
   onAssign,
+  onEditRequest,
   onAddGuestClick,
   onMove,
   onRenameRequest,
@@ -574,6 +731,7 @@ function FolderGroup({
                 isGuest={isGuest}
                 dragEnabled={dragEnabled}
                 open={openId === song.id}
+                highlighted={highlightId === song.id}
                 assignOptions={assignOptions}
                 linkedMedia={mediaBySong.get(song.id) ?? []}
                 canAddGuest={canAddGuest}
@@ -581,6 +739,7 @@ function FolderGroup({
                 onToggle={() => onToggle(song.id)}
                 onVote={() => onVote(song.id)}
                 onPromote={() => onPromote(song.id)}
+                onEdit={() => onEditRequest(song)}
                 onAssign={(slotKey, value) => onAssign(song.id, slotKey, value)}
                 onAddGuestClick={onAddGuestClick}
                 onMove={(folderId) => onMove(song.id, folderId)}
@@ -603,6 +762,7 @@ interface RowProps {
   isGuest: boolean;
   dragEnabled: boolean;
   open: boolean;
+  highlighted: boolean;
   assignOptions: AssignOption[];
   linkedMedia: MediaItem[];
   canAddGuest: boolean;
@@ -610,6 +770,7 @@ interface RowProps {
   onToggle: () => void;
   onVote: () => void;
   onPromote: () => void;
+  onEdit: () => void;
   onAssign: (slotKey: string, value: string) => void;
   onAddGuestClick: () => void;
   onMove: (folderId: string | null) => void;
@@ -623,6 +784,7 @@ function SongRow({
   isGuest,
   dragEnabled,
   open,
+  highlighted,
   assignOptions,
   linkedMedia,
   canAddGuest,
@@ -630,11 +792,13 @@ function SongRow({
   onToggle,
   onVote,
   onPromote,
+  onEdit,
   onAssign,
   onAddGuestClick,
   onMove,
 }: RowProps) {
   const { user, openLogin } = useApp();
+  const isMine = user != null && user.id === song.addedByUserId;
   const chips = sessionChips(song);
   const hasRef = song.referenceVideoUrl.length > 0;
   const slots = slotsOf(song);
@@ -693,8 +857,9 @@ function SongRow({
   return (
     <article
       ref={sortable.setNodeRef}
+      id={`song-${song.id}`}
       style={style}
-      className={`songrow${sortable.isDragging ? ' is-dragging' : ''}`}
+      className={`songrow${sortable.isDragging ? ' is-dragging' : ''}${highlighted ? ' is-highlighted' : ''}`}
     >
       {dragEnabled && (
         <button
@@ -969,14 +1134,21 @@ function SongRow({
           </div>
         )}
 
-        {isWish && isOwner && (
+        {(isOwner || isMine) && (
           <div className="songrow__actions">
-            <button type="button" className="btn btn--primary btn--sm" onClick={onPromote}>
-              합주곡으로 승격
+            {isWish && isOwner && (
+              <button type="button" className="btn btn--primary btn--sm" onClick={onPromote}>
+                합주곡으로 승격
+              </button>
+            )}
+            <button type="button" className="btn btn--sm" onClick={onEdit}>
+              수정
             </button>
-            <button type="button" className="btn btn--sm" onClick={onToggle}>
-              {open ? '접기' : '상세'}
-            </button>
+            {isWish && (
+              <button type="button" className="btn btn--sm" onClick={onToggle}>
+                {open ? '접기' : '상세'}
+              </button>
+            )}
           </div>
         )}
       </div>

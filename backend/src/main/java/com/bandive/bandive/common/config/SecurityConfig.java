@@ -54,12 +54,13 @@ public class SecurityConfig {
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			.authorizeHttpRequests(auth -> auth.requestMatchers("/actuator/health", "/actuator/info", "/error")
 				.permitAll()
-				.requestMatchers("/oauth2/**", "/login/**", "/files/**")
+				.requestMatchers("/oauth2/**", "/login/**", "/files/**", "/invite/**")
 				.permitAll()
 				.requestMatchers(HttpMethod.POST, "/api/auth/refresh", "/api/auth/logout", "/api/auth/signup",
 						"/api/auth/login")
 				.permitAll()
-				.requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/bands/my", "/api/me/following")
+				.requestMatchers(HttpMethod.GET, "/api/auth/me", "/api/bands/my", "/api/me/following",
+						"/api/notifications/**")
 				.authenticated()
 				.requestMatchers(HttpMethod.GET, "/api/**")
 				.permitAll()

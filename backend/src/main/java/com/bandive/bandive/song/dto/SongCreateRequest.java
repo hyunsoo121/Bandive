@@ -11,6 +11,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import com.bandive.bandive.song.SongSourceType;
+import com.bandive.bandive.song.SongStatus;
 
 /**
  * 곡 추가. SEARCH 면 {@code externalTrackId} 필수(서비스에서 검사). {@code sessions} 로 SongPart 슬롯을
@@ -19,6 +20,9 @@ import com.bandive.bandive.song.SongSourceType;
  * {@code artworkUrl}·{@code referenceVideoUrl} 은 프론트에서 그대로
  * {@code <img src>}·{@code <a href>} 로 렌더되므로 {@code http(s)://} 로 시작하는 값 (또는 빈 값) 만 허용한다
  * — {@code javascript:} 등 차단.
+ * <p>
+ * {@code status} 는 null 이면 항상 {@code WISHLIST}(기존 동작). {@code CONFIRMED} 로 바로 등록하려면 관리자여야
+ * 한다(서비스에서 검사) — 합주곡 탭에서 곧장 등록.
  */
 public record SongCreateRequest(@NotBlank(message = "곡 제목은 필수입니다") @Size(max = 200) String title,
 		@Size(max = 200) String artist, @NotNull(message = "등록 방식(SEARCH/MANUAL)은 필수입니다") SongSourceType sourceType,
@@ -28,7 +32,7 @@ public record SongCreateRequest(@NotBlank(message = "곡 제목은 필수입니�
 		@Size(max = 2000, message = "메모는 2000자 이내여야 합니다") String memo,
 		@Size(max = 500) @Pattern(regexp = "^(https?://.+)?$",
 				message = "참고 영상 주소는 http(s):// 로 시작해야 합니다") String referenceVideoUrl,
-		@Valid List<SessionSlot> sessions) {
+		@Valid List<SessionSlot> sessions, SongStatus status) {
 
 	/** 악기별 필요 인원. instrument x count 만큼 SongPart 가 생성된다. */
 	public record SessionSlot(@NotBlank(message = "악기 이름이 비어 있습니다") @Size(max = 20) String instrument,

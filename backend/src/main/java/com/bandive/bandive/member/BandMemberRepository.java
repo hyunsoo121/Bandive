@@ -13,6 +13,9 @@ public interface BandMemberRepository extends JpaRepository<BandMember, Long> {
 
 	Optional<BandMember> findByBandIdAndUserId(Long bandId, Long userId);
 
+	/** 밴드당 관리자(OWNER) 는 항상 정확히 한 명 — 알림 수신자 조회 등에 씀. */
+	Optional<BandMember> findByBandIdAndRole(Long bandId, BandRole role);
+
 	List<BandMember> findAllByBandId(Long bandId);
 
 	List<BandMember> findAllByUserId(Long userId);

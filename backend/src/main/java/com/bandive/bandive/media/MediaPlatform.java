@@ -5,7 +5,7 @@ package com.bandive.bandive.media;
  */
 public enum MediaPlatform {
 
-	YOUTUBE, GOOGLE_DRIVE, OTHER;
+	YOUTUBE, GOOGLE_DRIVE, GOOGLE_PHOTOS, OTHER;
 
 	public static MediaPlatform detect(String url) {
 		if (url == null) {
@@ -14,6 +14,9 @@ public enum MediaPlatform {
 		String lower = url.toLowerCase();
 		if (lower.contains("youtube.com") || lower.contains("youtu.be")) {
 			return YOUTUBE;
+		}
+		if (lower.contains("photos.google.com") || lower.contains("photos.app.goo.gl")) {
+			return GOOGLE_PHOTOS;
 		}
 		if (lower.contains("drive.google.com") || lower.contains("docs.google.com")) {
 			return GOOGLE_DRIVE;
