@@ -181,7 +181,6 @@ export function CreateBandModal() {
         <CropModal
           file={cropTarget.file}
           aspect={cropTarget.kind === 'logo' ? 1 : 3}
-          circle={cropTarget.kind === 'logo'}
           title={cropTarget.kind === 'logo' ? '로고 자르기' : '배너 자르기'}
           onCancel={() => setCropTarget(null)}
           onCropped={submitCrop}

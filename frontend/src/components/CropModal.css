@@ -10,9 +10,6 @@
 .cropmodal__frame:active {
   cursor: grabbing;
 }
-.cropmodal__frame--circle {
-  border-radius: 50%;
-}
 .cropmodal__frame img {
   position: absolute;
   max-width: none;

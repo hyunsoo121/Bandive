@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Modal } from './Modal';
 import './CropModal.css';
 
@@ -6,8 +6,6 @@ interface Props {
   file: File;
   /** 가로/세로 비율. 1 = 정사각(아바타·로고), 3 = 와이드(배너) */
   aspect: number;
-  /** 프레임을 원형으로 보여줄지 (아바타·로고). 기본 사각(배너) */
-  circle?: boolean;
   title?: string;
   onCancel: () => void;
   onCropped: (file: File) => void;
@@ -41,17 +39,17 @@ function clampOffset(
  * 드래그로 위치 이동, 슬라이더로 확대. "적용"하면 고정 해상도 JPEG File 을 콜백으로 돌려준다 — 업로드는
  * 호출한 쪽이 기존 API(uploadAvatar 등)로 그대로 이어서 하면 된다.
  */
-export function CropModal({
-  file,
-  aspect,
-  circle = false,
-  title = '사진 자르기',
-  onCancel,
-  onCropped,
-}: Props) {
+export function CropModal({ file, aspect, title = '사진 자르기', onCancel, onCropped }: Props) {
   const frameH = Math.round(FRAME_W / aspect);
-  const imgUrl = useMemo(() => URL.createObjectURL(file), [file]);
-  useEffect(() => () => URL.revokeObjectURL(imgUrl), [imgUrl]);
+  // ⚠️ 생성(useMemo)과 해제(useEffect cleanup)를 분리하면 안 된다 — StrictMode 개발 모드는 effect를
+  // 마운트→정리→재마운트로 한 번 더 돌려보는데, <img> 가 blob 을 다 읽기도 전에 URL 이 revoke 돼서
+  // 사진이 안 보이는 버그가 생겼다. 생성·해제를 같은 effect 안에 묶어 재마운트마다 새로 만든다.
+  const [imgUrl, setImgUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setImgUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   const imgRef = useRef<HTMLImageElement>(null);
   const [natural, setNatural] = useState<{ w: number; h: number } | null>(null);
@@ -166,7 +164,7 @@ export function CropModal({
     >
       <div className="stack" style={{ gap: 12 }}>
         <div
-          className={`cropmodal__frame${circle ? ' cropmodal__frame--circle' : ''}`}
+          className="cropmodal__frame"
           style={{ width: FRAME_W, height: frameH }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -175,7 +173,7 @@ export function CropModal({
         >
           <img
             ref={imgRef}
-            src={imgUrl}
+            src={imgUrl ?? undefined}
             alt=""
             onLoad={onImgLoad}
             draggable={false}

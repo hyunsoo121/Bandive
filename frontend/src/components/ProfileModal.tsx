@@ -269,7 +269,6 @@ export function ProfileModal({ onClose }: Props) {
         <CropModal
           file={cropFile}
           aspect={1}
-          circle
           title="프로필 사진 자르기"
           onCancel={() => setCropFile(null)}
           onCropped={submitCroppedAvatar}

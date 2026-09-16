@@ -4,6 +4,7 @@ import { useApp } from '../store/AppContext';
 import { useGuard } from '../hooks/useGuard';
 import { KIND_LABEL, nextSchedule, toUi } from '../lib/schedule';
 import { CropModal } from '../components/CropModal';
+import { urlToFile } from '../lib/image';
 import './HomePage.css';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -39,6 +40,7 @@ export function HomePage() {
   const [cropTarget, setCropTarget] = useState<{ kind: 'logo' | 'banner'; file: File } | null>(
     null,
   );
+  const [repositionBusy, setRepositionBusy] = useState(false);
 
   if (!currentBand) return null;
   const bandId = currentBand.id;
@@ -68,6 +70,20 @@ export function HomePage() {
       return;
     }
     setCropTarget({ kind, file });
+  };
+
+  /** 새 파일을 고르지 않고, 지금 걸려있는 배너의 위치·확대만 다시 조정한다. */
+  const adjustBannerPosition = async () => {
+    if (!currentBand.bannerUrl || repositionBusy) return;
+    setRepositionBusy(true);
+    try {
+      const file = await urlToFile(currentBand.bannerUrl, 'banner.jpg');
+      setCropTarget({ kind: 'banner', file });
+    } catch {
+      alert('배너 이미지를 불러오지 못했습니다.');
+    } finally {
+      setRepositionBusy(false);
+    }
   };
 
   const submitCropped = async (cropped: File) => {
@@ -113,13 +129,25 @@ export function HomePage() {
               onChange={onPick('banner')}
             />
             <input ref={logoInput} type="file" accept="image/*" hidden onChange={onPick('logo')} />
-            <button
-              type="button"
-              className="home__banner-upload"
-              onClick={guard(() => bannerInput.current?.click())}
-            >
-              배너 변경
-            </button>
+            <div className="home__banner-actions">
+              <button
+                type="button"
+                className="home__banner-upload"
+                onClick={guard(() => bannerInput.current?.click())}
+              >
+                배너 변경
+              </button>
+              {currentBand.bannerUrl && (
+                <button
+                  type="button"
+                  className="home__banner-upload"
+                  disabled={repositionBusy}
+                  onClick={guard(adjustBannerPosition)}
+                >
+                  {repositionBusy ? '불러오는 중…' : '위치 조정'}
+                </button>
+              )}
+            </div>
           </>
         )}
         <div className="home__band">
@@ -313,7 +341,6 @@ export function HomePage() {
         <CropModal
           file={cropTarget.file}
           aspect={cropTarget.kind === 'logo' ? 1 : 3}
-          circle={cropTarget.kind === 'logo'}
           title={cropTarget.kind === 'logo' ? '로고 자르기' : '배너 자르기'}
           onCancel={() => setCropTarget(null)}
           onCropped={submitCropped}

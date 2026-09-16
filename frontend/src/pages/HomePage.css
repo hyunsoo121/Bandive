@@ -27,10 +27,14 @@
   text-transform: uppercase;
   color: var(--color-neutral-700);
 }
-.home__banner-upload {
+.home__banner-actions {
   position: absolute;
   top: 12px;
   right: 12px;
+  display: flex;
+  gap: 6px;
+}
+.home__banner-upload {
   background: var(--color-bg);
   border: 2px solid var(--color-text);
   padding: 6px 10px;
