@@ -19,6 +19,13 @@ class MediaPlatformTest {
 	}
 
 	@Test
+	void 구글포토_URL_을_알아본다() {
+		assertThat(MediaPlatform.detect("https://photos.google.com/share/xyz?key=abc"))
+			.isEqualTo(MediaPlatform.GOOGLE_PHOTOS);
+		assertThat(MediaPlatform.detect("https://photos.app.goo.gl/abc123")).isEqualTo(MediaPlatform.GOOGLE_PHOTOS);
+	}
+
+	@Test
 	void 나머지는_OTHER() {
 		assertThat(MediaPlatform.detect("https://vimeo.com/123")).isEqualTo(MediaPlatform.OTHER);
 		assertThat(MediaPlatform.detect(null)).isEqualTo(MediaPlatform.OTHER);

@@ -318,7 +318,7 @@ export interface ScheduleDto {
 
 export type MediaTypeDto = 'REHEARSAL' | 'PERFORMANCE';
 export type MediaVisibilityDto = 'MEMBERS_ONLY' | 'LINK_PUBLIC';
-export type MediaPlatformDto = 'YOUTUBE' | 'GOOGLE_DRIVE' | 'OTHER';
+export type MediaPlatformDto = 'YOUTUBE' | 'GOOGLE_DRIVE' | 'GOOGLE_PHOTOS' | 'OTHER';
 
 export interface MediaDto {
   id: number;

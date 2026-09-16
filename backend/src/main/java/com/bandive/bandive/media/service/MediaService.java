@@ -54,8 +54,11 @@ public class MediaService {
 
 	private final MediaLikeRepository mediaLikes;
 
+	private final OgImageResolver ogImageResolver;
+
 	public MediaService(MediaRepository media, ScheduleRepository schedules, SongRepository songs, BandRepository bands,
-			BandMemberRepository bandMembers, UserRepository users, MediaLikeRepository mediaLikes) {
+			BandMemberRepository bandMembers, UserRepository users, MediaLikeRepository mediaLikes,
+			OgImageResolver ogImageResolver) {
 		this.media = media;
 		this.schedules = schedules;
 		this.songs = songs;
@@ -63,6 +66,7 @@ public class MediaService {
 		this.bandMembers = bandMembers;
 		this.users = users;
 		this.mediaLikes = mediaLikes;
+		this.ogImageResolver = ogImageResolver;
 	}
 
 	/** 공개범위 필터 적용. 밴드 멤버면 전부, 그 외(비회원·비멤버)는 LINK_PUBLIC 만. */
@@ -102,15 +106,18 @@ public class MediaService {
 		Song song = resolveSong(request.songId(), bandId);
 		MediaVisibility visibility = request.visibility() != null ? request.visibility() : MediaVisibility.MEMBERS_ONLY;
 
+		String url = request.externalUrl().trim();
+		MediaPlatform platform = MediaPlatform.detect(url);
 		Media saved = media.save(Media.builder()
 			.band(band)
 			.schedule(schedule)
 			.song(song)
 			.uploadedBy(uploader)
 			.type(request.type())
-			.externalUrl(request.externalUrl().trim())
+			.externalUrl(url)
 			.title(trimToNull(request.title()))
-			.platform(MediaPlatform.detect(request.externalUrl()))
+			.platform(platform)
+			.thumbnailUrl(resolveThumbnail(platform, url))
 			.visibility(visibility)
 			.build());
 		return MediaResponse.from(saved, 0L, false);
@@ -126,6 +133,7 @@ public class MediaService {
 
 		String url = request.externalUrl() != null ? request.externalUrl().trim() : found.getExternalUrl();
 		MediaPlatform platform = request.externalUrl() != null ? MediaPlatform.detect(url) : found.getPlatform();
+		String thumbnailUrl = request.externalUrl() != null ? resolveThumbnail(platform, url) : found.getThumbnailUrl();
 		MediaType type = request.type() != null ? request.type() : found.getType();
 		MediaVisibility visibility = request.visibility() != null ? request.visibility() : found.getVisibility();
 		String title = request.title() != null ? trimToNull(request.title()) : found.getTitle();
@@ -133,8 +141,13 @@ public class MediaService {
 				? resolveSchedule(request.scheduleId(), found.getBand().getId()) : found.getSchedule();
 		Song song = request.songId() != null ? resolveSong(request.songId(), found.getBand().getId()) : found.getSong();
 
-		found.edit(url, platform, type, visibility, title, schedule, song);
+		found.edit(url, platform, thumbnailUrl, type, visibility, title, schedule, song);
 		return toResponse(found, userId);
+	}
+
+	/** URL 만으로 계산 못 하는 플랫폼(구글 포토)만 한 번 fetch — 유튜브·드라이브는 응답 시 즉석 계산하므로 null. */
+	private String resolveThumbnail(MediaPlatform platform, String url) {
+		return platform == MediaPlatform.GOOGLE_PHOTOS ? ogImageResolver.resolve(url) : null;
 	}
 
 	/** 공개 범위 변경 — 등록자 본인 또는 관리자. */

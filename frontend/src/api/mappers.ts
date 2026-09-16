@@ -233,6 +233,7 @@ export function toSongFolder(dto: {
 const PLATFORM_LABEL: Record<MediaPlatformDto, string> = {
   YOUTUBE: 'YouTube',
   GOOGLE_DRIVE: 'Google Drive',
+  GOOGLE_PHOTOS: 'Google Photos',
   OTHER: '링크',
 };
 
@@ -250,6 +251,7 @@ function shortDate(iso: string): string {
 const PLATFORM_KEY: Record<MediaPlatformDto, MediaItem['platform']> = {
   YOUTUBE: 'youtube',
   GOOGLE_DRIVE: 'drive',
+  GOOGLE_PHOTOS: 'google_photos',
   OTHER: 'other',
 };
 

@@ -234,8 +234,8 @@ export interface MediaItem {
   /** 계산된 썸네일 이미지 URL. 없으면 null → 플랫폼 아이콘 */
   thumbnailUrl: string | null;
   source: string;
-  /** 'YouTube' | 'Google Drive' | '링크' — 아이콘/경고 판단용 */
-  platform: 'youtube' | 'drive' | 'other';
+  /** 'YouTube' | 'Google Drive' | 'Google Photos' | '링크' — 아이콘/경고 판단용 */
+  platform: 'youtube' | 'drive' | 'google_photos' | 'other';
   /** 표시용 날짜 문자열 (예: "9월 2일") */
   date: string;
   /** 정렬용 등록 시각 (epoch ms) */

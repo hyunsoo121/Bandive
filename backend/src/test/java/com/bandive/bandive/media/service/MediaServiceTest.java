@@ -64,7 +64,8 @@ class MediaServiceTest extends RepositoryTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new MediaService(media, schedules, songs, bands, bandMembers, users, mediaLikes);
+		service = new MediaService(media, schedules, songs, bands, bandMembers, users, mediaLikes,
+				new OgImageResolver());
 		band = em.persist(Fixtures.band("A"));
 		ownerId = joinMember("owner", BandRole.OWNER);
 		memberId = joinMember("member", BandRole.MEMBER);
