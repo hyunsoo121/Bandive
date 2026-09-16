@@ -75,6 +75,13 @@ export interface FollowerDto {
   decidedAt: string | null;
 }
 
+/** GET /api/bands/{bandId}/followers/public — 승인된 팔로워만, 콘텐츠 열람 가능한 사람이면 누구나. */
+export interface PublicFollowerDto {
+  userId: number;
+  nickname: string;
+  avatarUrl: string | null;
+}
+
 /** GET /api/me/following — 내가 팔로우한 밴드 한 곳 */
 export interface FollowingBandDto {
   bandId: number;
@@ -121,6 +128,33 @@ export interface InviteCodeDto {
   expiresAt: string | null;
   maxUses: number | null;
   usedCount: number;
+}
+
+/** GET /api/invite-codes/{code} — 가입 전 미리보기(공개, 비로그인도 조회 가능). */
+export interface InvitePreviewDto {
+  code: string;
+  bandId: number;
+  bandName: string;
+  description: string | null;
+  logoUrl: string | null;
+  memberCount: number;
+}
+
+/* ── 알림 (Notification) ─────────────────────────────────────── */
+
+export type NotificationTypeDto =
+  'SCHEDULE_CREATED' | 'MEMBER_JOINED' | 'FOLLOW_REQUESTED' | 'FOLLOW_AUTO_APPROVED';
+
+/** actorId/actorNickname 은 이 알림을 유발한 사람 — FOLLOW_REQUESTED 승인/거절 대상과 동일 인물. */
+export interface NotificationDto {
+  id: number;
+  type: NotificationTypeDto;
+  bandId: number;
+  bandName: string;
+  actorId: number | null;
+  actorNickname: string | null;
+  readAt: string | null;
+  createdAt: string;
 }
 
 export interface MeDto {
@@ -223,6 +257,20 @@ export interface SongCreateBody {
   referenceVideoUrl?: string;
   /** 악기별 필요 인원 → SongPart 슬롯 */
   sessions: { instrument: string; count: number }[];
+  /** 없으면 WISHLIST. CONFIRMED 로 바로 등록하려면 관리자여야 함(합주곡 탭에서 곧장 등록). */
+  status?: SongStatusDto;
+}
+
+/**
+ * 부분 수정 — 보낸 필드만 반영. sessions 는 null/미포함이면 세션 구성 미변경, 값이 있으면 그 목록이 곡의 전체 세션
+ * 구성이 된다(목록에 없는 악기는 0명 취급). 배정된 슬롯을 넘는 만큼 줄이면 서버가 거부한다.
+ */
+export interface SongUpdateBody {
+  title?: string;
+  artist?: string;
+  memo?: string;
+  referenceVideoUrl?: string;
+  sessions?: { instrument: string; count: number }[];
 }
 
 /* ── 일정 (Schedule) ─────────────────────────────────────────── */
@@ -270,7 +318,7 @@ export interface ScheduleDto {
 
 export type MediaTypeDto = 'REHEARSAL' | 'PERFORMANCE';
 export type MediaVisibilityDto = 'MEMBERS_ONLY' | 'LINK_PUBLIC';
-export type MediaPlatformDto = 'YOUTUBE' | 'GOOGLE_DRIVE' | 'OTHER';
+export type MediaPlatformDto = 'YOUTUBE' | 'GOOGLE_DRIVE' | 'GOOGLE_PHOTOS' | 'OTHER';
 
 export interface MediaDto {
   id: number;

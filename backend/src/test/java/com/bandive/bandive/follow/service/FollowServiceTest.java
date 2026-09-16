@@ -10,10 +10,13 @@ import com.bandive.bandive.common.exception.ConflictException;
 import com.bandive.bandive.common.exception.ForbiddenException;
 import com.bandive.bandive.common.exception.NotFoundException;
 import com.bandive.bandive.common.security.BandAccessGuard;
+import com.bandive.bandive.follow.BandFollow;
 import com.bandive.bandive.follow.BandFollowRepository;
 import com.bandive.bandive.follow.FollowStatus;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
+import com.bandive.bandive.notification.NotificationRepository;
+import com.bandive.bandive.notification.service.NotificationService;
 import com.bandive.bandive.support.Fixtures;
 import com.bandive.bandive.support.RepositoryTest;
 import com.bandive.bandive.user.User;
@@ -40,6 +43,9 @@ class FollowServiceTest extends RepositoryTest {
 	private UserRepository users;
 
 	@Autowired
+	private NotificationRepository notifications;
+
+	@Autowired
 	private TestEntityManager em;
 
 	private FollowService service;
@@ -52,7 +58,8 @@ class FollowServiceTest extends RepositoryTest {
 
 	@BeforeEach
 	void setUp() {
-		service = new FollowService(follows, bands, bandMembers, users);
+		service = new FollowService(follows, bands, bandMembers, users,
+				new BandAccessGuard(bands, bandMembers, follows), new NotificationService(notifications, bandMembers));
 		band = em.persist(Fixtures.band("A", BandVisibility.FOLLOWERS));
 		User owner = em.persist(Fixtures.user("owner"));
 		em.persist(Fixtures.member(band, owner, BandRole.OWNER));
@@ -71,12 +78,56 @@ class FollowServiceTest extends RepositoryTest {
 	}
 
 	@Test
-	void PUBLIC_밴드엔_요청_불가_409() {
-		band.changeVisibility(BandVisibility.PUBLIC);
+	void PRIVATE_밴드엔_요청_불가_409() {
+		band.changeVisibility(BandVisibility.PRIVATE);
 		em.flush();
 
 		assertThatThrownBy(() -> service.request(band.getId(), outsiderId)).isInstanceOf(ConflictException.class)
 			.satisfies(ex -> assertThat(((ConflictException) ex).getCode()).isEqualTo("FOLLOW_NOT_AVAILABLE"));
+	}
+
+	@Test
+	void PUBLIC_밴드는_요청하면_즉시_APPROVED_된다() {
+		band.changeVisibility(BandVisibility.PUBLIC);
+		em.flush();
+
+		service.request(band.getId(), outsiderId);
+		em.flush();
+		em.clear();
+
+		BandFollow follow = follows.findByBandIdAndUserId(band.getId(), outsiderId).orElseThrow();
+		assertThat(follow.getStatus()).isEqualTo(FollowStatus.APPROVED);
+		assertThat(follow.getDecidedAt()).isNotNull();
+	}
+
+	@Test
+	void 팔로우_요청하면_관리자에게_알림이_간다() {
+		service.request(band.getId(), outsiderId);
+		em.flush();
+		em.clear();
+
+		assertThat(notifications.findRecentByRecipient(ownerId, org.springframework.data.domain.Limit.of(10)))
+			.singleElement()
+			.satisfies(n -> {
+				assertThat(n.getType()).isEqualTo(com.bandive.bandive.notification.NotificationType.FOLLOW_REQUESTED);
+				assertThat(n.getActor().getId()).isEqualTo(outsiderId);
+				assertThat(n.getBand().getId()).isEqualTo(band.getId());
+			});
+	}
+
+	@Test
+	void PUBLIC_밴드_즉시승인도_관리자에게_확인용_알림이_간다() {
+		band.changeVisibility(BandVisibility.PUBLIC);
+		em.flush();
+
+		service.request(band.getId(), outsiderId);
+		em.flush();
+		em.clear();
+
+		assertThat(notifications.findRecentByRecipient(ownerId, org.springframework.data.domain.Limit.of(10)))
+			.singleElement()
+			.satisfies(n -> assertThat(n.getType())
+				.isEqualTo(com.bandive.bandive.notification.NotificationType.FOLLOW_AUTO_APPROVED));
 	}
 
 	@Test
@@ -116,6 +167,44 @@ class FollowServiceTest extends RepositoryTest {
 		assertThatThrownBy(() -> service.approve(band.getId(), plainMemberId, outsiderId))
 			.isInstanceOf(ForbiddenException.class)
 			.satisfies(ex -> assertThat(((ForbiddenException) ex).getCode()).isEqualTo("NOT_BAND_OWNER"));
+	}
+
+	@Test
+	void 공개_팔로워_목록은_승인된_사람만_담고_콘텐츠_열람_가능해야_조회된다() {
+		service.request(band.getId(), outsiderId);
+		em.flush();
+		service.approve(band.getId(), ownerId, outsiderId);
+		em.flush();
+
+		Long pendingId = em.persist(Fixtures.user("pending")).getId();
+		service.request(band.getId(), pendingId);
+		em.flush();
+		em.clear();
+
+		// FOLLOWERS 밴드 콘텐츠를 볼 수 있는 사람(자기 자신, 승인된 팔로워) → 조회 가능, 대기중인 사람은 목록에서 제외
+		var list = service.listPublicFollowers(band.getId(), outsiderId);
+
+		assertThat(list).singleElement().satisfies(f -> assertThat(f.userId()).isEqualTo(outsiderId));
+	}
+
+	@Test
+	void FOLLOWERS_밴드는_콘텐츠_못보는_사람에게_공개_팔로워_목록도_403() {
+		assertThatThrownBy(() -> service.listPublicFollowers(band.getId(), outsiderId))
+			.isInstanceOf(ForbiddenException.class)
+			.satisfies(ex -> assertThat(((ForbiddenException) ex).getCode()).isEqualTo("CONTENT_RESTRICTED"));
+	}
+
+	@Test
+	void PUBLIC_밴드는_비로그인도_공개_팔로워_목록을_본다() {
+		band.changeVisibility(BandVisibility.PUBLIC);
+		em.flush();
+		service.request(band.getId(), outsiderId);
+		em.flush();
+		em.clear();
+
+		var list = service.listPublicFollowers(band.getId(), null);
+
+		assertThat(list).singleElement().satisfies(f -> assertThat(f.userId()).isEqualTo(outsiderId));
 	}
 
 	@Test

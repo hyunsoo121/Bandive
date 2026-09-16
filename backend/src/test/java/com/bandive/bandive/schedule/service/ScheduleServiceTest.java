@@ -17,6 +17,9 @@ import com.bandive.bandive.media.MediaVisibility;
 import com.bandive.bandive.media.dto.MediaResponse;
 import com.bandive.bandive.member.BandMemberRepository;
 import com.bandive.bandive.member.BandRole;
+import com.bandive.bandive.notification.NotificationRepository;
+import com.bandive.bandive.notification.NotificationType;
+import com.bandive.bandive.notification.service.NotificationService;
 import com.bandive.bandive.schedule.AttendanceRepository;
 import com.bandive.bandive.schedule.AttendanceStatus;
 import com.bandive.bandive.schedule.Schedule;
@@ -62,6 +65,9 @@ class ScheduleServiceTest extends RepositoryTest {
 	private com.bandive.bandive.media.MediaRepository media;
 
 	@Autowired
+	private NotificationRepository notifications;
+
+	@Autowired
 	private TestEntityManager em;
 
 	private ScheduleService service;
@@ -75,7 +81,8 @@ class ScheduleServiceTest extends RepositoryTest {
 	@BeforeEach
 	void setUp() {
 		service = new ScheduleService(schedules, attendances, media, bands, bandMembers, guests, users,
-				new com.bandive.bandive.common.security.BandAccessGuard(bands, bandMembers, follows));
+				new com.bandive.bandive.common.security.BandAccessGuard(bands, bandMembers, follows),
+				new NotificationService(notifications, bandMembers));
 		band = em.persist(Fixtures.band("A"));
 		ownerId = joinMember("owner", BandRole.OWNER);
 		memberId = joinMember("member", BandRole.MEMBER);
@@ -99,6 +106,20 @@ class ScheduleServiceTest extends RepositoryTest {
 		assertThat(created.type()).isEqualTo(ScheduleType.REHEARSAL);
 		assertThat(created.location()).isEqualTo("연습실");
 		assertThat(created.attendees()).isEmpty();
+	}
+
+	@Test
+	void 등록하면_등록자_제외한_멤버_전체에게_알림이_간다() {
+		service.create(band.getId(), memberId, req());
+
+		assertThat(notifications.findRecentByRecipient(ownerId, org.springframework.data.domain.Limit.of(10)))
+			.singleElement()
+			.satisfies(n -> {
+				assertThat(n.getType()).isEqualTo(NotificationType.SCHEDULE_CREATED);
+				assertThat(n.getActor().getId()).isEqualTo(memberId);
+			});
+		assertThat(notifications.findRecentByRecipient(memberId, org.springframework.data.domain.Limit.of(10)))
+			.isEmpty();
 	}
 
 	@Test

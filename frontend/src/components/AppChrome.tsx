@@ -9,6 +9,7 @@ import { GuestBanner } from './GuestBanner';
 import { BandSwitcher } from './BandSwitcher';
 import { CreateBandModal } from './CreateBandModal';
 import { ProfileModal } from './ProfileModal';
+import { NotificationBell } from './NotificationBell';
 import './AppLayout.css';
 
 const ROLE_LABEL: Record<string, string> = { owner: '관리자', member: '사용자', guest: '비회원' };
@@ -82,8 +83,9 @@ export function AppChrome({ children }: { children: ReactNode }) {
     <div className="app">
       {/* 데스크탑 사이드바 */}
       <aside className="app__sidebar">
-        <div className="sidebar__brand">
+        <div className="sidebar__brand spread">
           <BrandMark size={22} wordmark />
+          <NotificationBell />
         </div>
 
         {shownBand ? (
@@ -170,8 +172,9 @@ export function AppChrome({ children }: { children: ReactNode }) {
       <div className="app__main">
         {/* 모바일 상단바 */}
         <header className="app__mobilebar">
-          <div className="mobilebar__brand">
+          <div className="mobilebar__brand spread">
             <BrandMark size={18} wordmark />
+            <NotificationBell />
           </div>
           {shownBand && (
             <button type="button" className="mobilebar__band" onClick={openSwitcher}>

@@ -161,6 +161,22 @@ class SongControllerTest {
 	}
 
 	@Test
+	void 부분수정_PATCH() throws Exception {
+		given(songService.update(eq(5L), eq(7L), any())).willReturn(SONG);
+
+		mvc.perform(patch("/api/songs/5").with(asUser(7L))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"title\":\"새 제목\"}")).andExpect(status().isOk()).andExpect(jsonPath("$.id").value(5));
+	}
+
+	@Test
+	void 부분수정_참고영상_URL_형식_틀리면_400() throws Exception {
+		mvc.perform(patch("/api/songs/5").with(asUser(7L))
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("{\"referenceVideoUrl\":\"ftp://x\"}")).andExpect(status().isBadRequest());
+	}
+
+	@Test
 	void 승격() throws Exception {
 		given(songService.confirm(5L, 7L)).willReturn(SONG);
 

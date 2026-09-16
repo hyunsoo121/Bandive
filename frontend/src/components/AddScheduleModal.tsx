@@ -3,6 +3,8 @@ import { useApp } from '../store/AppContext';
 import { KIND_LABEL } from '../lib/schedule';
 import type { ScheduleType } from '../types';
 import { Modal } from './Modal';
+import { DatePicker } from './DatePicker';
+import { TimePicker } from './TimePicker';
 
 interface Props {
   bandId: string;
@@ -16,16 +18,17 @@ export function AddScheduleModal({ bandId, onClose, onSubmitted }: Props) {
   const { addSchedule } = useApp();
 
   const [type, setType] = useState<ScheduleType>('REHEARSAL');
-  const [local, setLocal] = useState('');
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('19:00');
   const [location, setLocation] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const canSubmit = local.length > 0 && !submitting;
+  const canSubmit = date.length > 0 && time.length > 0 && !submitting;
 
   const submit = async () => {
     if (!canSubmit) return;
-    const parsed = new Date(local);
+    const parsed = new Date(`${date}T${time}`);
     if (Number.isNaN(parsed.getTime())) {
       setError('일시를 확인해 주세요.');
       return;
@@ -86,14 +89,13 @@ export function AddScheduleModal({ bandId, onClose, onSubmitted }: Props) {
       </div>
 
       <div className="field">
-        <label htmlFor="sched-when">일시</label>
-        <input
-          id="sched-when"
-          type="datetime-local"
-          className="input"
-          value={local}
-          onChange={(e) => setLocal(e.target.value)}
-        />
+        <label>날짜</label>
+        <DatePicker value={date} onChange={setDate} />
+      </div>
+
+      <div className="field">
+        <label>시간</label>
+        <TimePicker value={time} onChange={setTime} />
       </div>
 
       <div className="field">

@@ -9,6 +9,8 @@ import type {
   Guest,
   MediaItem,
   Member,
+  NotificationItem,
+  PublicFollower,
   ScheduleEvent,
   SessionShape,
   Song,
@@ -25,6 +27,8 @@ import type {
   MediaPlatformDto,
   MemberDto,
   MeDto,
+  NotificationDto,
+  PublicFollowerDto,
   ScheduleDto,
   SongDto,
   UserProfileDto,
@@ -101,6 +105,28 @@ export function toFollower(dto: FollowerDto): Follower {
   };
 }
 
+export function toPublicFollower(dto: PublicFollowerDto): PublicFollower {
+  return {
+    userId: String(dto.userId),
+    nickname: dto.nickname,
+    initial: initialOf(dto.nickname),
+    avatarUrl: dto.avatarUrl ? fileUrl(dto.avatarUrl) : null,
+  };
+}
+
+export function toNotificationItem(dto: NotificationDto): NotificationItem {
+  return {
+    id: String(dto.id),
+    type: dto.type,
+    bandId: String(dto.bandId),
+    bandName: dto.bandName,
+    actorId: dto.actorId != null ? String(dto.actorId) : null,
+    actorNickname: dto.actorNickname,
+    readAt: dto.readAt,
+    createdAt: dto.createdAt,
+  };
+}
+
 export function toFollowingBand(dto: FollowingBandDto): FollowingBand {
   return {
     bandId: String(dto.bandId),
@@ -154,6 +180,7 @@ export function toSong(dto: SongDto): Song {
     sourceType: dto.sourceType,
     externalTrackId: dto.externalTrackId ?? null,
     proposer: dto.addedByNickname,
+    addedByUserId: String(dto.addedByUserId),
     memo: dto.memo ?? '',
     referenceVideoUrl: dto.referenceVideoUrl ?? '',
     artworkUrl: dto.artworkUrl,
@@ -206,6 +233,7 @@ export function toSongFolder(dto: {
 const PLATFORM_LABEL: Record<MediaPlatformDto, string> = {
   YOUTUBE: 'YouTube',
   GOOGLE_DRIVE: 'Google Drive',
+  GOOGLE_PHOTOS: 'Google Photos',
   OTHER: '링크',
 };
 
@@ -223,6 +251,7 @@ function shortDate(iso: string): string {
 const PLATFORM_KEY: Record<MediaPlatformDto, MediaItem['platform']> = {
   YOUTUBE: 'youtube',
   GOOGLE_DRIVE: 'drive',
+  GOOGLE_PHOTOS: 'google_photos',
   OTHER: 'other',
 };
 

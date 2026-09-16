@@ -79,4 +79,8 @@ public class SongPart extends BaseTimeEntity {
 		this.assignedGuest = null;
 	}
 
+	public boolean isAssigned() {
+		return assignedMember != null || assignedGuest != null;
+	}
+
 }

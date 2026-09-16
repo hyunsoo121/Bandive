@@ -1,8 +1,10 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import { useGuard } from '../hooks/useGuard';
 import { KIND_LABEL, nextSchedule, toUi } from '../lib/schedule';
+import { CropModal } from '../components/CropModal';
+import { urlToFile } from '../lib/image';
 import './HomePage.css';
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -35,6 +37,10 @@ export function HomePage() {
   const guard = useGuard();
   const logoInput = useRef<HTMLInputElement>(null);
   const bannerInput = useRef<HTMLInputElement>(null);
+  const [cropTarget, setCropTarget] = useState<{ kind: 'logo' | 'banner'; file: File } | null>(
+    null,
+  );
+  const [repositionBusy, setRepositionBusy] = useState(false);
 
   if (!currentBand) return null;
   const bandId = currentBand.id;
@@ -54,7 +60,7 @@ export function HomePage() {
   const base = `/bands/${bandId}`;
   const going = upcoming?.counts.attending ?? 0;
 
-  const onPick = (kind: 'logo' | 'banner') => async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const onPick = (kind: 'logo' | 'banner') => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ''; // 같은 파일 다시 고를 수 있게
     if (!file) return;
@@ -63,8 +69,29 @@ export function HomePage() {
       alert(err);
       return;
     }
+    setCropTarget({ kind, file });
+  };
+
+  /** 새 파일을 고르지 않고, 지금 걸려있는 배너의 위치·확대만 다시 조정한다. */
+  const adjustBannerPosition = async () => {
+    if (!currentBand.bannerUrl || repositionBusy) return;
+    setRepositionBusy(true);
     try {
-      await (kind === 'logo' ? uploadBandLogo(file) : uploadBandBanner(file));
+      const file = await urlToFile(currentBand.bannerUrl, 'banner.jpg');
+      setCropTarget({ kind: 'banner', file });
+    } catch {
+      alert('배너 이미지를 불러오지 못했습니다.');
+    } finally {
+      setRepositionBusy(false);
+    }
+  };
+
+  const submitCropped = async (cropped: File) => {
+    if (!cropTarget) return;
+    const { kind } = cropTarget;
+    setCropTarget(null);
+    try {
+      await (kind === 'logo' ? uploadBandLogo(cropped) : uploadBandBanner(cropped));
     } catch {
       alert('업로드에 실패했습니다. 다시 시도해 주세요.');
     }
@@ -102,13 +129,25 @@ export function HomePage() {
               onChange={onPick('banner')}
             />
             <input ref={logoInput} type="file" accept="image/*" hidden onChange={onPick('logo')} />
-            <button
-              type="button"
-              className="home__banner-upload"
-              onClick={guard(() => bannerInput.current?.click())}
-            >
-              배너 변경
-            </button>
+            <div className="home__banner-actions">
+              <button
+                type="button"
+                className="home__banner-upload"
+                onClick={guard(() => bannerInput.current?.click())}
+              >
+                배너 변경
+              </button>
+              {currentBand.bannerUrl && (
+                <button
+                  type="button"
+                  className="home__banner-upload"
+                  disabled={repositionBusy}
+                  onClick={guard(adjustBannerPosition)}
+                >
+                  {repositionBusy ? '불러오는 중…' : '위치 조정'}
+                </button>
+              )}
+            </div>
           </>
         )}
         <div className="home__band">
@@ -152,7 +191,7 @@ export function HomePage() {
           <strong>{currentBand.memberCount}</strong>
           <span className="muted">멤버</span>
         </Link>
-        <Link className="home__stat" to={isOwner ? `${base}/followers` : `${base}/members`}>
+        <Link className="home__stat" to={`${base}/followers`}>
           <strong>{currentBand.followerCount}</strong>
           <span className="muted">팔로워</span>
         </Link>
@@ -238,7 +277,7 @@ export function HomePage() {
           {recentSongs.length > 0 ? (
             <div className="home__songlist">
               {recentSongs.map((s, i) => (
-                <div key={s.id} className="home__songrow">
+                <Link key={s.id} to={`${base}/songs?song=${s.id}`} className="home__songrow">
                   <span className="home__songno">{String(i + 1).padStart(2, '0')}</span>
                   <span className="stack" style={{ flex: 1 }}>
                     <strong style={{ fontSize: 14 }}>{s.title}</strong>
@@ -249,7 +288,7 @@ export function HomePage() {
                   <span className={`tag ${s.status === 'CONFIRMED' ? '' : 'tag--soft'}`}>
                     {s.status === 'CONFIRMED' ? '합주곡' : `위시 · ${s.votes}표`}
                   </span>
-                </div>
+                </Link>
               ))}
             </div>
           ) : (
@@ -272,7 +311,7 @@ export function HomePage() {
             {media.slice(0, 3).map((v, i) => {
               const [a, b] = STRIPE_SHADES[i % STRIPE_SHADES.length];
               return (
-                <div key={v.id} className="home__video">
+                <Link key={v.id} to={`${base}/media?video=${v.id}`} className="home__video">
                   <div className="home__video-thumb" style={{ background: stripe(a, b) }}>
                     {v.thumbnailUrl && (
                       <img
@@ -290,7 +329,7 @@ export function HomePage() {
                       {v.source} · {v.date}
                     </span>
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>
@@ -298,6 +337,15 @@ export function HomePage() {
           <div className="panel home__empty">등록된 영상이 없습니다.</div>
         )}
       </section>
+      {cropTarget && (
+        <CropModal
+          file={cropTarget.file}
+          aspect={cropTarget.kind === 'logo' ? 1 : 3}
+          title={cropTarget.kind === 'logo' ? '로고 자르기' : '배너 자르기'}
+          onCancel={() => setCropTarget(null)}
+          onCropped={submitCropped}
+        />
+      )}
     </div>
   );
 }

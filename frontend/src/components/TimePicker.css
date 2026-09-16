@@ -1,0 +1,44 @@
+.timepicker {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.timepicker__summary {
+  text-align: center;
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.timepicker__cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.timepicker__col {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--color-divider);
+}
+
+.timepicker__opt {
+  display: block;
+  width: 100%;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  text-align: center;
+  color: var(--color-text);
+  cursor: pointer;
+}
+.timepicker__opt:hover {
+  background: var(--color-neutral-100);
+}
+.timepicker__opt.is-selected {
+  background: var(--color-accent-100);
+  font-weight: 700;
+}

@@ -21,9 +21,12 @@ public record MediaResponse(Long id, Long bandId, Long scheduleId, Long songId, 
 		Long scheduleId = media.getSchedule() != null ? media.getSchedule().getId() : null;
 		Long songId = media.getSong() != null ? media.getSong().getId() : null;
 		String songTitle = media.getSong() != null ? media.getSong().getTitle() : null;
+		// 구글 포토처럼 등록 시점에 fetch 해 저장해둔 값이 있으면 그걸 쓰고, 없으면(유튜브·드라이브)
+		// URL 에서 즉석 계산한다.
+		String thumbnailUrl = media.getThumbnailUrl() != null ? media.getThumbnailUrl()
+				: MediaThumbnail.of(media.getPlatform(), media.getExternalUrl());
 		return new MediaResponse(media.getId(), media.getBand().getId(), scheduleId, songId, songTitle, media.getType(),
-				media.getExternalUrl(), media.getTitle(), media.getPlatform(),
-				MediaThumbnail.of(media.getPlatform(), media.getExternalUrl()), media.getVisibility(),
+				media.getExternalUrl(), media.getTitle(), media.getPlatform(), thumbnailUrl, media.getVisibility(),
 				media.getUploadedBy().getId(), media.getUploadedBy().getNickname(), likeCount, likedByMe,
 				media.getCreatedAt());
 	}

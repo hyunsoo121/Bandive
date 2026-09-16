@@ -155,16 +155,20 @@ textarea.input {
   justify-content: center;
 }
 
-/* 이미지 업로드 자리 (목업 단계 — 아직 실제 업로드 없음) */
+/* 이미지 업로드 자리. <button> 로도 쓰이므로 배경/패딩을 명시해서 브라우저 기본 버튼 모양을 지운다. */
 .upload-box {
+  width: 100%;
   height: 72px;
   border: 2px dashed var(--color-neutral-500);
+  background: transparent;
+  padding: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 11px;
   color: var(--color-neutral-600);
   cursor: pointer;
+  overflow: hidden;
 }
 .upload-box--square {
   width: 72px;

@@ -32,6 +32,30 @@ export interface Follower {
   decidedAt: string | null;
 }
 
+/** 누구나 볼 수 있는 팔로워 한 명 (승인된 팔로워만, 관리자용 타임스탬프 없이). */
+export interface PublicFollower {
+  userId: string;
+  nickname: string;
+  initial: string;
+  avatarUrl: string | null;
+}
+
+export type NotificationType =
+  'SCHEDULE_CREATED' | 'MEMBER_JOINED' | 'FOLLOW_REQUESTED' | 'FOLLOW_AUTO_APPROVED';
+
+/** 알림 한 건. actorId/actorNickname 은 FOLLOW_REQUESTED 승인/거절 대상과 동일 인물. */
+export interface NotificationItem {
+  id: string;
+  type: NotificationType;
+  bandId: string;
+  bandName: string;
+  actorId: string | null;
+  actorNickname: string | null;
+  /** 읽음 시각. 안 읽었으면 null */
+  readAt: string | null;
+  createdAt: string;
+}
+
 /** 내가 팔로우한 밴드 한 곳 (탐색 > 팔로잉 탭). */
 export interface FollowingBand {
   bandId: string;
@@ -152,6 +176,8 @@ export interface Song {
   /** 검색으로 추가한 곡의 외부 트랙 id. 직접입력(MANUAL)이면 null — 다른 밴드 합주 영상 조회 키 */
   externalTrackId: string | null;
   proposer: string;
+  /** 등록자 userId — 수정 권한(본인/관리자) 판단용 */
+  addedByUserId: string;
   memo: string;
   referenceVideoUrl: string;
   /** 앨범 커버 이미지 URL (SEARCH 로 추가 시). 없으면 null */
@@ -208,8 +234,8 @@ export interface MediaItem {
   /** 계산된 썸네일 이미지 URL. 없으면 null → 플랫폼 아이콘 */
   thumbnailUrl: string | null;
   source: string;
-  /** 'YouTube' | 'Google Drive' | '링크' — 아이콘/경고 판단용 */
-  platform: 'youtube' | 'drive' | 'other';
+  /** 'YouTube' | 'Google Drive' | 'Google Photos' | '링크' — 아이콘/경고 판단용 */
+  platform: 'youtube' | 'drive' | 'google_photos' | 'other';
   /** 표시용 날짜 문자열 (예: "9월 2일") */
   date: string;
   /** 정렬용 등록 시각 (epoch ms) */

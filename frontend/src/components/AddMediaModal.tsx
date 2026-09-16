@@ -15,7 +15,8 @@ interface Props {
 
 const KINDS: MediaKind[] = ['합주', '공연'];
 const SCOPES: Visibility[] = ['멤버만', '전체공개'];
-const YT_OR_DRIVE = /(youtube\.com|youtu\.be|drive\.google\.com|docs\.google\.com)/i;
+const KNOWN_PLATFORM =
+  /(youtube\.com|youtu\.be|drive\.google\.com|docs\.google\.com|photos\.google\.com|photos\.app\.goo\.gl)/i;
 
 export function AddMediaModal({ bandId, schedules, editing, onClose, onSubmitted }: Props) {
   const { addMedia, editMedia, songs } = useApp();
@@ -32,7 +33,7 @@ export function AddMediaModal({ bandId, schedules, editing, onClose, onSubmitted
 
   const trimmed = url.trim();
   const isValidUrl = /^https?:\/\/.+/.test(trimmed);
-  const suspicious = isValidUrl && !YT_OR_DRIVE.test(trimmed);
+  const suspicious = isValidUrl && !KNOWN_PLATFORM.test(trimmed);
   const canSubmit = isValidUrl && !submitting;
 
   const submit = async () => {
@@ -92,12 +93,12 @@ export function AddMediaModal({ bandId, schedules, editing, onClose, onSubmitted
         />
         {suspicious ? (
           <span style={{ fontSize: 11, color: 'var(--color-accent)' }}>
-            유튜브·구글드라이브 링크가 아닌 것 같습니다. 그래도 첨부할 수 있지만 썸네일은 표시되지
-            않습니다.
+            유튜브·구글드라이브·구글포토 링크가 아닌 것 같습니다. 그래도 첨부할 수 있지만 썸네일은
+            표시되지 않습니다.
           </span>
         ) : (
           <span className="muted" style={{ fontSize: 11 }}>
-            유튜브·구글드라이브 링크는 자동으로 구분되고 썸네일이 표시됩니다.
+            유튜브·구글드라이브·구글포토 링크는 자동으로 구분되고 썸네일이 표시됩니다.
           </span>
         )}
       </div>

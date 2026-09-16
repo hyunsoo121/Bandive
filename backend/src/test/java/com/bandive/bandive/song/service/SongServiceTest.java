@@ -93,7 +93,7 @@ class SongServiceTest extends RepositoryTest {
 	}
 
 	private SongCreateRequest manual(List<SessionSlot> sessions) {
-		return new SongCreateRequest("곡", "아티스트", SongSourceType.MANUAL, null, null, "메모", null, sessions);
+		return new SongCreateRequest("곡", "아티스트", SongSourceType.MANUAL, null, null, "메모", null, sessions, null);
 	}
 
 	// ── add ──────────────────────────────────────────────
@@ -120,10 +120,37 @@ class SongServiceTest extends RepositoryTest {
 
 	@Test
 	void SEARCH_인데_트랙id가_없으면_400() {
-		SongCreateRequest req = new SongCreateRequest("곡", "a", SongSourceType.SEARCH, "  ", null, null, null, null);
+		SongCreateRequest req = new SongCreateRequest("곡", "a", SongSourceType.SEARCH, "  ", null, null, null, null,
+				null);
 
 		assertThatThrownBy(() -> service.add(band.getId(), memberId, req)).isInstanceOf(ValidationException.class)
 			.satisfies(ex -> assertThat(((ValidationException) ex).getCode()).isEqualTo("EXTERNAL_TRACK_ID_REQUIRED"));
+	}
+
+	@Test
+	void 관리자는_합주곡으로_바로_등록할_수_있다() {
+		SongCreateRequest req = new SongCreateRequest("곡", "아티스트", SongSourceType.MANUAL, null, null, "메모", null, null,
+				SongStatus.CONFIRMED);
+
+		SongResponse created = service.add(band.getId(), ownerId, req);
+
+		assertThat(created.status()).isEqualTo(SongStatus.CONFIRMED);
+	}
+
+	@Test
+	void 일반_멤버는_합주곡으로_바로_등록할_수_없다() {
+		SongCreateRequest req = new SongCreateRequest("곡", "아티스트", SongSourceType.MANUAL, null, null, "메모", null, null,
+				SongStatus.CONFIRMED);
+
+		assertThatThrownBy(() -> service.add(band.getId(), memberId, req)).isInstanceOf(ForbiddenException.class)
+			.satisfies(ex -> assertThat(((ForbiddenException) ex).getCode()).isEqualTo("NOT_BAND_OWNER"));
+	}
+
+	@Test
+	void status_를_안_주면_위시리스트로_등록된다() {
+		SongResponse created = service.add(band.getId(), memberId, manual(null));
+
+		assertThat(created.status()).isEqualTo(SongStatus.WISHLIST);
 	}
 
 	// ── list / vote ──────────────────────────────────────
@@ -369,6 +396,144 @@ class SongServiceTest extends RepositoryTest {
 		em.flush();
 
 		assertThat(service.confirm(songId, ownerId).folderId()).isNull();
+	}
+
+	// ── update ───────────────────────────────────────────
+
+	@Test
+	void 등록자_본인은_제목_아티스트_메모_참고영상을_수정할_수_있다() {
+		Long songId = service.add(band.getId(), memberId, manual(null)).id();
+		em.flush();
+
+		SongResponse updated = service.update(songId, memberId, new com.bandive.bandive.song.dto.SongUpdateRequest(
+				"새 제목", "새 아티스트", "새 메모", "https://youtu.be/x", null));
+
+		assertThat(updated.title()).isEqualTo("새 제목");
+		assertThat(updated.artist()).isEqualTo("새 아티스트");
+		assertThat(updated.memo()).isEqualTo("새 메모");
+		assertThat(updated.referenceVideoUrl()).isEqualTo("https://youtu.be/x");
+	}
+
+	@Test
+	void 관리자도_남의_곡을_수정할_수_있다() {
+		Long songId = service.add(band.getId(), memberId, manual(null)).id();
+		em.flush();
+
+		assertThat(service
+			.update(songId, ownerId,
+					new com.bandive.bandive.song.dto.SongUpdateRequest("관리자가 고침", null, null, null, null))
+			.title()).isEqualTo("관리자가 고침");
+	}
+
+	@Test
+	void 등록자도_관리자도_아니면_수정할_수_없다() {
+		Long songId = service.add(band.getId(), memberId, manual(null)).id();
+		Long thirdId = joinMember("third", BandRole.MEMBER);
+		em.flush();
+
+		assertThatThrownBy(() -> service.update(songId, thirdId,
+				new com.bandive.bandive.song.dto.SongUpdateRequest("남이 고침", null, null, null, null)))
+			.isInstanceOf(ForbiddenException.class);
+	}
+
+	@Test
+	void 수정은_null_필드를_유지하고_빈_제목은_거부한다() {
+		Long songId = service.add(band.getId(), memberId, manual(null)).id();
+		em.flush();
+
+		SongResponse kept = service.update(songId, memberId,
+				new com.bandive.bandive.song.dto.SongUpdateRequest(null, null, null, null, null));
+		assertThat(kept.title()).isEqualTo("곡"); // manual() 기본값 유지
+		assertThat(kept.artist()).isEqualTo("아티스트");
+
+		assertThatThrownBy(() -> service.update(songId, memberId,
+				new com.bandive.bandive.song.dto.SongUpdateRequest("  ", null, null, null, null)))
+			.isInstanceOf(ValidationException.class);
+	}
+
+	@Test
+	void 합주곡으로_승격된_곡도_수정할_수_있다() {
+		Long songId = service.add(band.getId(), memberId, manual(null)).id();
+		em.flush();
+		service.confirm(songId, ownerId);
+		em.flush();
+
+		assertThat(service
+			.update(songId, memberId,
+					new com.bandive.bandive.song.dto.SongUpdateRequest("합주곡 제목 수정", null, null, null, null))
+			.status()).isEqualTo(SongStatus.CONFIRMED);
+	}
+
+	// ── update: 세션 구성 ──────────────────────────────────
+
+	@Test
+	void 세션_구성을_늘리면_빈_슬롯이_추가된다() {
+		Long songId = service.add(band.getId(), memberId, manual(List.of(new SessionSlot("GUITAR", 1)))).id();
+		em.flush();
+
+		SongResponse updated = service.update(songId, memberId, new com.bandive.bandive.song.dto.SongUpdateRequest(null,
+				null, null, null, List.of(new SessionSlot("GUITAR", 2), new SessionSlot("DRUM", 1))));
+
+		assertThat(updated.parts()).hasSize(3);
+		assertThat(updated.parts()).filteredOn(p -> p.instrument().equals("GUITAR")).hasSize(2);
+		assertThat(updated.parts()).filteredOn(p -> p.instrument().equals("DRUM")).hasSize(1);
+	}
+
+	@Test
+	void 세션_구성을_줄이면_배정없는_슬롯부터_지운다() {
+		Long songId = service.add(band.getId(), memberId, manual(List.of(new SessionSlot("GUITAR", 2)))).id();
+		em.flush();
+
+		SongResponse updated = service.update(songId, memberId, new com.bandive.bandive.song.dto.SongUpdateRequest(null,
+				null, null, null, List.of(new SessionSlot("GUITAR", 1))));
+
+		assertThat(updated.parts()).hasSize(1);
+	}
+
+	@Test
+	void 목록에_없는_악기는_전부_지워진다() {
+		Long songId = service
+			.add(band.getId(), memberId, manual(List.of(new SessionSlot("GUITAR", 1), new SessionSlot("DRUM", 1))))
+			.id();
+		em.flush();
+
+		SongResponse updated = service.update(songId, memberId, new com.bandive.bandive.song.dto.SongUpdateRequest(null,
+				null, null, null, List.of(new SessionSlot("GUITAR", 1))));
+
+		assertThat(updated.parts()).extracting(SongPartResponse::instrument).containsExactly("GUITAR");
+	}
+
+	@Test
+	void 배정된_슬롯이_있으면_그만큼_줄일_수_없다() {
+		Long songId = service.add(band.getId(), memberId, manual(List.of(new SessionSlot("GUITAR", 2)))).id();
+		em.flush();
+		service.confirm(songId, ownerId);
+		Long partId = parts.findAllBySongId(songId).getFirst().getId();
+		service.assignPart(songId, partId, memberId, memberId, null);
+		em.flush();
+
+		// 배정 2개보다 적게 줄이려 하면 거부 (2 -> 0)
+		assertThatThrownBy(() -> service.update(songId, memberId,
+				new com.bandive.bandive.song.dto.SongUpdateRequest(null, null, null, null, List.of())))
+			.isInstanceOf(ConflictException.class)
+			.satisfies(ex -> assertThat(((ConflictException) ex).getCode()).isEqualTo("SESSION_SLOT_ASSIGNED"));
+
+		// 배정 없는 슬롯만큼은 줄일 수 있다 (2 -> 1, 배정된 것만 남음)
+		SongResponse updated = service.update(songId, memberId, new com.bandive.bandive.song.dto.SongUpdateRequest(null,
+				null, null, null, List.of(new SessionSlot("GUITAR", 1))));
+		assertThat(updated.parts()).hasSize(1);
+		assertThat(updated.parts().getFirst().assignedUserId()).isEqualTo(memberId);
+	}
+
+	@Test
+	void sessions가_null이면_세션_구성은_그대로다() {
+		Long songId = service.add(band.getId(), memberId, manual(List.of(new SessionSlot("GUITAR", 2)))).id();
+		em.flush();
+
+		SongResponse updated = service.update(songId, memberId,
+				new com.bandive.bandive.song.dto.SongUpdateRequest("새 제목", null, null, null, null));
+
+		assertThat(updated.parts()).hasSize(2);
 	}
 
 }

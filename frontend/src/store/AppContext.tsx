@@ -18,6 +18,7 @@ import type {
   MediaItem,
   MediaKind,
   Member,
+  NotificationItem,
   Role,
   ScheduleEvent,
   ScheduleType,
@@ -35,6 +36,7 @@ import * as inviteApi from '../api/invites';
 import * as memberApi from '../api/members';
 import * as guestApi from '../api/guests';
 import * as followApi from '../api/follow';
+import * as notificationApi from '../api/notifications';
 import * as songApi from '../api/songs';
 import * as songFolderApi from '../api/songFolders';
 import * as scheduleApi from '../api/schedules';
@@ -46,6 +48,7 @@ import {
   toGuest,
   toMedia,
   toMember,
+  toNotificationItem,
   toSchedule,
   toSong,
   toSongFolder,
@@ -62,6 +65,17 @@ export interface NewSongInput {
   externalTrackId?: string | null;
   /** SEARCH 일 때 앨범 커버 URL */
   artworkUrl?: string | null;
+  memo: string;
+  referenceVideoUrl: string;
+  sessions: SessionShape;
+  /** 없으면 WISHLIST. 'CONFIRMED' 로 바로 등록하려면 관리자여야 함(합주곡 탭에서 곧장 등록). */
+  status?: Song['status'];
+}
+
+/** 곡 부분 수정 — 제목/아티스트/메모/참고영상만(세션 구성은 바꾸지 않음). */
+export interface EditSongInput {
+  title: string;
+  artist: string;
   memo: string;
   referenceVideoUrl: string;
   sessions: SessionShape;
@@ -163,8 +177,13 @@ interface AppState {
   removeAvatar: () => Promise<void>;
   /** 비밀번호 변경 (이메일 로그인 계정만) */
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
-  /** 밴드 생성 → 내 밴드에 추가하고 해당 밴드로 이동. visibility 생략 시 PUBLIC */
-  createBand: (name: string, visibility?: BandVisibility) => Promise<void>;
+  /** 밴드 생성 → 내 밴드에 추가하고 해당 밴드로 이동. visibility 생략 시 PUBLIC. logo/banner 는 선택 */
+  createBand: (
+    name: string,
+    visibility?: BandVisibility,
+    logoFile?: File | null,
+    bannerFile?: File | null,
+  ) => Promise<void>;
   /** 초대 코드로 가입 → 가입한 밴드 반환 */
   joinByInvite: (code: string) => Promise<Band>;
   /** 밴드 이름·소개 수정 (관리자) */
@@ -194,6 +213,16 @@ interface AppState {
   refreshFollowing: () => Promise<void>;
   /** 팔로우 취소 / 언팔로우 (밴드 지정) → following 목록에서 제거 */
   unfollowBand: (bandId: string) => Promise<void>;
+  /**
+   * 알림 (오른쪽 위 벨). 새로고침·재진입 시에만 갱신 — 폴링·실시간(웹소켓) 아직 없음. 로그인 유저만.
+   */
+  notifications: NotificationItem[];
+  notificationsLoading: boolean;
+  /** 알림 목록 다시 불러오기 (벨 열 때, 로그인 시) */
+  refreshNotifications: () => Promise<void>;
+  /** 알림 하나 읽음 처리 (낙관적 갱신) */
+  markNotificationRead: (id: string) => Promise<void>;
+  markAllNotificationsRead: () => Promise<void>;
   /** 관리자 위임 (관리자) */
   transferOwnership: (userId: string) => Promise<void>;
   /** 밴드 삭제 (관리자) → 홈으로 */
@@ -220,6 +249,8 @@ interface AppState {
   ) => Promise<void>;
   /** 곡 추가 (POST /api/bands/{id}/songs) */
   addSong: (input: NewSongInput) => Promise<void>;
+  /** 곡 부분 수정 (PATCH /api/songs/{id}) — 등록자 본인 또는 관리자. 위시리스트·합주곡 모두 가능 */
+  updateSong: (songId: string, input: EditSongInput) => Promise<void>;
   /** 곡 삭제 (관리자) */
   removeSong: (songId: string) => Promise<void>;
   /** 곡을 폴더로 이동 (멤버 누구나). folderId null = 미분류. 대상 그룹 맨 끝으로 */
@@ -309,6 +340,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [approvedFollowers, setApprovedFollowers] = useState<Follower[]>([]);
   const [following, setFollowing] = useState<FollowingBand[]>([]);
   const [followingLoading, setFollowingLoading] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [guests, setGuests] = useState<Guest[]>([]);
   const [invite, setInvite] = useState<InviteInfo | null>(null);
@@ -470,11 +503,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [navigate]);
 
   const createBand = useCallback(
-    async (name: string, visibility?: BandVisibility) => {
+    async (
+      name: string,
+      visibility?: BandVisibility,
+      logoFile?: File | null,
+      bannerFile?: File | null,
+    ) => {
       const trimmed = name.trim();
       if (!trimmed) return;
       const dto = await bandApi.createBand(trimmed, null, visibility);
-      const band = toBand(dto); // 생성 응답에 role: 'OWNER' 포함됨
+      let band = toBand(dto); // 생성 응답에 role: 'OWNER' 포함됨
+      // 로고/배너는 생성 직후 곧바로(관리자 권한 필요 — 방금 생성한 본인) 업로드.
+      // uploadBandLogo/Banner 액션은 currentBandId 를 쓰는데 아직 이 밴드로 이동 전이라 여기선 직접 호출.
+      if (logoFile) band = toBand(await bandApi.uploadLogo(band.id, logoFile));
+      if (bannerFile) band = toBand(await bandApi.uploadBanner(band.id, bannerFile));
       setBands((prev) => [...prev, band]);
       setCreateOpen(false);
       setSwitcherOpen(false);
@@ -551,6 +593,50 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (user) void refreshFollowing();
     else setFollowing([]);
   }, [user, refreshFollowing]);
+
+  const refreshNotifications = useCallback(async () => {
+    if (!user) {
+      setNotifications([]);
+      return;
+    }
+    setNotificationsLoading(true);
+    try {
+      const list = await notificationApi.listNotifications();
+      setNotifications(list.map(toNotificationItem));
+    } catch {
+      setNotifications([]);
+    } finally {
+      setNotificationsLoading(false);
+    }
+  }, [user]);
+
+  // 로그인 상태가 되면(또는 새로고침으로 세션 복구되면) 알림 로드, 로그아웃되면 비움.
+  // 실시간(웹소켓) 없이 새로고침/재진입 때만 갱신 — 벨을 열 때도 refreshNotifications 를 다시 부른다.
+  useEffect(() => {
+    if (user) void refreshNotifications();
+    else setNotifications([]);
+  }, [user, refreshNotifications]);
+
+  const markNotificationRead = useCallback(async (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id && !n.readAt ? { ...n, readAt: new Date().toISOString() } : n)),
+    );
+    try {
+      await notificationApi.markNotificationRead(id);
+    } catch {
+      /* 무시 — 다음에 refreshNotifications 하면 맞춰짐 */
+    }
+  }, []);
+
+  const markAllNotificationsRead = useCallback(async () => {
+    const now = new Date().toISOString();
+    setNotifications((prev) => prev.map((n) => (n.readAt ? n : { ...n, readAt: now })));
+    try {
+      await notificationApi.markAllNotificationsRead();
+    } catch {
+      /* 무시 */
+    }
+  }, []);
 
   const requestFollow = useCallback(async () => {
     if (!currentBandId) return;
@@ -853,8 +939,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       memo: input.memo.trim(),
       referenceVideoUrl: input.referenceVideoUrl.trim(),
       sessions,
+      status: input.status,
     });
     setSongs((prev) => [...prev, toSong(dto)]);
+  }, []);
+
+  const updateSong = useCallback(async (songId: string, input: EditSongInput) => {
+    const sessions = Object.entries(input.sessions)
+      .filter(([, count]) => (count ?? 0) > 0)
+      .map(([instrument, count]) => ({ instrument, count: count as number }));
+    const dto = await songApi.updateSong(songId, {
+      title: input.title.trim(),
+      artist: input.artist.trim(),
+      memo: input.memo.trim(),
+      referenceVideoUrl: input.referenceVideoUrl.trim(),
+      sessions,
+    });
+    setSongs((prev) => prev.map((s) => (s.id === songId ? toSong(dto) : s)));
   }, []);
 
   const removeSong = useCallback(async (songId: string) => {
@@ -1067,6 +1168,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     approvedFollowers,
     following,
     followingLoading,
+    notifications,
+    notificationsLoading,
     bootLoading,
     bandLoading,
     role,
@@ -1099,6 +1202,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     unfollowBand,
     refreshFollowers,
     refreshFollowing,
+    refreshNotifications,
+    markNotificationRead,
+    markAllNotificationsRead,
     approveFollower,
     rejectFollower,
     removeFollower,
@@ -1113,6 +1219,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     promoteSong,
     assignPart,
     addSong,
+    updateSong,
     removeSong,
     moveSongToFolder,
     reorderSongs,

@@ -2,6 +2,7 @@ package com.bandive.bandive.invite.controller;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.bandive.bandive.auth.CurrentUser;
 import com.bandive.bandive.band.dto.BandResponse;
 import com.bandive.bandive.invite.dto.InviteCodeResponse;
+import com.bandive.bandive.invite.dto.InvitePreviewResponse;
 import com.bandive.bandive.invite.service.InviteService;
 
 @RestController
@@ -27,6 +29,12 @@ public class InviteController {
 	@PreAuthorize("@bandGuard.isOwner(#bandId)")
 	public InviteCodeResponse issue(@PathVariable Long bandId) {
 		return inviteService.issue(bandId);
+	}
+
+	/** 초대 코드 미리보기 (공개, 가입 전 — 참여 확인 화면용). */
+	@GetMapping("/api/invite-codes/{code}")
+	public InvitePreviewResponse preview(@PathVariable String code) {
+		return inviteService.preview(code);
 	}
 
 	/** 초대 코드로 가입 (로그인). */

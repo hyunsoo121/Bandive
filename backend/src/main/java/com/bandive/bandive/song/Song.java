@@ -1,6 +1,7 @@
 package com.bandive.bandive.song;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 import jakarta.persistence.CascadeType;
@@ -95,6 +96,11 @@ public class Song extends BaseTimeEntity {
 		part.assignToSong(this);
 	}
 
+	/** 세션 구성 수정 시 줄어든 슬롯 제거. orphanRemoval 이라 리스트에서 빠지면 삭제된다. */
+	public void removeParts(Collection<SongPart> toRemove) {
+		this.parts.removeAll(toRemove);
+	}
+
 	public boolean isConfirmed() {
 		return this.status == SongStatus.CONFIRMED;
 	}
@@ -108,6 +114,14 @@ public class Song extends BaseTimeEntity {
 	/** 폴더로 이동. null 이면 미분류. */
 	public void moveToFolder(SongFolder folder) {
 		this.folder = folder;
+	}
+
+	/** 부분 수정 — 제목/아티스트/메모/참고영상. 위시리스트·합주곡 상태 모두 가능. null 유지 여부는 서비스에서 결정해 넘긴다. */
+	public void updateDetails(String title, String artist, String memo, String referenceVideoUrl) {
+		this.title = title;
+		this.artist = artist;
+		this.memo = memo;
+		this.referenceVideoUrl = referenceVideoUrl;
 	}
 
 	/** 그룹 안 정렬 위치 지정. */
