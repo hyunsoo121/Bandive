@@ -3,6 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <!-- 안드로이드 크롬 "홈 화면에 추가" 는 manifest.icons 를 쓰지만, iOS 사파리/크롬은 이 태그가 있어야
+         기본 스크린샷 아이콘 대신 우리 로고를 쓴다. -->
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="밴디브" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="theme-color" content="#201e1d" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>밴디브 · Bandive</title>
   </head>
