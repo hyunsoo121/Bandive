@@ -149,15 +149,23 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  flex-wrap: wrap;
 }
 .media__foot-right {
   display: flex;
   align-items: center;
   gap: 4px;
+  flex-wrap: wrap;
 }
 .media__actions {
   display: flex;
   gap: 4px;
+}
+/* 버튼이 늘어나서 카드 폭이 좁아지면 글자가 세로로 쪼개져 보이던 문제 — 줄바꿈 대신 버튼째로 다음 줄로. */
+.media__like,
+.media__act,
+.media__pinbtn {
+  white-space: nowrap;
 }
 /* 좋아요 버튼 — 곡 카드 투표 버튼(.votebox) 과 같은 톤 */
 .media__like {
@@ -198,6 +206,24 @@
 .media__act--danger {
   border-color: var(--color-accent);
   color: var(--color-accent);
+}
+/* 고정 버튼 — "고정"/"고정 해제" 텍스트 대신 아이콘 하나로, 다른 버튼들과 자리다툼을 안 하게. */
+.media__pinbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  font-size: 13px;
+  border: 2px solid var(--color-text);
+  background: var(--color-bg);
+  cursor: pointer;
+  line-height: 1;
+}
+.media__pinbtn.is-pinned {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
 }
 .media__card-body {
   padding: 10px;

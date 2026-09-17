@@ -133,6 +133,14 @@
   font-size: 11px;
 }
 
+.home__share {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 2px solid var(--color-text);
+}
+
 /* 홈에서 멤버/설정 진입 — 모바일 전용 (데스크탑은 사이드바에 있음) */
 .home__manage {
   display: none;

@@ -79,7 +79,7 @@ public class InviteService {
 			.orElseThrow(() -> new NotFoundException("INVITE_CODE_NOT_FOUND", "유효하지 않은 초대 코드입니다."));
 		Band band = inviteCode.getBand();
 		return new InvitePreviewResponse(code, band.getId(), band.getName(), band.getDescription(), band.getLogoUrl(),
-				bandMembers.countByBandId(band.getId()));
+				bandMembers.countByBandId(band.getId()), band.getVisibility());
 	}
 
 	/** 코드로 가입 — MEMBER 로 등록. */
