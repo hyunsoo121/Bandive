@@ -276,5 +276,6 @@ export function toMedia(dto: MediaDto): MediaItem {
     songTitle: dto.songTitle,
     likeCount: dto.likeCount,
     likedByMe: dto.likedByMe,
+    pinned: dto.pinned,
   };
 }

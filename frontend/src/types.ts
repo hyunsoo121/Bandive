@@ -256,4 +256,6 @@ export interface MediaItem {
   likeCount: number;
   /** 현재 유저가 좋아요 눌렀는지. 비회원이면 false */
   likedByMe: boolean;
+  /** 관리자가 고정했는지 — 고정된 영상은 목록 맨 위에 모아서 보여준다 */
+  pinned: boolean;
 }

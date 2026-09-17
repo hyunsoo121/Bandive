@@ -119,6 +119,28 @@ class ExploreServiceTest extends RepositoryTest {
 	}
 
 	@Test
+	void 구글포토처럼_저장해둔_썸네일도_돌려준다() {
+		Band pub = em.persist(Fixtures.band("공개2", BandVisibility.PUBLIC));
+		em.persist(Fixtures.member(pub, owner, BandRole.OWNER));
+		Song song = track(pub, "gphoto", "구글포토곡");
+		em.persist(Media.builder()
+			.band(pub)
+			.song(song)
+			.type(MediaType.REHEARSAL)
+			.externalUrl("https://photos.app.goo.gl/abc")
+			.platform(MediaPlatform.GOOGLE_PHOTOS)
+			.thumbnailUrl("https://lh3.googleusercontent.com/pw/thumb.jpg")
+			.visibility(MediaVisibility.LINK_PUBLIC)
+			.uploadedBy(owner)
+			.build());
+		em.flush();
+		em.clear();
+
+		assertThat(service.trackVideos("gphoto", null, null)).singleElement()
+			.satisfies(v -> assertThat(v.thumbnailUrl()).isEqualTo("https://lh3.googleusercontent.com/pw/thumb.jpg"));
+	}
+
+	@Test
 	void 밴드_구경은_PUBLIC_이면_공개영상_FOLLOWERS_면_비어있고_PRIVATE_면_404() {
 		Band pub = em.persist(Fixtures.band("공개", BandVisibility.PUBLIC));
 		Band fol = em.persist(Fixtures.band("팔로워공개", BandVisibility.FOLLOWERS));

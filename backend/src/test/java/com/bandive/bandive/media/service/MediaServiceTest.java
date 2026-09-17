@@ -189,6 +189,21 @@ class MediaServiceTest extends RepositoryTest {
 	}
 
 	@Test
+	void 고정은_관리자만_할_수_있고_멱등이다() {
+		Long mediaId = service
+			.create(band.getId(), memberId, req("https://a.com/x", MediaVisibility.MEMBERS_ONLY, null))
+			.id();
+		em.flush();
+
+		assertThatThrownBy(() -> service.pin(mediaId, memberId)).isInstanceOf(ForbiddenException.class)
+			.satisfies(ex -> assertThat(((ForbiddenException) ex).getCode()).isEqualTo("NOT_BAND_OWNER"));
+
+		assertThat(service.pin(mediaId, ownerId).pinned()).isTrue();
+		assertThat(service.pin(mediaId, ownerId).pinned()).isTrue(); // 멱등
+		assertThat(service.unpin(mediaId, ownerId).pinned()).isFalse();
+	}
+
+	@Test
 	void 부분수정_null_필드는_유지하고_URL_바뀌면_플랫폼_재판별() {
 		Long mediaId = service
 			.create(band.getId(), memberId,

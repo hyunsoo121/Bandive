@@ -81,4 +81,16 @@ public class MediaController {
 		return mediaService.unlike(mediaId, userId);
 	}
 
+	/** 고정 — 관리자만. 여러 개 고정 가능(멱등). */
+	@PostMapping("/api/media/{mediaId}/pin")
+	public MediaResponse pin(@PathVariable Long mediaId, @CurrentUser Long userId) {
+		return mediaService.pin(mediaId, userId);
+	}
+
+	/** 고정 해제 — 관리자만(멱등). */
+	@DeleteMapping("/api/media/{mediaId}/pin")
+	public MediaResponse unpin(@PathVariable Long mediaId, @CurrentUser Long userId) {
+		return mediaService.unpin(mediaId, userId);
+	}
+
 }

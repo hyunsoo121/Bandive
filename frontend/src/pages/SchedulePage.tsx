@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import { useGuard } from '../hooks/useGuard';
 import { KIND_LABEL, byDateAsc, toUi, type UiSchedule } from '../lib/schedule';
@@ -77,11 +78,30 @@ export function SchedulePage() {
   const [deleting, setDeleting] = useState(false);
   const [pending, setPending] = useState(false);
   const [guestPickerOpen, setGuestPickerOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // 밴드가 바뀌면 이전 밴드의 선택을 버린다 → 아래 초점 effect 가 새 밴드 기준으로 다시 돈다.
   useEffect(() => {
     setSelectedId(null);
   }, [bandId]);
+
+  // 영상 카드 등 다른 화면에서 "이 일정으로" 넘어온 경우 — 그 달로 이동하고 바로 선택한다.
+  useEffect(() => {
+    const targetId = searchParams.get('schedule');
+    if (!targetId) return;
+    const target = uiEvents.find((e) => e.id === targetId);
+    if (!target) return;
+    setSelectedId(target.id);
+    setView({ year: target.year, month: target.month });
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('schedule');
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, uiEvents, setSearchParams]);
 
   // 데이터가 들어오면 가장 가까운(또는 마지막) 일정으로 초점을 맞춘다.
   useEffect(() => {
@@ -217,7 +237,9 @@ export function SchedulePage() {
       {/* 리스트 + 상세 */}
       <div className="sched__cols">
         <section className="sched__list-col">
-          <span className="kicker">{view.month + 1}월 일정</span>
+          <span className="kicker">
+            {view.year}년 {view.month + 1}월 일정
+          </span>
           <div className="sched__list">
             {monthEvents.length === 0 && (
               <div className="sched__empty">이 달에는 등록된 일정이 없습니다.</div>
@@ -279,7 +301,8 @@ export function SchedulePage() {
                       {KIND_LABEL[selected.type]}
                     </span>
                     <span className="muted" style={{ fontSize: 11 }}>
-                      {selected.month + 1}월 {selected.day}일 {selected.dow} · {selected.timeLabel}
+                      {selected.year}년 {selected.month + 1}월 {selected.day}일 {selected.dow} ·{' '}
+                      {selected.timeLabel}
                     </span>
                   </span>
                   {(canEditSchedule || isOwner) && (
