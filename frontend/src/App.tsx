@@ -11,7 +11,9 @@ import { MembersPage } from './pages/MembersPage';
 import { FollowersPage } from './pages/FollowersPage';
 import { BandSettingsPage } from './pages/BandSettingsPage';
 import { ExplorePage } from './pages/ExplorePage';
+import { ExploreBandPage } from './pages/ExploreBandPage';
 import {
+  BandShareRedirect,
   HomeRedirect,
   InviteJoin,
   InviteShareRedirect,
@@ -37,11 +39,21 @@ export default function App() {
               로컬 dev(프록시 없음) 등 SPA 로 직접 떨어지는 경우의 안전망 — 바로 /join 으로 넘긴다. */}
           <Route path="/invite/:code" element={<InviteShareRedirect />} />
           <Route path="/join/:code" element={<InviteJoin />} />
+          {/* 마찬가지로 운영에선 Caddy 가 /band/{id} 를 OG 태그 HTML 로 먼저 처리 — 로컬 dev 안전망. */}
+          <Route path="/band/:bandId" element={<BandShareRedirect />} />
           <Route
             path="/explore"
             element={
               <AppChrome>
                 <ExplorePage />
+              </AppChrome>
+            }
+          />
+          <Route
+            path="/explore/bands/:bandId"
+            element={
+              <AppChrome>
+                <ExploreBandPage />
               </AppChrome>
             }
           />

@@ -1,6 +1,7 @@
 package com.bandive.bandive.invite.controller;
 
 import com.bandive.bandive.auth.jwt.JwtProvider;
+import com.bandive.bandive.band.BandVisibility;
 import com.bandive.bandive.common.config.FrontendProperties;
 import com.bandive.bandive.common.exception.NotFoundException;
 import com.bandive.bandive.invite.dto.InvitePreviewResponse;
@@ -47,8 +48,8 @@ class InviteShareControllerTest {
 
 	@Test
 	void 유효한_코드는_밴드명과_og_태그를_담은_HTML_을_준다() throws Exception {
-		given(inviteService.preview("ABCD2345"))
-			.willReturn(new InvitePreviewResponse("ABCD2345", 1L, "금요일의소음", "소개", "https://x/logo.png", 3));
+		given(inviteService.preview("ABCD2345")).willReturn(new InvitePreviewResponse("ABCD2345", 1L, "금요일의소음", "소개",
+				"https://x/logo.png", 3, BandVisibility.PUBLIC));
 
 		mvc.perform(get("/invite/ABCD2345"))
 			.andExpect(status().isOk())
@@ -69,8 +70,8 @@ class InviteShareControllerTest {
 
 	@Test
 	void 밴드명에_HTML_이_들어있어도_이스케이프된다() throws Exception {
-		given(inviteService.preview("XSS1234"))
-			.willReturn(new InvitePreviewResponse("XSS1234", 1L, "<script>alert(1)</script>", null, null, 1));
+		given(inviteService.preview("XSS1234")).willReturn(new InvitePreviewResponse("XSS1234", 1L,
+				"<script>alert(1)</script>", null, null, 1, BandVisibility.PUBLIC));
 
 		// 리다이렉트용 스크립트 태그 자체는 응답에 정상적으로 존재하므로, "<script> 자체가 없어야 한다"가 아니라
 		// "밴드명이 들어간 payload 가 그대로(비escape) 삽입되지는 않아야 한다"를 확인한다.

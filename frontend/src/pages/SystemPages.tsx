@@ -4,6 +4,7 @@ import { useApp } from '../store/AppContext';
 import { BrandMark } from '../components/BrandMark';
 import { CreateBandModal } from '../components/CreateBandModal';
 import { Avatar } from '../components/Avatar';
+import { LandingPage } from './LandingPage';
 import { fileUrl } from '../api/client';
 import * as inviteApi from '../api/invites';
 import type { InvitePreviewDto } from '../api/types';
@@ -41,28 +42,16 @@ export function HomeRedirect() {
   if (bootLoading) return <FullscreenLoader label="세션 확인 중…" />;
   if (bands.length > 0) return <Navigate to={`/bands/${bands[0].id}`} replace />;
 
+  // 로그인 전 방문자는 로그인 화면 대신 서비스 소개 랜딩페이지를 본다.
+  if (!user) return <LandingPage onLogin={openLogin} />;
+
   return (
     <CenterBox>
       <BrandMark size={40} wordmark />
-      {user ? (
-        <>
-          <p className="muted">
-            아직 속한 밴드가 없습니다. 밴드를 만들거나 초대 링크로 참여하세요.
-          </p>
-          <button type="button" className="btn btn--primary" onClick={openCreate}>
-            새 밴드 만들기
-          </button>
-        </>
-      ) : (
-        <>
-          <p className="muted">
-            밴드를 만들고 멤버를 초대해 합주곡·일정·영상을 한곳에서 관리하세요.
-          </p>
-          <button type="button" className="btn btn--primary" onClick={openLogin}>
-            로그인 / 회원가입
-          </button>
-        </>
-      )}
+      <p className="muted">아직 속한 밴드가 없습니다. 밴드를 만들거나 초대 링크로 참여하세요.</p>
+      <button type="button" className="btn btn--primary" onClick={openCreate}>
+        새 밴드 만들기
+      </button>
       <Link className="btn btn--ghost btn--sm" to="/explore">
         다른 밴드 구경하기
       </Link>
@@ -104,6 +93,12 @@ export function OAuthFailure() {
 export function InviteShareRedirect() {
   const { code } = useParams();
   return <Navigate to={code ? `/join/${code}` : '/'} replace />;
+}
+
+/** "/band/:bandId" 로컬 dev 안전망(운영은 Caddy 가 OG HTML 로 먼저 처리) — 구경 화면으로 바로 넘긴다. */
+export function BandShareRedirect() {
+  const { bandId } = useParams();
+  return <Navigate to={bandId ? `/explore/bands/${bandId}` : '/explore'} replace />;
 }
 
 /** "/join/:code" — 밴드 미리보기를 먼저 보여주고, "참여하기" 를 눌러야 가입한다 (오클릭 방지). */
@@ -155,6 +150,12 @@ export function InviteJoin() {
   }
 
   const alreadyMember = bands.some((b) => b.id === String(preview.bandId));
+  // 전체공개 밴드만 — 가입 없이도 콘텐츠를 볼 수 있으니 둘러보기 버튼을 보여준다.
+  const browseButton = preview.visibility === 'PUBLIC' && (
+    <Link className="btn btn--ghost btn--sm" to={`/explore/bands/${preview.bandId}`}>
+      가입 전에 둘러보기
+    </Link>
+  );
 
   const previewCard = (
     <div
@@ -205,6 +206,7 @@ export function InviteJoin() {
         >
           로그인하고 참여하기
         </button>
+        {browseButton}
       </CenterBox>
     );
   }
@@ -256,6 +258,7 @@ export function InviteJoin() {
           취소
         </button>
       </div>
+      {browseButton}
       {joinError && <p className="muted">{joinError}</p>}
     </CenterBox>
   );

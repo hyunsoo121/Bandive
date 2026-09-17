@@ -11,12 +11,11 @@ import './MediaPage.css';
 type Filter = '전체' | MediaKind;
 const FILTERS: Filter[] = ['전체', '합주', '공연'];
 
-type SortKey = 'recent' | 'oldest' | 'likes' | 'title' | 'schedule';
-const SORT_LABEL: Record<SortKey, string> = {
+export type MediaSortKey = 'recent' | 'oldest' | 'likes' | 'schedule';
+const SORT_LABEL: Record<MediaSortKey, string> = {
   recent: '최신순',
   oldest: '오래된순',
   likes: '좋아요순',
-  title: '제목순',
   schedule: '일정순',
 };
 
@@ -29,31 +28,55 @@ const STRIPE_SHADES = [
 const stripe = (a: string, b: string) =>
   `repeating-linear-gradient(135deg, ${a} 0 12px, ${b} 12px 24px)`;
 
-/** 정렬칩 하나로 목록 전체를 정렬 — 고정된 영상은 어떤 정렬을 고르든 그 안에서도 항상 맨 앞. */
-function sortMedia(
+/** 연결된 일정이 지금과 얼마나 가까운지 비교 — 가까운(과거든 미래든) 게 먼저, 일정 없는 영상은 항상 맨 뒤로. */
+function scheduleProximityCmp(
+  a: MediaItem,
+  b: MediaItem,
+  scheduleById: Map<string, ScheduleEvent>,
+): number {
+  const now = Date.now();
+  const distanceOf = (m: MediaItem) => {
+    const ev = m.scheduleId ? scheduleById.get(m.scheduleId) : undefined;
+    return ev ? Math.abs(new Date(ev.dateTime).getTime() - now) : null;
+  };
+  const da = distanceOf(a);
+  const db = distanceOf(b);
+  if (da == null && db == null) return 0;
+  if (da == null) return 1;
+  if (db == null) return -1;
+  return da - db;
+}
+
+function sortCmp(
+  a: MediaItem,
+  b: MediaItem,
+  sort: MediaSortKey,
+  scheduleById: Map<string, ScheduleEvent>,
+): number {
+  switch (sort) {
+    case 'recent':
+      return b.createdAtMs - a.createdAtMs;
+    case 'oldest':
+      return a.createdAtMs - b.createdAtMs;
+    case 'likes':
+      return b.likeCount - a.likeCount || b.createdAtMs - a.createdAtMs;
+    case 'schedule':
+      return scheduleProximityCmp(a, b, scheduleById);
+  }
+}
+
+/**
+ * 정렬칩으로 목록을 정렬하되, 고정된 영상은 항상 맨 앞에 모아둔다 — 다만 고정된 것들끼리의
+ * 순서는 어떤 정렬칩을 누르든 등록순으로 고정(안 바뀜). 정렬은 고정 안 된 나머지에만 적용된다.
+ */
+export function sortMedia(
   list: MediaItem[],
-  sort: SortKey,
+  sort: MediaSortKey,
   scheduleById: Map<string, ScheduleEvent>,
 ): MediaItem[] {
-  const scheduleTimeOf = (m: MediaItem) => {
-    const ev = m.scheduleId ? scheduleById.get(m.scheduleId) : undefined;
-    return ev ? new Date(ev.dateTime).getTime() : Number.POSITIVE_INFINITY;
-  };
-  const cmp = (a: MediaItem, b: MediaItem) => {
-    switch (sort) {
-      case 'recent':
-        return b.createdAtMs - a.createdAtMs;
-      case 'oldest':
-        return a.createdAtMs - b.createdAtMs;
-      case 'likes':
-        return b.likeCount - a.likeCount || b.createdAtMs - a.createdAtMs;
-      case 'title':
-        return a.title.localeCompare(b.title, 'ko');
-      case 'schedule':
-        return scheduleTimeOf(a) - scheduleTimeOf(b);
-    }
-  };
-  return [...list].sort((a, b) => Number(b.pinned) - Number(a.pinned) || cmp(a, b));
+  const pinned = list.filter((m) => m.pinned).sort((a, b) => b.createdAtMs - a.createdAtMs);
+  const rest = list.filter((m) => !m.pinned).sort((a, b) => sortCmp(a, b, sort, scheduleById));
+  return [...pinned, ...rest];
 }
 
 export function MediaPage() {
@@ -72,7 +95,7 @@ export function MediaPage() {
   const isOwner = role === 'owner';
 
   const [filter, setFilter] = useState<Filter>('전체');
-  const [sort, setSort] = useState<SortKey>('recent');
+  const [sort, setSort] = useState<MediaSortKey>('recent');
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<MediaItem | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -145,7 +168,7 @@ export function MediaPage() {
         <span className="muted" style={{ fontSize: 11 }}>
           정렬
         </span>
-        {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+        {(Object.keys(SORT_LABEL) as MediaSortKey[]).map((k) => (
           <button
             key={k}
             type="button"
@@ -256,15 +279,15 @@ export function MediaPage() {
                       <span className="media__like-count">{m.likeCount}</span>
                     </button>
                     {isOwner && (
-                      <span className="media__actions">
-                        <button
-                          type="button"
-                          className="media__act"
-                          onClick={() => void togglePinMedia(m.id)}
-                        >
-                          {m.pinned ? '고정 해제' : '고정'}
-                        </button>
-                      </span>
+                      <button
+                        type="button"
+                        className={`media__pinbtn${m.pinned ? ' is-pinned' : ''}`}
+                        onClick={() => void togglePinMedia(m.id)}
+                        aria-pressed={m.pinned}
+                        title={m.pinned ? '고정 해제' : '고정'}
+                      >
+                        📌
+                      </button>
                     )}
                     {canManage(m) && (
                       <span className="media__actions">

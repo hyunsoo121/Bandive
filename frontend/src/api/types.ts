@@ -138,6 +138,7 @@ export interface InvitePreviewDto {
   description: string | null;
   logoUrl: string | null;
   memberCount: number;
+  visibility: BandVisibilityDto;
 }
 
 /* ── 알림 (Notification) ─────────────────────────────────────── */
