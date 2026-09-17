@@ -70,7 +70,7 @@ export function GuestPickerModal({ guests, addedGuestIds, onAddNew, onPick, onCl
             placeholder="새 게스트 이름"
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 void addNew();
               }

@@ -109,6 +109,7 @@ export interface NewScheduleInput {
   /** ISO-8601 (Instant) */
   dateTime: string;
   location: string;
+  title?: string;
 }
 
 /** 현재 밴드의 초대 코드 (관리자가 발급/재발급한 뒤에만 채워진다 — 조회 전용 API 가 없어서). */
@@ -270,8 +271,13 @@ interface AppState {
   /** 한 status 안에서 폴더 순서 재지정 (관리자) */
   reorderSongFolders: (status: Song['status'], folderIds: string[]) => Promise<void>;
 
-  /** 일정 등록 (POST /api/bands/{id}/schedules) */
-  addSchedule: (input: NewScheduleInput) => Promise<void>;
+  /** 일정 등록 (POST /api/bands/{id}/schedules). 등록된 일정을 반환 — 등록 직후 그 일정으로 이동할 때 씀 */
+  addSchedule: (input: NewScheduleInput) => Promise<ScheduleEvent>;
+  /** 일정 부분 수정 (밴드 멤버 누구나). 수정된 일정을 반환 */
+  updateSchedule: (
+    scheduleId: string,
+    input: { type?: ScheduleType; dateTime?: string; location?: string; title?: string },
+  ) => Promise<ScheduleEvent>;
   /** 일정 삭제 (관리자) */
   removeSchedule: (scheduleId: string) => Promise<void>;
   /** 내 참석 여부 등록/변경 (POST /api/schedules/{id}/attendance) */
@@ -1038,9 +1044,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
       type: input.type,
       dateTime: input.dateTime,
       location: input.location.trim() || undefined,
+      title: input.title?.trim() || undefined,
     });
-    setSchedules((prev) => sortSchedules([...prev, toSchedule(dto)]));
+    const schedule = toSchedule(dto);
+    setSchedules((prev) => sortSchedules([...prev, schedule]));
+    return schedule;
   }, []);
+
+  const updateSchedule = useCallback(
+    async (
+      scheduleId: string,
+      input: { type?: ScheduleType; dateTime?: string; location?: string; title?: string },
+    ) => {
+      const dto = await scheduleApi.updateSchedule(scheduleId, input);
+      const schedule = toSchedule(dto);
+      setSchedules((prev) => sortSchedules(prev.map((s) => (s.id === scheduleId ? schedule : s))));
+      return schedule;
+    },
+    [],
+  );
 
   const removeSchedule = useCallback(async (scheduleId: string) => {
     await scheduleApi.deleteSchedule(scheduleId);
@@ -1228,6 +1250,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     removeSongFolder,
     reorderSongFolders,
     addSchedule,
+    updateSchedule,
     removeSchedule,
     setAttendance,
     setMemberAttendance,

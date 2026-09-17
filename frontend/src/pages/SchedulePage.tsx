@@ -56,8 +56,10 @@ export function SchedulePage() {
     setGuestAttendance,
     clearGuestAttendance,
     addGuest,
+    removeSchedule,
   } = useApp();
   const isOwner = role === 'owner';
+  const canEditSchedule = role === 'owner' || role === 'member';
   const guard = useGuard();
   const bandId = currentBand?.id ?? '';
 
@@ -71,6 +73,8 @@ export function SchedulePage() {
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const [editingSchedule, setEditingSchedule] = useState<UiSchedule | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [pending, setPending] = useState(false);
   const [guestPickerOpen, setGuestPickerOpen] = useState(false);
 
@@ -246,7 +250,7 @@ export function SchedulePage() {
                       {e.timeLabel}
                     </span>
                   </span>
-                  <strong style={{ fontSize: 14 }}>{e.location || KIND_LABEL[e.type]}</strong>
+                  <strong style={{ fontSize: 14 }}>{e.title || KIND_LABEL[e.type]}</strong>
                   <span className="muted" style={{ fontSize: 11 }}>
                     {e.location || '장소 미정'}
                   </span>
@@ -261,24 +265,54 @@ export function SchedulePage() {
           {selected ? (
             <div className="panel">
               <div className="sched__detail-head">
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <span
-                    className="sched__kind"
-                    style={{
-                      background:
-                        selected.type === 'PERFORMANCE'
-                          ? 'var(--color-neutral-800)'
-                          : 'var(--color-accent)',
-                    }}
-                  >
-                    {KIND_LABEL[selected.type]}
+                <div className="spread">
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span
+                      className="sched__kind"
+                      style={{
+                        background:
+                          selected.type === 'PERFORMANCE'
+                            ? 'var(--color-neutral-800)'
+                            : 'var(--color-accent)',
+                      }}
+                    >
+                      {KIND_LABEL[selected.type]}
+                    </span>
+                    <span className="muted" style={{ fontSize: 11 }}>
+                      {selected.month + 1}월 {selected.day}일 {selected.dow} · {selected.timeLabel}
+                    </span>
                   </span>
-                  <span className="muted" style={{ fontSize: 11 }}>
-                    {selected.month + 1}월 {selected.day}일 {selected.dow} · {selected.timeLabel}
-                  </span>
-                </span>
+                  {(canEditSchedule || isOwner) && (
+                    <span style={{ display: 'flex', gap: 6 }}>
+                      {canEditSchedule && (
+                        <button
+                          type="button"
+                          className="btn btn--sm"
+                          onClick={guard(() => setEditingSchedule(selected))}
+                        >
+                          수정
+                        </button>
+                      )}
+                      {isOwner && (
+                        <button
+                          type="button"
+                          className="btn btn--sm"
+                          disabled={deleting}
+                          onClick={guard(() => {
+                            if (!confirm('이 일정을 삭제할까요? 출결 기록도 함께 사라집니다.'))
+                              return;
+                            setDeleting(true);
+                            void removeSchedule(selected.id).finally(() => setDeleting(false));
+                          })}
+                        >
+                          삭제
+                        </button>
+                      )}
+                    </span>
+                  )}
+                </div>
                 <strong style={{ fontFamily: 'var(--font-heading)', fontSize: 18 }}>
-                  {selected.location || KIND_LABEL[selected.type]}
+                  {selected.title || KIND_LABEL[selected.type]}
                 </strong>
                 <span className="muted" style={{ fontSize: 12 }}>
                   {selected.location || '장소 미정'}
@@ -452,11 +486,22 @@ export function SchedulePage() {
 
       <Fab label="＋ 일정 등록" onClick={guard(() => setAddOpen(true))} />
 
-      {addOpen && (
+      {(addOpen || editingSchedule) && (
         <AddScheduleModal
           bandId={bandId}
-          onClose={() => setAddOpen(false)}
-          onSubmitted={() => setAddOpen(false)}
+          editing={editingSchedule ?? undefined}
+          onClose={() => {
+            setAddOpen(false);
+            setEditingSchedule(null);
+          }}
+          onSubmitted={(schedule) => {
+            setAddOpen(false);
+            setEditingSchedule(null);
+            // 등록/수정한 일정이 다른 달일 수 있으니 그 달로 이동하고 바로 선택해서 보여준다.
+            const ui = toUi(schedule);
+            setView({ year: ui.year, month: ui.month });
+            setSelectedId(schedule.id);
+          }}
         />
       )}
 

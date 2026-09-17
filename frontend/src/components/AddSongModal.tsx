@@ -364,7 +364,7 @@ export function AddSongModal({
             maxLength={20}
             onChange={(e) => setNewInst(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') {
+              if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 addInstrument();
               }

@@ -63,7 +63,7 @@ export function PromptModal({
           placeholder={placeholder}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === 'Enter') submit();
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing) submit();
           }}
           autoFocus
         />

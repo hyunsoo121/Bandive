@@ -10,6 +10,7 @@ export interface ScheduleCreateBody {
   /** ISO-8601 (Instant) */
   dateTime: string;
   location?: string;
+  title?: string;
 }
 
 /** 일정 등록 (밴드 멤버). */
