@@ -1,0 +1,164 @@
+.landing {
+  min-height: 100dvh;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.landing__hero {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 64px 24px 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+}
+.landing__headline {
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 34px;
+  line-height: 1.25;
+  margin: 8px 0 0;
+}
+.landing__sub {
+  margin: 0;
+  color: var(--color-neutral-700);
+  font-size: 15px;
+  line-height: 1.6;
+  max-width: 460px;
+}
+.landing__cta {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.landing__features {
+  max-width: var(--content-max);
+  margin: 0 auto;
+  padding: 24px 24px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 56px;
+}
+.landing__feature {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  align-items: center;
+}
+.landing__feature.is-reverse .landing__feature-text {
+  order: 2;
+}
+.landing__feature-text h2 {
+  font-family: var(--font-heading);
+  font-size: 22px;
+  font-weight: 800;
+  margin: 6px 0 10px;
+}
+.landing__feature-text p {
+  font-size: 14px;
+  line-height: 1.7;
+  max-width: 420px;
+}
+.landing__feature-visual {
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+}
+
+/* ── 기능 미니 목업 (실제 화면 스크린샷 대신 단순화한 그림) ── */
+.landing__mock {
+  width: 100%;
+}
+.landing__mock-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 4px;
+  border-bottom: 1px solid var(--color-divider);
+}
+.landing__mock-row:last-child {
+  border-bottom: 0;
+}
+.landing__mock-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+.landing__mock-vote {
+  flex: none;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--color-accent-700);
+  background: var(--color-accent-100);
+  padding: 3px 7px;
+}
+.landing__mock-avatar {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  background: var(--color-neutral-500);
+}
+
+.landing__mock-cal {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.landing__mock-day {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: var(--color-neutral-600);
+  background: var(--color-neutral-100);
+}
+.landing__mock-day.is-on {
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 800;
+}
+
+.landing__mock--media {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.landing__mock-thumb {
+  aspect-ratio: 16 / 10;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--color-neutral-400) 0 8px,
+    var(--color-neutral-300) 8px 16px
+  );
+}
+
+@media (max-width: 760px) {
+  .landing__headline {
+    font-size: 26px;
+  }
+  .landing__feature {
+    grid-template-columns: 1fr;
+  }
+  .landing__feature.is-reverse .landing__feature-text {
+    order: 0;
+  }
+}
+
+.landing__footer {
+  border-top: 2px solid var(--color-text);
+  padding: 40px 24px 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  text-align: center;
+}
+.landing__footer strong {
+  font-family: var(--font-heading);
+  font-size: 18px;
+}

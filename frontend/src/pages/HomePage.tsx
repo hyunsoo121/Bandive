@@ -41,6 +41,8 @@ export function HomePage() {
     null,
   );
   const [repositionBusy, setRepositionBusy] = useState(false);
+  const [shareCopied, setShareCopied] = useState(false);
+  const [videoTab, setVideoTab] = useState<'pinned' | 'recent'>('pinned');
 
   if (!currentBand) return null;
   const bandId = currentBand.id;
@@ -48,8 +50,16 @@ export function HomePage() {
   const songs = allSongs.filter((s) => s.bandId === bandId);
   const confirmed = songs.filter((s) => s.status === 'CONFIRMED');
   const wishlist = songs.filter((s) => s.status === 'WISHLIST');
-  const media = allMedia.filter((m) => m.bandId === bandId);
-  const recentSongs = [...songs].sort((a, b) => b.addedOrder - a.addedOrder).slice(0, 3);
+  const bandMedia = allMedia.filter((m) => m.bandId === bandId);
+  // 탭별로 완전히 독립된 정렬 — "최근"은 고정 여부와 무관하게 순수 등록순이어야 한다
+  // (고정된 영상이 최근 탭 순서에 끼어드는 문제가 있었음).
+  const byRecent = (a: { createdAtMs: number }, b: { createdAtMs: number }) =>
+    b.createdAtMs - a.createdAtMs;
+  const pinnedMedia = bandMedia.filter((m) => m.pinned).sort(byRecent);
+  const recentMedia = [...bandMedia].sort(byRecent);
+  const media = videoTab === 'pinned' ? pinnedMedia : recentMedia;
+  // 홈은 "최근 등록"이 아니라 합주곡 위주로 — 위시리스트는 곡 탭에서 따로 챙겨보게.
+  const recentConfirmed = [...confirmed].sort((a, b) => b.addedOrder - a.addedOrder).slice(0, 3);
   const upcomingRaw = nextSchedule(schedules);
   const upcoming = upcomingRaw ? toUi(upcomingRaw) : null;
   const dday = upcoming
@@ -59,6 +69,18 @@ export function HomePage() {
 
   const base = `/bands/${bandId}`;
   const going = upcoming?.counts.attending ?? 0;
+
+  /** 전체공개 밴드만 — 가입 없이 구경할 수 있는 공유 링크. 백엔드 /band/{id} 가 OG 미리보기 후
+   * /explore/bands/{id} 로 리다이렉트한다(카카오톡 등에 붙여넣었을 때 미리보기 카드가 뜨게). */
+  const copyShareLink = async () => {
+    try {
+      await navigator.clipboard.writeText(`${window.location.origin}/band/${bandId}`);
+      setShareCopied(true);
+      window.setTimeout(() => setShareCopied(false), 1600);
+    } catch {
+      setShareCopied(false);
+    }
+  };
 
   const onPick = (kind: 'logo' | 'banner') => (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -184,7 +206,7 @@ export function HomePage() {
           <span className="muted">위시리스트</span>
         </Link>
         <Link className="home__stat" to={`${base}/media`}>
-          <strong>{media.length}</strong>
+          <strong>{bandMedia.length}</strong>
           <span className="muted">영상</span>
         </Link>
         <Link className="home__stat home__stat--desktop" to={`${base}/members`}>
@@ -196,6 +218,18 @@ export function HomePage() {
           <span className="muted">팔로워</span>
         </Link>
       </div>
+
+      {/* 전체공개 밴드만 — 가입 없이 구경할 수 있는 링크 공유 */}
+      {currentBand.visibility === 'PUBLIC' && (
+        <div className="home__share">
+          <button type="button" className="btn btn--sm" onClick={copyShareLink}>
+            {shareCopied ? '복사됨 ✓' : '🔗 밴드 링크 공유'}
+          </button>
+          <span className="muted" style={{ fontSize: 11 }}>
+            가입 없이 구경할 수 있는 링크예요.
+          </span>
+        </div>
+      )}
 
       {/* 모바일: 멤버/팔로워/설정은 하단탭에 없으니 홈에서 진입 */}
       <div className="home__manage">
@@ -265,18 +299,18 @@ export function HomePage() {
           )}
         </section>
 
-        {/* 최근 등록된 곡 */}
+        {/* 합주곡 */}
         <section className="home__section">
           <div className="spread">
-            <span className="kicker">최근 등록된 곡</span>
+            <span className="kicker">합주곡</span>
             <Link className="home__more" to={`${base}/songs`}>
               전체보기
             </Link>
           </div>
 
-          {recentSongs.length > 0 ? (
+          {recentConfirmed.length > 0 ? (
             <div className="home__songlist">
-              {recentSongs.map((s, i) => (
+              {recentConfirmed.map((s, i) => (
                 <Link key={s.id} to={`${base}/songs?song=${s.id}`} className="home__songrow">
                   <span className="home__songno">{String(i + 1).padStart(2, '0')}</span>
                   <span className="stack" style={{ flex: 1 }}>
@@ -285,22 +319,35 @@ export function HomePage() {
                       {s.artist} · {s.proposer} 등록
                     </span>
                   </span>
-                  <span className={`tag ${s.status === 'CONFIRMED' ? '' : 'tag--soft'}`}>
-                    {s.status === 'CONFIRMED' ? '합주곡' : `위시 · ${s.votes}표`}
-                  </span>
+                  <span className="tag">합주곡</span>
                 </Link>
               ))}
             </div>
           ) : (
-            <div className="panel home__empty">아직 등록된 곡이 없습니다.</div>
+            <div className="panel home__empty">아직 확정된 합주곡이 없습니다.</div>
           )}
         </section>
       </div>
 
-      {/* 최근 영상 */}
+      {/* 영상 — 고정 / 최근 */}
       <section className="home__section home__section--wide">
         <div className="spread">
-          <span className="kicker">최근 영상</span>
+          <div className="seg">
+            <button
+              type="button"
+              className={`seg__opt${videoTab === 'pinned' ? ' seg__opt--on' : ''}`}
+              onClick={() => setVideoTab('pinned')}
+            >
+              고정 영상
+            </button>
+            <button
+              type="button"
+              className={`seg__opt${videoTab === 'recent' ? ' seg__opt--on' : ''}`}
+              onClick={() => setVideoTab('recent')}
+            >
+              최근 영상
+            </button>
+          </div>
           <Link className="home__more" to={`${base}/media`}>
             전체보기
           </Link>
@@ -334,7 +381,9 @@ export function HomePage() {
             })}
           </div>
         ) : (
-          <div className="panel home__empty">등록된 영상이 없습니다.</div>
+          <div className="panel home__empty">
+            {videoTab === 'pinned' ? '고정된 영상이 없습니다.' : '등록된 영상이 없습니다.'}
+          </div>
         )}
       </section>
       {cropTarget && (

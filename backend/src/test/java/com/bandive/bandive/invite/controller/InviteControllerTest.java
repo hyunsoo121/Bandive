@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import com.bandive.bandive.auth.UserPrincipal;
 import com.bandive.bandive.auth.jwt.JwtProvider;
+import com.bandive.bandive.band.BandVisibility;
 import com.bandive.bandive.band.dto.BandResponse;
 import com.bandive.bandive.member.BandRole;
 import com.bandive.bandive.common.security.BandGuard;
@@ -86,7 +87,7 @@ class InviteControllerTest {
 	@Test
 	void 미리보기는_비회원도_볼_수_있다() throws Exception {
 		given(inviteService.preview("ABCD2345"))
-			.willReturn(new InvitePreviewResponse("ABCD2345", 1L, "내 밴드", "소개", null, 3));
+			.willReturn(new InvitePreviewResponse("ABCD2345", 1L, "내 밴드", "소개", null, 3, BandVisibility.PUBLIC));
 
 		mvc.perform(get("/api/invite-codes/ABCD2345"))
 			.andExpect(status().isOk())

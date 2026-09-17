@@ -10,8 +10,9 @@
 		Referrer-Policy strict-origin-when-cross-origin
 	}
 
-	# 백엔드로 보낼 경로: API, 카카오 OAuth2, 업로드 파일, 헬스체크, 초대 공유링크(OG 태그 응답 후 /join/{code} 로 리다이렉트)
-	@backend path /api/* /oauth2/* /login/* /files/* /actuator/* /invite/*
+	# 백엔드로 보낼 경로: API, 카카오 OAuth2, 업로드 파일, 헬스체크, 초대 공유링크(OG 태그 응답 후 /join/{code} 로 리다이렉트),
+	# 밴드 구경 공유링크(OG 태그 응답 후 /explore/bands/{id} 로 리다이렉트)
+	@backend path /api/* /oauth2/* /login/* /files/* /actuator/* /invite/* /band/*
 	handle @backend {
 		reverse_proxy backend:8080
 	}

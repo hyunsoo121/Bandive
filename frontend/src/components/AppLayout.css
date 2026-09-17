@@ -187,6 +187,8 @@
     flex: none;
     position: sticky;
     bottom: 0;
+    /* z-index 가 없어서 페이지 콘텐츠(카드 등)에 깔리는 경우가 있었다 — Fab(15)보다도 위로. */
+    z-index: 18;
     border-top: 2px solid var(--color-text);
     background: var(--color-bg);
   }
