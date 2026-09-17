@@ -230,7 +230,7 @@ export function HomePage() {
                 <div className="home__next-date">
                   <strong>{upcoming.day}</strong>
                   <span className="muted">
-                    {upcoming.month + 1}월 {upcoming.dow}
+                    {upcoming.year}. {upcoming.month + 1}월 {upcoming.dow}
                   </span>
                 </div>
                 <div className="stack" style={{ gap: 6, flex: 1 }}>

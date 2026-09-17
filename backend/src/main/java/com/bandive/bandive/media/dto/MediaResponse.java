@@ -10,7 +10,8 @@ import com.bandive.bandive.media.MediaVisibility;
 
 public record MediaResponse(Long id, Long bandId, Long scheduleId, Long songId, String songTitle, MediaType type,
 		String externalUrl, String title, MediaPlatform platform, String thumbnailUrl, MediaVisibility visibility,
-		Long uploadedByUserId, String uploadedByNickname, long likeCount, boolean likedByMe, Instant createdAt) {
+		Long uploadedByUserId, String uploadedByNickname, long likeCount, boolean likedByMe, boolean pinned,
+		Instant createdAt) {
 
 	/** 좋아요 수가 필요 없는 임베드용(예: 일정 상세의 연결 영상 목록). likeCount=0, likedByMe=false. */
 	public static MediaResponse from(Media media) {
@@ -28,7 +29,7 @@ public record MediaResponse(Long id, Long bandId, Long scheduleId, Long songId, 
 		return new MediaResponse(media.getId(), media.getBand().getId(), scheduleId, songId, songTitle, media.getType(),
 				media.getExternalUrl(), media.getTitle(), media.getPlatform(), thumbnailUrl, media.getVisibility(),
 				media.getUploadedBy().getId(), media.getUploadedBy().getNickname(), likeCount, likedByMe,
-				media.getCreatedAt());
+				media.getPinnedAt() != null, media.getCreatedAt());
 	}
 
 }

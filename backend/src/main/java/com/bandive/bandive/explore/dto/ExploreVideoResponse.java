@@ -11,10 +11,13 @@ public record ExploreVideoResponse(Long mediaId, Long bandId, String bandName, S
 		String thumbnailUrl, MediaPlatform platform, long likeCount, boolean likedByMe, Instant createdAt) {
 
 	public static ExploreVideoResponse from(Media media, long likeCount, boolean likedByMe) {
+		// 구글 포토처럼 등록 시점에 fetch 해 저장해둔 값이 있으면 그걸 쓰고, 없으면(유튜브·드라이브)
+		// URL 에서 즉석 계산한다 — MediaResponse.from() 과 동일한 우선순위.
+		String thumbnailUrl = media.getThumbnailUrl() != null ? media.getThumbnailUrl()
+				: MediaThumbnail.of(media.getPlatform(), media.getExternalUrl());
 		return new ExploreVideoResponse(media.getId(), media.getBand().getId(), media.getBand().getName(),
-				media.getExternalUrl(), media.getTitle(),
-				MediaThumbnail.of(media.getPlatform(), media.getExternalUrl()), media.getPlatform(), likeCount,
-				likedByMe, media.getCreatedAt());
+				media.getExternalUrl(), media.getTitle(), thumbnailUrl, media.getPlatform(), likeCount, likedByMe,
+				media.getCreatedAt());
 	}
 
 }

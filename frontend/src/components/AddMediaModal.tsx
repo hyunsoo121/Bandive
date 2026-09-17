@@ -160,7 +160,7 @@ export function AddMediaModal({ bandId, schedules, editing, onClose, onSubmitted
             const u = toUi(ev);
             return (
               <option key={ev.id} value={ev.id}>
-                {u.month + 1}/{u.day} {KIND_LABEL[ev.type]}
+                {u.year}. {u.month + 1}/{u.day} · {ev.title || KIND_LABEL[ev.type]}
                 {ev.location ? ` · ${ev.location}` : ''}
               </option>
             );

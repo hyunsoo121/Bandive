@@ -1,15 +1,24 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import { useGuard } from '../hooks/useGuard';
 import { KIND_LABEL, toUi } from '../lib/schedule';
-import type { MediaItem, MediaKind } from '../types';
+import type { MediaItem, MediaKind, ScheduleEvent } from '../types';
 import { Fab } from '../components/Fab';
 import { AddMediaModal } from '../components/AddMediaModal';
 import './MediaPage.css';
 
 type Filter = '전체' | MediaKind;
 const FILTERS: Filter[] = ['전체', '합주', '공연'];
+
+type SortKey = 'recent' | 'oldest' | 'likes' | 'title' | 'schedule';
+const SORT_LABEL: Record<SortKey, string> = {
+  recent: '최신순',
+  oldest: '오래된순',
+  likes: '좋아요순',
+  title: '제목순',
+  schedule: '일정순',
+};
 
 const STRIPE_SHADES = [
   ['#9b9797', '#bab6b6'],
@@ -20,12 +29,50 @@ const STRIPE_SHADES = [
 const stripe = (a: string, b: string) =>
   `repeating-linear-gradient(135deg, ${a} 0 12px, ${b} 12px 24px)`;
 
+/** 정렬칩 하나로 목록 전체를 정렬 — 고정된 영상은 어떤 정렬을 고르든 그 안에서도 항상 맨 앞. */
+function sortMedia(
+  list: MediaItem[],
+  sort: SortKey,
+  scheduleById: Map<string, ScheduleEvent>,
+): MediaItem[] {
+  const scheduleTimeOf = (m: MediaItem) => {
+    const ev = m.scheduleId ? scheduleById.get(m.scheduleId) : undefined;
+    return ev ? new Date(ev.dateTime).getTime() : Number.POSITIVE_INFINITY;
+  };
+  const cmp = (a: MediaItem, b: MediaItem) => {
+    switch (sort) {
+      case 'recent':
+        return b.createdAtMs - a.createdAtMs;
+      case 'oldest':
+        return a.createdAtMs - b.createdAtMs;
+      case 'likes':
+        return b.likeCount - a.likeCount || b.createdAtMs - a.createdAtMs;
+      case 'title':
+        return a.title.localeCompare(b.title, 'ko');
+      case 'schedule':
+        return scheduleTimeOf(a) - scheduleTimeOf(b);
+    }
+  };
+  return [...list].sort((a, b) => Number(b.pinned) - Number(a.pinned) || cmp(a, b));
+}
+
 export function MediaPage() {
-  const { currentBand, role, user, media: allMedia, schedules, removeMedia, likeMedia } = useApp();
+  const {
+    currentBand,
+    role,
+    user,
+    media: allMedia,
+    schedules,
+    removeMedia,
+    likeMedia,
+    togglePinMedia,
+  } = useApp();
   const guard = useGuard();
   const isGuest = role === 'guest';
+  const isOwner = role === 'owner';
 
   const [filter, setFilter] = useState<Filter>('전체');
+  const [sort, setSort] = useState<SortKey>('recent');
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<MediaItem | null>(null);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -69,7 +116,8 @@ export function MediaPage() {
   // 공개범위 적용: 비회원은 '멤버만' 영상 제외 (기획서 8.7)
   const visible = bandMedia.filter((m) => !isGuest || m.visibility === '전체공개');
   const hiddenCount = bandMedia.length - visible.length;
-  const list = visible.filter((m) => filter === '전체' || m.kind === filter);
+  const filtered = visible.filter((m) => filter === '전체' || m.kind === filter);
+  const list = sortMedia(filtered, sort, scheduleById);
 
   const canManage = (m: MediaItem) =>
     role === 'owner' || (user != null && m.uploadedByUserId === user.id);
@@ -89,6 +137,22 @@ export function MediaPage() {
             onClick={() => setFilter(f)}
           >
             {f}
+          </button>
+        ))}
+      </div>
+
+      <div className="media__filters">
+        <span className="muted" style={{ fontSize: 11 }}>
+          정렬
+        </span>
+        {(Object.keys(SORT_LABEL) as SortKey[]).map((k) => (
+          <button
+            key={k}
+            type="button"
+            className={`media__chip${sort === k ? ' is-on' : ''}`}
+            onClick={() => setSort(k)}
+          >
+            {SORT_LABEL[k]}
           </button>
         ))}
       </div>
@@ -121,6 +185,7 @@ export function MediaPage() {
                 )}
                 <span className="media__play" aria-hidden="true" />
                 <span className="media__kind">{m.kind}</span>
+                {m.pinned && <span className="media__pin">📌 고정</span>}
                 {m.platform === 'other' && <span className="media__other">기타 링크</span>}
               </a>
               <div className="media__card-body">
@@ -136,14 +201,21 @@ export function MediaPage() {
                 <span className="muted" style={{ fontSize: 11 }}>
                   {m.source} · {m.date}
                 </span>
-                <span
-                  className="media__link"
-                  style={{ color: evUi ? 'var(--color-accent-700)' : 'var(--color-neutral-600)' }}
-                >
-                  {evUi
-                    ? `일정 · ${evUi.month + 1}/${evUi.day} ${KIND_LABEL[evUi.type]}`
-                    : '연결된 일정 없음'}
-                </span>
+                {evUi ? (
+                  <Link
+                    className="media__link"
+                    style={{ color: 'var(--color-accent-700)' }}
+                    to={`/bands/${bandId}/schedule?schedule=${evUi.id}`}
+                  >
+                    일정 · {evUi.year}. {evUi.month + 1}/{evUi.day} ·{' '}
+                    {evUi.title || KIND_LABEL[evUi.type]}
+                    {evUi.location ? ` · ${evUi.location}` : ''}
+                  </Link>
+                ) : (
+                  <span className="media__link" style={{ color: 'var(--color-neutral-600)' }}>
+                    연결된 일정 없음
+                  </span>
+                )}
                 {m.songTitle && (
                   <span className="media__link" style={{ color: 'var(--color-accent-700)' }}>
                     곡 · {m.songTitle}
@@ -183,6 +255,17 @@ export function MediaPage() {
                       </svg>
                       <span className="media__like-count">{m.likeCount}</span>
                     </button>
+                    {isOwner && (
+                      <span className="media__actions">
+                        <button
+                          type="button"
+                          className="media__act"
+                          onClick={() => void togglePinMedia(m.id)}
+                        >
+                          {m.pinned ? '고정 해제' : '고정'}
+                        </button>
+                      </span>
+                    )}
                     {canManage(m) && (
                       <span className="media__actions">
                         <button

@@ -301,6 +301,8 @@ interface AppState {
   removeMedia: (mediaId: string) => Promise<void>;
   /** 영상 좋아요 토글 (로그인) — 현재 상태 기준으로 like/unlike */
   likeMedia: (mediaId: string) => Promise<void>;
+  /** 영상 고정 토글 (관리자) */
+  togglePinMedia: (mediaId: string) => Promise<void>;
 
   /** 멤버 추방 (관리자) — userId */
   kickMember: (userId: string) => Promise<void>;
@@ -1180,6 +1182,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [media],
   );
 
+  const togglePinMedia = useCallback(
+    async (mediaId: string) => {
+      const item = media.find((m) => m.id === mediaId);
+      if (!item) return;
+      try {
+        const dto = item.pinned
+          ? await mediaApi.unpinMedia(mediaId)
+          : await mediaApi.pinMedia(mediaId);
+        const updated = toMedia(dto);
+        setMedia((prev) => prev.map((m) => (m.id === mediaId ? updated : m)));
+      } catch (e) {
+        console.error('영상 고정 처리 실패', e);
+      }
+    },
+    [media],
+  );
+
   const value: AppState = {
     user,
     bands,
@@ -1260,6 +1279,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     editMedia,
     removeMedia,
     likeMedia,
+    togglePinMedia,
     kickMember,
     setMemberParts,
     setBandLeader,

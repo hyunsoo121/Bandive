@@ -343,6 +343,8 @@ export interface MediaDto {
   likeCount: number;
   /** 현재 로그인 유저가 좋아요 눌렀는지. 비회원이면 항상 false */
   likedByMe: boolean;
+  /** 관리자가 고정했는지 */
+  pinned: boolean;
   createdAt: string;
 }
 
