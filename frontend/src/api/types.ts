@@ -304,6 +304,7 @@ export interface ScheduleDto {
   /** ISO-8601 (Instant) */
   dateTime: string;
   location: string | null;
+  title: string | null;
   createdByUserId: number;
   createdByNickname: string;
   counts: { attending: number; absent: number; undecided: number };

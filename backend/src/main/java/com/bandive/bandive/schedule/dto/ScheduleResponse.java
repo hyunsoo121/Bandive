@@ -10,7 +10,7 @@ import com.bandive.bandive.schedule.AttendanceStatus;
 import com.bandive.bandive.schedule.Schedule;
 import com.bandive.bandive.schedule.ScheduleType;
 
-public record ScheduleResponse(Long id, Long bandId, ScheduleType type, Instant dateTime, String location,
+public record ScheduleResponse(Long id, Long bandId, ScheduleType type, Instant dateTime, String location, String title,
 		Long createdByUserId, String createdByNickname, Counts counts, AttendanceStatus myStatus,
 		List<AttendeeResponse> attendees, List<MediaResponse> media, Instant createdAt) {
 
@@ -41,7 +41,7 @@ public record ScheduleResponse(Long id, Long bandId, ScheduleType type, Instant 
 		}
 		List<MediaResponse> media = linkedMedia.stream().map(MediaResponse::from).toList();
 		return new ScheduleResponse(schedule.getId(), schedule.getBand().getId(), schedule.getType(),
-				schedule.getDateTime(), schedule.getLocation(), schedule.getCreatedBy().getId(),
+				schedule.getDateTime(), schedule.getLocation(), schedule.getTitle(), schedule.getCreatedBy().getId(),
 				schedule.getCreatedBy().getNickname(), new Counts(attending, absent, undecided), myStatus, attendees,
 				media, schedule.getCreatedAt());
 	}

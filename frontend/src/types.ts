@@ -213,6 +213,8 @@ export interface ScheduleEvent {
   /** ISO-8601 (Instant) */
   dateTime: string;
   location: string;
+  /** 사용자가 붙인 제목. 없으면 null → 프론트가 종류(합주/공연) 라벨로 대신 표시 */
+  title: string | null;
   counts: { attending: number; absent: number; undecided: number };
   /** 내 참석 여부. 비회원/미응답이면 null */
   myStatus: AttendanceStatus | null;

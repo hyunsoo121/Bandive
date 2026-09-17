@@ -105,6 +105,7 @@ public class ScheduleService {
 			.type(request.type())
 			.dateTime(request.dateTime())
 			.location(trimToNull(request.location()))
+			.title(trimToNull(request.title()))
 			.build());
 		notificationService.notifyBandMembers(band, NotificationType.SCHEDULE_CREATED, creator, userId);
 		return ScheduleResponse.from(schedule, List.of(), List.of(), userId);
@@ -114,7 +115,7 @@ public class ScheduleService {
 	public ScheduleResponse update(Long scheduleId, Long userId, ScheduleUpdateRequest request) {
 		Schedule schedule = findSchedule(scheduleId);
 		requireMember(schedule.getBand().getId(), userId);
-		schedule.updateInfo(request.type(), request.dateTime(), request.location());
+		schedule.updateInfo(request.type(), request.dateTime(), request.location(), request.title());
 		return toResponse(schedule, userId);
 	}
 

@@ -9,12 +9,17 @@ import './AppLayout.css';
 
 export function AppLayout() {
   const { bandId } = useParams();
-  const { currentBandId, currentBand, bandRestricted, bandLoading, setCurrentBandId } = useApp();
+  const { currentBandId, currentBand, bandRestricted, bandLoading, bootLoading, setCurrentBandId } =
+    useApp();
 
   // URL 의 밴드 → 컨텍스트 (뒤로가기 / 직접 URL 진입 / 밴드 전환 대응)
   useEffect(() => {
     if (bandId && bandId !== currentBandId) setCurrentBandId(bandId);
   }, [bandId, currentBandId, setCurrentBandId]);
+
+  // 세션 복구가 끝나기 전에 밴드를 그려버리면 로그인 상태인데도 잠깐 비회원(guest)처럼 보인다 —
+  // 새로고침/직접 URL 진입마다 "로그아웃된 것처럼" 깜빡이던 원인.
+  if (bootLoading) return <FullscreenLoader label="세션 확인 중…" />;
 
   if (!currentBand) {
     if (bandLoading || bandId !== currentBandId)

@@ -9,5 +9,6 @@ import com.bandive.bandive.schedule.ScheduleType;
 
 public record ScheduleCreateRequest(@NotNull(message = "일정 종류(REHEARSAL/PERFORMANCE)는 필수입니다") ScheduleType type,
 		@NotNull(message = "일시는 필수입니다") Instant dateTime,
-		@Size(max = 200, message = "장소는 200자 이내여야 합니다") String location) {
+		@Size(max = 200, message = "장소는 200자 이내여야 합니다") String location,
+		@Size(max = 100, message = "제목은 100자 이내여야 합니다") String title) {
 }

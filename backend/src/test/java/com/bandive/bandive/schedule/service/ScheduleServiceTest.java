@@ -95,7 +95,7 @@ class ScheduleServiceTest extends RepositoryTest {
 	}
 
 	private ScheduleCreateRequest req() {
-		return new ScheduleCreateRequest(ScheduleType.REHEARSAL, Instant.parse("2026-10-01T10:00:00Z"), "연습실");
+		return new ScheduleCreateRequest(ScheduleType.REHEARSAL, Instant.parse("2026-10-01T10:00:00Z"), "연습실", null);
 	}
 
 	@Test
@@ -106,6 +106,17 @@ class ScheduleServiceTest extends RepositoryTest {
 		assertThat(created.type()).isEqualTo(ScheduleType.REHEARSAL);
 		assertThat(created.location()).isEqualTo("연습실");
 		assertThat(created.attendees()).isEmpty();
+	}
+
+	@Test
+	void 제목을_붙일_수_있고_빈_문자열로_지울_수_있다() {
+		ScheduleResponse created = service.create(band.getId(), memberId, new ScheduleCreateRequest(
+				ScheduleType.REHEARSAL, Instant.parse("2026-10-01T10:00:00Z"), "연습실", "정기 합주"));
+		assertThat(created.title()).isEqualTo("정기 합주");
+
+		ScheduleResponse cleared = service.update(created.id(), memberId,
+				new ScheduleUpdateRequest(null, null, null, ""));
+		assertThat(cleared.title()).isNull();
 	}
 
 	@Test
@@ -158,7 +169,7 @@ class ScheduleServiceTest extends RepositoryTest {
 		em.flush();
 
 		ScheduleResponse updated = service.update(scheduleId, memberId,
-				new ScheduleUpdateRequest(ScheduleType.PERFORMANCE, null, "홍대 공연장"));
+				new ScheduleUpdateRequest(ScheduleType.PERFORMANCE, null, "홍대 공연장", null));
 
 		assertThat(updated.type()).isEqualTo(ScheduleType.PERFORMANCE);
 		assertThat(updated.location()).isEqualTo("홍대 공연장");
@@ -171,7 +182,8 @@ class ScheduleServiceTest extends RepositoryTest {
 		Long outsiderId = em.persist(Fixtures.user("out2")).getId();
 		em.flush();
 
-		assertThatThrownBy(() -> service.update(scheduleId, outsiderId, new ScheduleUpdateRequest(null, null, "x")))
+		assertThatThrownBy(
+				() -> service.update(scheduleId, outsiderId, new ScheduleUpdateRequest(null, null, "x", null)))
 			.isInstanceOf(ForbiddenException.class);
 	}
 

@@ -53,7 +53,7 @@ export function LoginModal() {
   };
 
   const onKey = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') void submit();
+    if (e.key === 'Enter' && !e.nativeEvent.isComposing) void submit();
   };
 
   return (

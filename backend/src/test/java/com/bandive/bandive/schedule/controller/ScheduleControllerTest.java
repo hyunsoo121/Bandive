@@ -44,8 +44,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class ScheduleControllerTest {
 
 	private static final ScheduleResponse SCHEDULE = new ScheduleResponse(3L, 1L, ScheduleType.REHEARSAL,
-			Instant.parse("2026-10-01T10:00:00Z"), "연습실", 7L, "나", new Counts(1, 0, 0), null, List.of(), List.of(),
-			Instant.parse("2026-09-02T00:00:00Z"));
+			Instant.parse("2026-10-01T10:00:00Z"), "연습실", null, 7L, "나", new Counts(1, 0, 0), null, List.of(),
+			List.of(), Instant.parse("2026-09-02T00:00:00Z"));
 
 	@Autowired
 	private MockMvc mvc;
