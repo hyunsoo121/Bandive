@@ -48,7 +48,7 @@ class MediaControllerTest {
 
 	private static final MediaResponse MEDIA = new MediaResponse(5L, 1L, null, null, null, MediaType.PERFORMANCE,
 			"https://youtu.be/x", "공연 영상", MediaPlatform.YOUTUBE, "https://img.youtube.com/vi/x/hqdefault.jpg",
-			MediaVisibility.MEMBERS_ONLY, 7L, "나", 0L, false, Instant.parse("2026-09-02T00:00:00Z"));
+			MediaVisibility.MEMBERS_ONLY, 7L, "나", 0L, false, false, Instant.parse("2026-09-02T00:00:00Z"));
 
 	@Autowired
 	private MockMvc mvc;
@@ -160,6 +160,20 @@ class MediaControllerTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.likeCount").value(2))
 			.andExpect(jsonPath("$.likedByMe").value(false));
+	}
+
+	@Test
+	void 고정() throws Exception {
+		given(mediaService.pin(5L, 7L)).willReturn(MEDIA);
+
+		mvc.perform(post("/api/media/5/pin").with(asUser(7L))).andExpect(status().isOk());
+	}
+
+	@Test
+	void 고정_해제() throws Exception {
+		given(mediaService.unpin(5L, 7L)).willReturn(MEDIA);
+
+		mvc.perform(delete("/api/media/5/pin").with(asUser(7L))).andExpect(status().isOk());
 	}
 
 	@TestConfiguration

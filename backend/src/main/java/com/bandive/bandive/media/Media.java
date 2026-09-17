@@ -1,5 +1,7 @@
 package com.bandive.bandive.media;
 
+import java.time.Instant;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -83,8 +85,20 @@ public class Media extends BaseTimeEntity {
 	@JoinColumn(name = "uploaded_by", nullable = false)
 	private User uploadedBy;
 
+	/** 고정한 시각(관리자). null 이면 고정 아님 — 고정된 것끼리는 이 값 내림차순으로 정렬한다. */
+	@Column(name = "pinned_at")
+	private Instant pinnedAt;
+
 	public void changeVisibility(MediaVisibility visibility) {
 		this.visibility = visibility;
+	}
+
+	public void pin() {
+		this.pinnedAt = Instant.now();
+	}
+
+	public void unpin() {
+		this.pinnedAt = null;
 	}
 
 	/** 부분 수정 후 서비스가 계산한 최종값으로 한 번에 갱신. */

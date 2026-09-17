@@ -33,3 +33,9 @@ export const likeMedia = (mediaId: string) =>
 /** 좋아요 취소 (로그인, 멱등). */
 export const unlikeMedia = (mediaId: string) =>
   api.del<MediaLikeResultDto>(`/api/media/${mediaId}/like`);
+
+/** 고정 (관리자, 멱등). 여러 개 고정 가능. */
+export const pinMedia = (mediaId: string) => api.post<MediaDto>(`/api/media/${mediaId}/pin`, {});
+
+/** 고정 해제 (관리자, 멱등). */
+export const unpinMedia = (mediaId: string) => api.del<MediaDto>(`/api/media/${mediaId}/pin`);

@@ -185,6 +185,24 @@ public class MediaService {
 		return new MediaLikeResult(mediaLikes.countByMediaId(mediaId), false);
 	}
 
+	/** 고정 — 관리자만, 여러 개 고정 가능(멱등). */
+	@Transactional
+	public MediaResponse pin(Long mediaId, Long userId) {
+		Media found = findMedia(mediaId);
+		requireOwner(found.getBand().getId(), userId);
+		found.pin();
+		return toResponse(found, userId);
+	}
+
+	/** 고정 해제 — 관리자만(멱등). */
+	@Transactional
+	public MediaResponse unpin(Long mediaId, Long userId) {
+		Media found = findMedia(mediaId);
+		requireOwner(found.getBand().getId(), userId);
+		found.unpin();
+		return toResponse(found, userId);
+	}
+
 	private MediaResponse toResponse(Media found, Long userId) {
 		long likeCount = mediaLikes.countByMediaId(found.getId());
 		boolean likedByMe = userId != null && mediaLikes.existsByMediaIdAndUserId(found.getId(), userId);
