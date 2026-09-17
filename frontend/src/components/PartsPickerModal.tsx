@@ -98,7 +98,7 @@ export function PartsPickerModal({ name, current, onSave, onClose }: Props) {
               placeholder="직접 입력 (예: 신디, 색소폰)"
               onChange={(e) => setNewPart(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
+                if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
                   e.preventDefault();
                   addCustom();
                 }

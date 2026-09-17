@@ -1,26 +1,42 @@
 import { useState } from 'react';
 import { useApp } from '../store/AppContext';
 import { KIND_LABEL } from '../lib/schedule';
-import type { ScheduleType } from '../types';
+import type { ScheduleEvent, ScheduleType } from '../types';
 import { Modal } from './Modal';
 import { DatePicker } from './DatePicker';
 import { TimePicker } from './TimePicker';
 
 interface Props {
   bandId: string;
+  /** 있으면 수정 모드 — 이 일정의 값을 채우고 PATCH 로 저장 */
+  editing?: ScheduleEvent;
   onClose: () => void;
-  onSubmitted: () => void;
+  onSubmitted: (schedule: ScheduleEvent) => void;
 }
 
 const TYPES: ScheduleType[] = ['REHEARSAL', 'PERFORMANCE'];
 
-export function AddScheduleModal({ bandId, onClose, onSubmitted }: Props) {
-  const { addSchedule } = useApp();
+/** ISO(UTC) → 로컬 기준 "yyyy-mm-dd"/"HH:mm" — DatePicker/TimePicker 프리필용. */
+function toLocalDateInput(iso: string): string {
+  const d = new Date(iso);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+function toLocalTimeInput(iso: string): string {
+  const d = new Date(iso);
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
 
-  const [type, setType] = useState<ScheduleType>('REHEARSAL');
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('19:00');
-  const [location, setLocation] = useState('');
+export function AddScheduleModal({ bandId, editing, onClose, onSubmitted }: Props) {
+  const { addSchedule, updateSchedule } = useApp();
+
+  const [title, setTitle] = useState(editing?.title ?? '');
+  const [type, setType] = useState<ScheduleType>(editing?.type ?? 'REHEARSAL');
+  const [date, setDate] = useState(editing ? toLocalDateInput(editing.dateTime) : '');
+  const [time, setTime] = useState(editing ? toLocalTimeInput(editing.dateTime) : '19:00');
+  const [location, setLocation] = useState(editing?.location ?? '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,15 +52,13 @@ export function AddScheduleModal({ bandId, onClose, onSubmitted }: Props) {
     setSubmitting(true);
     setError(null);
     try {
-      await addSchedule({
-        bandId,
-        type,
-        dateTime: parsed.toISOString(),
-        location,
-      });
-      onSubmitted();
+      const payload = { type, dateTime: parsed.toISOString(), location, title };
+      const schedule = editing
+        ? await updateSchedule(editing.id, payload)
+        : await addSchedule({ bandId, ...payload });
+      onSubmitted(schedule);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : '일정을 등록하지 못했습니다.');
+      setError(e instanceof Error ? e.message : '일정을 저장하지 못했습니다.');
     } finally {
       setSubmitting(false);
     }
@@ -52,7 +66,7 @@ export function AddScheduleModal({ bandId, onClose, onSubmitted }: Props) {
 
   return (
     <Modal
-      title="일정 등록"
+      title={editing ? '일정 수정' : '일정 등록'}
       width={380}
       onClose={onClose}
       footer={
@@ -64,7 +78,7 @@ export function AddScheduleModal({ bandId, onClose, onSubmitted }: Props) {
             disabled={!canSubmit}
             onClick={submit}
           >
-            {submitting ? '등록 중…' : '일정 등록'}
+            {submitting ? '저장 중…' : editing ? '수정 저장' : '일정 등록'}
           </button>
           <button type="button" className="btn" onClick={onClose}>
             취소
@@ -72,6 +86,18 @@ export function AddScheduleModal({ bandId, onClose, onSubmitted }: Props) {
         </>
       }
     >
+      <div className="field">
+        <label htmlFor="sched-title">제목 · 선택</label>
+        <input
+          id="sched-title"
+          className="input"
+          value={title}
+          maxLength={100}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder={`예: ${KIND_LABEL[type]} 전 파트 리허설`}
+        />
+      </div>
+
       <div className="field">
         <label>종류</label>
         <div className="seg">

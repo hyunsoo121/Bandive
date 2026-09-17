@@ -36,11 +36,11 @@
 }
 
 .notif__panel {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
+  /* top/left 는 JS 가 뷰포트 기준으로 계산해서 인라인으로 넣는다(TSX 참고) — 사이드바처럼 좁은
+     곳에 벨이 있으면 항상 오른쪽으로만 펼치는 absolute 로는 화면 밖으로 잘려나갈 수 있어서. */
+  position: fixed;
   width: 320px;
-  max-width: calc(100vw - 32px);
+  max-width: calc(100vw - 16px);
   max-height: 420px;
   overflow-y: auto;
   z-index: 50;

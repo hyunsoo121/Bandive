@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../store/AppContext';
 import * as followApi from '../api/follow';
@@ -45,6 +46,9 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const bellRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [panelPos, setPanelPos] = useState<{ top: number; left: number } | null>(null);
   const navigate = useNavigate();
 
   const unreadCount = notifications.filter((n) => !n.readAt).length;
@@ -52,10 +56,31 @@ export function NotificationBell() {
   useEffect(() => {
     if (!open) return;
     const onClickOutside = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      // 패널이 portal 로 body 바로 밑에 그려지므로(아래 참고) rootRef 만으론 패널 내부 클릭까지
+      // "바깥 클릭"으로 잘못 잡는다 — panelRef 도 같이 확인한다.
+      if (rootRef.current?.contains(target)) return;
+      if (panelRef.current?.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener('mousedown', onClickOutside);
     return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [open]);
+
+  // 사이드바(좁은 폭)·모바일 상단바(넓은 폭) 어디서든 화면 밖으로 안 나가게, 뷰포트 기준 좌표를 직접 계산한다.
+  // 벨 오른쪽 끝에 패널 오른쪽을 맞추는 게 기본이지만, 그러면 왼쪽으로 잘리는 경우가 있어(좁은
+  // 사이드바) 화면 안에 들어오도록 clamp 한다.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const bell = bellRef.current;
+    const panelEl = panelRef.current;
+    if (!bell || !panelEl) return;
+    const bellRect = bell.getBoundingClientRect();
+    const panelW = panelEl.offsetWidth;
+    const margin = 8;
+    const maxLeft = Math.max(margin, window.innerWidth - panelW - margin);
+    const left = Math.min(Math.max(margin, bellRect.right - panelW), maxLeft);
+    setPanelPos({ top: bellRect.bottom + 8, left });
   }, [open]);
 
   if (!user) return null;
@@ -91,7 +116,13 @@ export function NotificationBell() {
 
   return (
     <div className="notif" ref={rootRef}>
-      <button type="button" className="notif__bell" onClick={toggle} aria-label="알림">
+      <button
+        type="button"
+        className="notif__bell"
+        ref={bellRef}
+        onClick={toggle}
+        aria-label="알림"
+      >
         <NavIcon
           d1="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"
           d2="M10 21a2 2 0 0 0 4 0"
@@ -102,59 +133,65 @@ export function NotificationBell() {
         )}
       </button>
 
-      {open && (
-        <div className="notif__panel panel">
-          <div className="notif__head spread">
-            <span className="kicker">알림</span>
-            {notifications.some((n) => !n.readAt) && (
-              <button
-                type="button"
-                className="notif__markall"
-                onClick={() => void markAllNotificationsRead()}
-              >
-                모두 읽음
-              </button>
-            )}
-          </div>
-
-          {notificationsLoading && notifications.length === 0 ? (
-            <p className="muted notif__empty">불러오는 중…</p>
-          ) : notifications.length === 0 ? (
-            <p className="muted notif__empty">알림이 없습니다.</p>
-          ) : (
-            <div className="notif__list">
-              {notifications.map((n) => (
-                <div key={n.id} className={`notif__row${n.readAt ? '' : ' is-unread'}`}>
-                  <button type="button" className="notif__row-main" onClick={() => openRow(n)}>
-                    <span className="notif__dot" aria-hidden="true" />
-                    <span className="notif__text">{MESSAGE[n.type](n)}</span>
-                  </button>
-                  {n.type === 'FOLLOW_REQUESTED' && !n.readAt && (
-                    <div className="notif__actions">
-                      <button
-                        type="button"
-                        className="notif__act notif__act--ok"
-                        disabled={busyId === n.id}
-                        onClick={() => decide(n, true)}
-                      >
-                        승인
-                      </button>
-                      <button
-                        type="button"
-                        className="notif__act"
-                        disabled={busyId === n.id}
-                        onClick={() => decide(n, false)}
-                      >
-                        거절
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+      {open &&
+        createPortal(
+          <div
+            className="notif__panel panel"
+            ref={panelRef}
+            style={panelPos ? { top: panelPos.top, left: panelPos.left } : undefined}
+          >
+            <div className="notif__head spread">
+              <span className="kicker">알림</span>
+              {notifications.some((n) => !n.readAt) && (
+                <button
+                  type="button"
+                  className="notif__markall"
+                  onClick={() => void markAllNotificationsRead()}
+                >
+                  모두 읽음
+                </button>
+              )}
             </div>
-          )}
-        </div>
-      )}
+
+            {notificationsLoading && notifications.length === 0 ? (
+              <p className="muted notif__empty">불러오는 중…</p>
+            ) : notifications.length === 0 ? (
+              <p className="muted notif__empty">알림이 없습니다.</p>
+            ) : (
+              <div className="notif__list">
+                {notifications.map((n) => (
+                  <div key={n.id} className={`notif__row${n.readAt ? '' : ' is-unread'}`}>
+                    <button type="button" className="notif__row-main" onClick={() => openRow(n)}>
+                      <span className="notif__dot" aria-hidden="true" />
+                      <span className="notif__text">{MESSAGE[n.type](n)}</span>
+                    </button>
+                    {n.type === 'FOLLOW_REQUESTED' && !n.readAt && (
+                      <div className="notif__actions">
+                        <button
+                          type="button"
+                          className="notif__act notif__act--ok"
+                          disabled={busyId === n.id}
+                          onClick={() => decide(n, true)}
+                        >
+                          승인
+                        </button>
+                        <button
+                          type="button"
+                          className="notif__act"
+                          disabled={busyId === n.id}
+                          onClick={() => decide(n, false)}
+                        >
+                          거절
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

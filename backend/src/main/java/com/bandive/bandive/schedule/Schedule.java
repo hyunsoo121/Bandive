@@ -50,12 +50,16 @@ public class Schedule extends BaseTimeEntity {
 	@Column(length = 200)
 	private String location;
 
+	/** 사용자가 붙인 제목. 선택 입력이라 null 가능 — 없으면 프론트가 종류 라벨로 대신 표시. */
+	@Column(length = 100)
+	private String title;
+
 	@ManyToOne(fetch = FetchType.LAZY, optional = false)
 	@JoinColumn(name = "created_by", nullable = false)
 	private User createdBy;
 
 	/** 부분 수정 — null 인 필드는 그대로 둔다. */
-	public void updateInfo(ScheduleType type, Instant dateTime, String location) {
+	public void updateInfo(ScheduleType type, Instant dateTime, String location, String title) {
 		if (type != null) {
 			this.type = type;
 		}
@@ -64,6 +68,9 @@ public class Schedule extends BaseTimeEntity {
 		}
 		if (location != null) {
 			this.location = location.isBlank() ? null : location;
+		}
+		if (title != null) {
+			this.title = title.isBlank() ? null : title;
 		}
 	}
 

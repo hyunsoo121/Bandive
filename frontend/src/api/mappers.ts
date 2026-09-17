@@ -209,6 +209,7 @@ export function toSchedule(dto: ScheduleDto): ScheduleEvent {
     type: dto.type,
     dateTime: dto.dateTime,
     location: dto.location ?? '',
+    title: dto.title,
     counts: dto.counts,
     myStatus: dto.myStatus ? ATT_TO_KO[dto.myStatus] : null,
     attendees: dto.attendees.map((a) => ({

@@ -29,7 +29,12 @@ public class OgImageResolver {
 	private final RestClient client;
 
 	public OgImageResolver() {
-		HttpClient httpClient = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(3)).build();
+		// photos.app.goo.gl 같은 단축 링크는 실제 photos.google.com/share/... 로 302 리다이렉트되는데,
+		// 기본값(NEVER)이면 그 리다이렉트 응답(빈 본문)만 받고 끝나버려서 followRedirects 를 켠다.
+		HttpClient httpClient = HttpClient.newBuilder()
+			.connectTimeout(Duration.ofSeconds(3))
+			.followRedirects(HttpClient.Redirect.NORMAL)
+			.build();
 		JdkClientHttpRequestFactory requestFactory = new JdkClientHttpRequestFactory(httpClient);
 		requestFactory.setReadTimeout(Duration.ofSeconds(5));
 		this.client = RestClient.builder()

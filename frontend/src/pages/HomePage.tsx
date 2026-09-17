@@ -243,7 +243,7 @@ export function HomePage() {
                     <span className="tag">D-{dday}</span>
                   </div>
                   <strong style={{ fontFamily: 'var(--font-heading)', fontSize: 16 }}>
-                    {upcoming.location || KIND_LABEL[upcoming.type]}
+                    {upcoming.title || KIND_LABEL[upcoming.type]}
                   </strong>
                   <span className="muted" style={{ fontSize: 12 }}>
                     {upcoming.timeLabel}
