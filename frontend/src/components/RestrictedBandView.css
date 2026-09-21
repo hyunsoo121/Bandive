@@ -56,6 +56,12 @@
   font-size: 12px;
   color: var(--color-accent);
 }
+.restricted__back {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
 .restricted__brand {
   opacity: 0.5;
 }
