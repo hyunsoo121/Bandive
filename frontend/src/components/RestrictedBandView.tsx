@@ -8,7 +8,7 @@ import './RestrictedBandView.css';
 
 /** 밴드 표지는 보이지만 콘텐츠는 게이트된 화면 (FOLLOWERS 밴드에 팔로우 안 함 / 승인 대기). */
 export function RestrictedBandView() {
-  const { currentBand, user, openLogin, requestFollow, cancelFollow } = useApp();
+  const { currentBand, bands, user, openLogin, requestFollow, cancelFollow } = useApp();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   if (!currentBand) return null;
@@ -68,9 +68,20 @@ export function RestrictedBandView() {
         )}
         {err && <span className="restricted__err">{err}</span>}
 
-        <Link className="btn btn--sm" to="/">
-          홈으로
-        </Link>
+        <div className="restricted__back">
+          <Link className="btn btn--sm" to="/explore">
+            ← 탐색으로
+          </Link>
+          {bands.length > 0 ? (
+            <Link className="btn btn--sm" to={`/bands/${bands[0].id}`}>
+              내 밴드로 →
+            </Link>
+          ) : (
+            <Link className="btn btn--sm" to="/">
+              홈으로
+            </Link>
+          )}
+        </div>
       </div>
 
       <div className="restricted__brand">

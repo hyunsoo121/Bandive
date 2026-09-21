@@ -74,6 +74,7 @@ export function SongsPage() {
     promoteSong,
     assignPart,
     addGuest,
+    removeSong,
     moveSongToFolder,
     reorderSongs,
     createSongFolder,
@@ -332,6 +333,11 @@ export function SongsPage() {
     setPrompt(null);
   };
 
+  const runDeleteSong = (song: Song) => {
+    if (!confirm(`"${song.title}" 곡을 삭제할까요? 투표·세션 배정 기록도 함께 사라집니다.`)) return;
+    void removeSong(song.id);
+  };
+
   return (
     <div className="songs">
       <header className="songs__head">
@@ -467,6 +473,7 @@ export function SongsPage() {
                   void assignPart(songId, slotKey, parseAssignee(value))
                 }
                 onEditRequest={setEditingSong}
+                onDeleteSong={runDeleteSong}
                 onAddGuestClick={() => setGuestPickerOpen(true)}
                 onMove={moveSongToFolder}
                 onRenameRequest={(f) => setPrompt({ mode: 'rename', folder: f })}
@@ -599,6 +606,7 @@ interface GroupProps {
   onPromote: (id: string) => void;
   onAssign: (songId: string, slotKey: string, value: string) => void;
   onEditRequest: (song: Song) => void;
+  onDeleteSong: (song: Song) => void;
   onAddGuestClick: () => void;
   onMove: (songId: string, folderId: string | null) => void;
   onRenameRequest: (folder: SongFolder) => void;
@@ -624,6 +632,7 @@ function FolderGroup({
   onPromote,
   onAssign,
   onEditRequest,
+  onDeleteSong,
   onAddGuestClick,
   onMove,
   onRenameRequest,
@@ -740,6 +749,7 @@ function FolderGroup({
                 onVote={() => onVote(song.id)}
                 onPromote={() => onPromote(song.id)}
                 onEdit={() => onEditRequest(song)}
+                onDeleteSong={() => onDeleteSong(song)}
                 onAssign={(slotKey, value) => onAssign(song.id, slotKey, value)}
                 onAddGuestClick={onAddGuestClick}
                 onMove={(folderId) => onMove(song.id, folderId)}
@@ -771,6 +781,7 @@ interface RowProps {
   onVote: () => void;
   onPromote: () => void;
   onEdit: () => void;
+  onDeleteSong: () => void;
   onAssign: (slotKey: string, value: string) => void;
   onAddGuestClick: () => void;
   onMove: (folderId: string | null) => void;
@@ -793,6 +804,7 @@ function SongRow({
   onVote,
   onPromote,
   onEdit,
+  onDeleteSong,
   onAssign,
   onAddGuestClick,
   onMove,
@@ -860,12 +872,14 @@ function SongRow({
       id={`song-${song.id}`}
       style={style}
       className={`songrow${sortable.isDragging ? ' is-dragging' : ''}${highlighted ? ' is-highlighted' : ''}`}
+      onClick={onToggle}
     >
       {dragEnabled && (
         <button
           type="button"
           className="songrow__handle"
           aria-label="곡 순서 이동"
+          onClick={(e) => e.stopPropagation()}
           {...sortable.attributes}
           {...sortable.listeners}
         >
@@ -877,7 +891,10 @@ function SongRow({
         <button
           type="button"
           className={`votebox${song.votedByMe ? ' is-voted' : ''}`}
-          onClick={onVote}
+          onClick={(e) => {
+            e.stopPropagation();
+            onVote();
+          }}
           aria-pressed={song.votedByMe}
         >
           <svg
@@ -917,7 +934,7 @@ function SongRow({
       </div>
 
       <div className="songrow__main">
-        <button type="button" className="songrow__title-btn" onClick={onToggle}>
+        <div className="songrow__title-btn">
           <span className="stack" style={{ gap: 4 }}>
             <strong className="songrow__title">{song.title}</strong>
             <span className="muted" style={{ fontSize: 12 }}>
@@ -925,7 +942,7 @@ function SongRow({
             </span>
           </span>
           <span className="songrow__caret">{open ? '닫기 ▲' : '상세 ▼'}</span>
-        </button>
+        </div>
 
         <div className="songrow__chips">
           {chips.map((c) => (
@@ -940,7 +957,7 @@ function SongRow({
         </div>
 
         {!isGuest && folders.length > 0 && (
-          <label className="songrow__folder">
+          <label className="songrow__folder" onClick={(e) => e.stopPropagation()}>
             <span className="muted" style={{ fontSize: 11 }}>
               폴더
             </span>
@@ -960,7 +977,7 @@ function SongRow({
         )}
 
         {open && (
-          <div className="songrow__detail panel">
+          <div className="songrow__detail panel" onClick={(e) => e.stopPropagation()}>
             {canAssign && (
               <div className="stack" style={{ gap: 7 }}>
                 <div className="spread">
@@ -1131,23 +1148,23 @@ function SongRow({
                 )}
               </div>
             )}
-          </div>
-        )}
 
-        {(isOwner || isMine) && (
-          <div className="songrow__actions">
-            {isWish && isOwner && (
-              <button type="button" className="btn btn--primary btn--sm" onClick={onPromote}>
-                합주곡으로 승격
-              </button>
-            )}
-            <button type="button" className="btn btn--sm" onClick={onEdit}>
-              수정
-            </button>
-            {isWish && (
-              <button type="button" className="btn btn--sm" onClick={onToggle}>
-                {open ? '접기' : '상세'}
-              </button>
+            {(isOwner || isMine) && (
+              <div className="songrow__actions">
+                {isWish && isOwner && (
+                  <button type="button" className="btn btn--primary btn--sm" onClick={onPromote}>
+                    합주곡으로 승격
+                  </button>
+                )}
+                <button type="button" className="btn btn--sm" onClick={onEdit}>
+                  수정
+                </button>
+                {isOwner && (
+                  <button type="button" className="songrow__delete" onClick={onDeleteSong}>
+                    삭제
+                  </button>
+                )}
+              </div>
             )}
           </div>
         )}
