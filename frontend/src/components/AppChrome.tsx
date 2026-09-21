@@ -6,6 +6,7 @@ import { BrandMark } from './BrandMark';
 import { NavIcon } from './NavIcon';
 import { Avatar } from './Avatar';
 import { GuestBanner } from './GuestBanner';
+import { BrowsingBandBanner } from './BrowsingBandBanner';
 import { BandSwitcher } from './BandSwitcher';
 import { CreateBandModal } from './CreateBandModal';
 import { ProfileModal } from './ProfileModal';
@@ -193,6 +194,7 @@ export function AppChrome({ children }: { children: ReactNode }) {
           )}
         </header>
 
+        <BrowsingBandBanner />
         <GuestBanner />
 
         <main className="app__content scr">{children}</main>

@@ -19,6 +19,10 @@ export function ExploreBandPage() {
   const { user, openLogin, refreshFollowing } = useApp();
   const navigate = useNavigate();
 
+  // 진입 경로가 초대 링크·공유 링크·목록 클릭 등 제각각이라 브라우저 히스토리(navigate(-1))에
+  // 기대면 "뒤로"가 엉뚱한 곳으로 갈 수 있다 — 항상 탐색 목록으로 고정.
+  const backToExplore = () => navigate('/explore');
+
   const [detail, setDetail] = useState<ExploreBandDetailDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
@@ -99,7 +103,7 @@ export function ExploreBandPage() {
     return (
       <div className="explore">
         <header className="explore__head">
-          <button type="button" className="explore__back" onClick={() => navigate('/explore')}>
+          <button type="button" className="explore__back" onClick={backToExplore}>
             ←
           </button>
           <h1 className="explore__title">밴드 구경</h1>
@@ -118,7 +122,7 @@ export function ExploreBandPage() {
   return (
     <div className="explore">
       <header className="explore__head">
-        <button type="button" className="explore__back" onClick={() => navigate(-1)}>
+        <button type="button" className="explore__back" onClick={backToExplore}>
           ←
         </button>
         <h1 className="explore__title">밴드 구경</h1>
