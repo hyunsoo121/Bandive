@@ -198,6 +198,10 @@
   display: flex;
   gap: 12px;
   align-items: flex-start;
+  cursor: pointer;
+}
+.songrow:hover {
+  background: var(--color-neutral-100);
 }
 .songrow.is-dragging {
   opacity: 0.5;
@@ -462,4 +466,16 @@
   display: flex;
   gap: 8px;
   margin-top: 2px;
+}
+.songrow__delete {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent-700);
+  background: transparent;
+  cursor: pointer;
+}
+.songrow__delete:hover {
+  background: var(--color-accent-100);
 }
